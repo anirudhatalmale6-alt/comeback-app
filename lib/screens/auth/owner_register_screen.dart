@@ -65,10 +65,14 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
 
       final uid = cred.user!.uid;
 
-      // Upload photo if selected
+      // Upload photo if selected (skip silently if Storage not available)
       String? photoUrl;
       if (_photo != null) {
-        photoUrl = await storage.uploadProfilePhoto(uid, _photo!);
+        try {
+          photoUrl = await storage.uploadProfilePhoto(uid, _photo!);
+        } catch (_) {
+          // Storage not enabled - continue without photo
+        }
       }
 
       // Create owner document in Firestore

@@ -22,7 +22,11 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   final notificationService = NotificationService();
-  await notificationService.initialize();
+  try {
+    await notificationService.initialize();
+  } catch (_) {
+    // FCM not fully configured yet - app still works without push notifications
+  }
   runApp(ComeBackApp(notificationService: notificationService));
 }
 
