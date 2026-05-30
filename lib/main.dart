@@ -10,15 +10,16 @@ import 'package:comeback_app/screens/auth/auth_wrapper.dart';
 import 'package:comeback_app/screens/owner/owner_dashboard.dart';
 import 'package:comeback_app/screens/employee/employee_dashboard.dart';
 import 'package:comeback_app/utils/app_theme.dart';
+import 'package:comeback_app/firebase_options.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   final notificationService = NotificationService();
   await notificationService.initialize();

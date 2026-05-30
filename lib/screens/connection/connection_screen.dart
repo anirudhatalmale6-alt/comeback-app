@@ -77,11 +77,11 @@ class ConnectionCodeDisplay extends StatelessWidget {
             size: 200,
             backgroundColor: Colors.white,
             eyeStyle: const QrEyeStyle(
-              eyeShape: QrEyeShape.roundedOuter,
+              eyeShape: QrEyeShape.circle,
               color: AppTheme.primaryDark,
             ),
             dataModuleStyle: const QrDataModuleStyle(
-              dataModuleShape: QrDataModuleShape.roundedOuter,
+              dataModuleShape: QrDataModuleShape.circle,
               color: AppTheme.primary,
             ),
           ),

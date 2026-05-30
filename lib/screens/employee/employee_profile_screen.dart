@@ -82,11 +82,11 @@ class EmployeeProfileScreen extends StatelessWidget {
                       version: QrVersions.auto,
                       size: 150,
                       eyeStyle: const QrEyeStyle(
-                        eyeShape: QrEyeShape.roundedRect,
+                        eyeShape: QrEyeShape.circle,
                         color: Color(0xFF00897B),
                       ),
                       dataModuleStyle: const QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.roundedRect,
+                        dataModuleShape: QrDataModuleShape.circle,
                         color: Color(0xFF00897B),
                       ),
                     ),
