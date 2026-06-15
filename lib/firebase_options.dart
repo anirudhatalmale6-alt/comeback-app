@@ -23,8 +23,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: '',
-    appId: '',
+    apiKey: 'AIzaSyDFB4kuo8pxdO401PQaaxWDp9JgSkFMkkY',
+    appId: '1:768545987217:ios:011a4031c6f1e0e829bd30',
     messagingSenderId: '768545987217',
     projectId: 'come-back-ce7ab',
     storageBucket: 'come-back-ce7ab.firebasestorage.app',
