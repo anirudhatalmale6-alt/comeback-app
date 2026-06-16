@@ -111,7 +111,7 @@ class _OwnerRegisterScreenState extends State<OwnerRegisterScreen> {
     if (msg.contains('email-already-in-use')) return 'This email is already registered.';
     if (msg.contains('weak-password')) return 'Password must be at least 6 characters.';
     if (msg.contains('invalid-email')) return 'Please enter a valid email address.';
-    return 'Registration failed. Please try again.';
+    return 'Registration failed: ${e.toString()}';
   }
 
   @override
