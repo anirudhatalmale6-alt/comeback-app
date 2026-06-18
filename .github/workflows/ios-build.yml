@@ -104,6 +104,9 @@ jobs:
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
 
       - name: Archive & Export with fastlane
+        env:
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
+          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: 5
         run: |
           cd ios
           fastlane run build_app \
