@@ -33,13 +33,16 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Install fastlane
+        run: gem install fastlane
+
       - name: Setup signing
         run: |
           KEY_PATH="$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8"
           mkdir -p "$HOME/private_keys"
           echo '${{ secrets.APP_STORE_CONNECT_KEY }}' > "$KEY_PATH"
 
-          # Create API key JSON with properly escaped key content
+          # Create API key JSON
           python3 -c "
           import json
           with open('$KEY_PATH') as f:
@@ -55,55 +58,80 @@ jobs:
           "
 
           # Setup keychain
+          KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
-          security set-keychain-settings -lut 21600 "$HOME/Library/Keychains/$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$HOME/Library/Keychains/$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$HOME/Library/Keychains/$KEYCHAIN_PATH" login.keychain-db
-          security default-keychain -s "$HOME/Library/Keychains/$KEYCHAIN_PATH"
-
-      - name: Install fastlane
-        run: gem install fastlane
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain-db
+          security default-keychain -s "$KC"
 
       - name: Get certificate & profile
+        id: signing
         run: |
           KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
 
-          # Get or create distribution certificate
+          # Get distribution certificate
           fastlane run get_certificates \
             api_key_path:"/tmp/api_key.json" \
             keychain_path:"$KC" \
             keychain_password:"$KEYCHAIN_PASSWORD" \
             platform:"ios"
 
-          # Get or create App Store provisioning profile
+          # Get App Store provisioning profile
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/api_key.json" \
             app_identifier:"com.comeback.app" \
-            platform:"ios"
+            platform:"ios" \
+            output_path:"/tmp/profiles"
 
-      - name: Build IPA
+          # Find the profile UUID
+          PROFILE_PATH=$(ls /tmp/profiles/*.mobileprovision 2>/dev/null | head -1)
+          if [ -z "$PROFILE_PATH" ]; then
+            PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision 2>/dev/null | head -1)
+          fi
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "Found profile: $PROFILE_NAME ($PROFILE_UUID)"
+
+          # Install profile
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" 2>/dev/null || true
+
+      - name: Build unsigned Flutter
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+
+      - name: Archive & Export with fastlane
         run: |
-          flutter build ipa \
-            --release \
-            --export-options-plist=ios/ExportOptions.plist \
-            --build-number=${{ github.run_number }}
+          cd ios
+          fastlane run build_app \
+            workspace:"Runner.xcworkspace" \
+            scheme:"Runner" \
+            configuration:"Release" \
+            export_method:"app-store" \
+            export_team_id:"UUKQ5CU4Q6" \
+            codesigning_identity:"Apple Distribution" \
+            output_directory:"/tmp/ipa" \
+            output_name:"ComeBackSalon.ipa" \
+            skip_build_archive:false \
+            clean:false \
+            xcargs:"DEVELOPMENT_TEAM=UUKQ5CU4Q6 PROVISIONING_PROFILE_SPECIFIER='${{ steps.signing.outputs.PROFILE_NAME }}'"
 
       - name: Upload to TestFlight
         run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file build/ios/ipa/*.ipa \
-            --apiKey ${{ secrets.APP_STORE_KEY_ID }} \
-            --apiIssuer ${{ secrets.APP_STORE_ISSUER_ID }}
-        env:
-          API_PRIVATE_KEYS_DIR: ~/private_keys
+          fastlane run upload_to_testflight \
+            api_key_path:"/tmp/api_key.json" \
+            ipa:"/tmp/ipa/ComeBackSalon.ipa" \
+            skip_waiting_for_build_processing:true
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: comeback-ios
-          path: build/ios/ipa/*.ipa
+          path: /tmp/ipa/*.ipa
           if-no-files-found: ignore
 
       - name: Cleanup keychain
