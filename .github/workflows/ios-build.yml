@@ -70,12 +70,13 @@ jobs:
         run: |
           KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
 
-          # Get distribution certificate
+          # Get distribution certificate (force to replace orphaned certs from previous CI runs)
           fastlane run get_certificates \
             api_key_path:"/tmp/api_key.json" \
             keychain_path:"$KC" \
             keychain_password:"$KEYCHAIN_PASSWORD" \
-            platform:"ios"
+            platform:"ios" \
+            force:true
 
           # Get App Store provisioning profile
           fastlane run get_provisioning_profile \
