@@ -65,18 +65,33 @@ jobs:
           security list-keychains -d user -s "$KC" login.keychain-db
           security default-keychain -s "$KC"
 
+      - name: Revoke orphaned certificates
+        run: |
+          ruby -e '
+            require "spaceship"
+            key = Spaceship::ConnectAPI::Token.from_json_file("/tmp/api_key.json")
+            Spaceship::ConnectAPI.token = key
+            certs = Spaceship::ConnectAPI::Certificate.all
+            certs.each do |cert|
+              if cert.certificate_type == "DISTRIBUTION" || cert.certificate_type == "IOS_DISTRIBUTION"
+                puts "Revoking certificate: #{cert.id} (#{cert.display_name})"
+                cert.delete!
+              end
+            end
+            puts "Done revoking orphaned certificates"
+          '
+
       - name: Get certificate & profile
         id: signing
         run: |
           KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
 
-          # Get distribution certificate (force to replace orphaned certs from previous CI runs)
+          # Create fresh distribution certificate
           fastlane run get_certificates \
             api_key_path:"/tmp/api_key.json" \
             keychain_path:"$KC" \
             keychain_password:"$KEYCHAIN_PASSWORD" \
-            platform:"ios" \
-            force:true
+            platform:"ios"
 
           # Get App Store provisioning profile
           fastlane run get_provisioning_profile \
