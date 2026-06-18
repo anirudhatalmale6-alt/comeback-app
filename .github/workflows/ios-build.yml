@@ -37,48 +37,45 @@ jobs:
       - name: Install fastlane
         run: gem install fastlane
 
-      - name: Setup keychain & signing
+      - name: Setup keychain
         run: |
-          # Create a temporary keychain for CI
-          security create-keychain -p "ci_password" ci_keychain.keychain-db
-          security set-keychain-settings -lut 21600 ci_keychain.keychain-db
-          security unlock-keychain -p "ci_password" ci_keychain.keychain-db
-          security list-keychains -d user -s ci_keychain.keychain-db login.keychain-db
+          KEYCHAIN_PATH="$HOME/Library/Keychains/ci_keychain.keychain-db"
+          security create-keychain -p "ci_password" ci_keychain.keychain-db || true
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "ci_password" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$KEYCHAIN_PATH"
 
-          # Create API key JSON for fastlane
+      - name: Get distribution certificate
+        run: |
+          KEYCHAIN_PATH="$HOME/Library/Keychains/ci_keychain.keychain-db"
+
+          # Create API key JSON for fastlane (extract key content without header/footer)
+          KEY_CONTENT=$(sed -n '/BEGIN/,/END/{ /BEGIN/d; /END/d; p; }' ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8 | tr -d '\n')
           cat > /tmp/api_key.json << EOF
           {
             "key_id": "${{ secrets.APP_STORE_KEY_ID }}",
             "issuer_id": "${{ secrets.APP_STORE_ISSUER_ID }}",
-            "key": "$(cat ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8 | tail -n +2 | head -n -1 | tr -d '\n')",
+            "key": "$KEY_CONTENT",
             "in_house": false
           }
           EOF
 
-          # Create distribution certificate
-          fastlane run create_keychain \
-            name:"ci_keychain" \
-            password:"ci_password" \
-            unlock:true \
-            timeout:21600 \
-            add_to_search_list:true 2>/dev/null || true
-
-          # Get or create distribution certificate
           fastlane run get_certificates \
             api_key_path:"/tmp/api_key.json" \
-            keychain_path:"$(pwd)/ci_keychain.keychain-db" \
+            keychain_path:"$KEYCHAIN_PATH" \
             keychain_password:"ci_password" \
-            platform:"ios" \
-            type:"appstore"
+            platform:"ios"
 
-          # Get or create App Store provisioning profile
+      - name: Get provisioning profile
+        run: |
+          # Reuse the API key JSON
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/api_key.json" \
             app_identifier:"com.comeback.app" \
-            platform:"ios" \
-            type:"appstore"
+            platform:"ios"
 
-      - name: Build Flutter iOS
+      - name: Build IPA
         run: |
           flutter build ipa \
             --release \
