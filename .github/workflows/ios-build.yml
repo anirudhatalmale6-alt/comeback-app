@@ -11,6 +11,10 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
 
+    env:
+      KEYCHAIN_PATH: ci_keychain.keychain-db
+      KEYCHAIN_PASSWORD: ci_password
+
     steps:
       - uses: actions/checkout@v4
 
@@ -29,47 +33,44 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Setup App Store Connect API Key
+      - name: Setup signing
         run: |
-          mkdir -p ~/private_keys
-          echo "${{ secrets.APP_STORE_CONNECT_KEY }}" > ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8
+          KEY_PATH="$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8"
+          mkdir -p "$HOME/private_keys"
+          echo '${{ secrets.APP_STORE_CONNECT_KEY }}' > "$KEY_PATH"
+
+          # Create API key JSON using key_filepath
+          cat > /tmp/api_key.json <<APIEOF
+          {
+            "key_id": "${{ secrets.APP_STORE_KEY_ID }}",
+            "issuer_id": "${{ secrets.APP_STORE_ISSUER_ID }}",
+            "key_filepath": "$KEY_PATH",
+            "in_house": false
+          }
+          APIEOF
+
+          # Setup keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
+          security set-keychain-settings -lut 21600 "$HOME/Library/Keychains/$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$HOME/Library/Keychains/$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$HOME/Library/Keychains/$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -s "$HOME/Library/Keychains/$KEYCHAIN_PATH"
 
       - name: Install fastlane
         run: gem install fastlane
 
-      - name: Setup keychain
+      - name: Get certificate & profile
         run: |
-          KEYCHAIN_PATH="$HOME/Library/Keychains/ci_keychain.keychain-db"
-          security create-keychain -p "ci_password" ci_keychain.keychain-db || true
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "ci_password" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
-          security default-keychain -s "$KEYCHAIN_PATH"
+          KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
 
-      - name: Get distribution certificate
-        run: |
-          KEYCHAIN_PATH="$HOME/Library/Keychains/ci_keychain.keychain-db"
-
-          # Create API key JSON for fastlane (extract key content without header/footer)
-          KEY_CONTENT=$(sed -n '/BEGIN/,/END/{ /BEGIN/d; /END/d; p; }' ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8 | tr -d '\n')
-          cat > /tmp/api_key.json << EOF
-          {
-            "key_id": "${{ secrets.APP_STORE_KEY_ID }}",
-            "issuer_id": "${{ secrets.APP_STORE_ISSUER_ID }}",
-            "key": "$KEY_CONTENT",
-            "in_house": false
-          }
-          EOF
-
+          # Get or create distribution certificate
           fastlane run get_certificates \
             api_key_path:"/tmp/api_key.json" \
-            keychain_path:"$KEYCHAIN_PATH" \
-            keychain_password:"ci_password" \
+            keychain_path:"$KC" \
+            keychain_password:"$KEYCHAIN_PASSWORD" \
             platform:"ios"
 
-      - name: Get provisioning profile
-        run: |
-          # Reuse the API key JSON
+          # Get or create App Store provisioning profile
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/api_key.json" \
             app_identifier:"com.comeback.app" \
@@ -99,3 +100,7 @@ jobs:
           name: comeback-ios
           path: build/ios/ipa/*.ipa
           if-no-files-found: ignore
+
+      - name: Cleanup keychain
+        if: always()
+        run: security delete-keychain "$HOME/Library/Keychains/$KEYCHAIN_PATH" || true
