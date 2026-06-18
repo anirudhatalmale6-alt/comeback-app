@@ -37,7 +37,7 @@ jobs:
       - name: Build Flutter iOS (unsigned)
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
 
-      - name: Archive & Sign
+      - name: Archive (unsigned)
         run: |
           cd ios
           xcodebuild archive \
@@ -46,15 +46,12 @@ jobs:
             -configuration Release \
             -archivePath ${{ runner.temp }}/Runner.xcarchive \
             -destination 'generic/platform=iOS' \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }} \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=UUKQ5CU4Q6 \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
 
-      - name: Export IPA
+      - name: Export & Sign IPA
         run: |
           xcodebuild -exportArchive \
             -archivePath ${{ runner.temp }}/Runner.xcarchive \
