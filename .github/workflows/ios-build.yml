@@ -39,15 +39,20 @@ jobs:
           mkdir -p "$HOME/private_keys"
           echo '${{ secrets.APP_STORE_CONNECT_KEY }}' > "$KEY_PATH"
 
-          # Create API key JSON using key_filepath
-          cat > /tmp/api_key.json <<APIEOF
-          {
-            "key_id": "${{ secrets.APP_STORE_KEY_ID }}",
-            "issuer_id": "${{ secrets.APP_STORE_ISSUER_ID }}",
-            "key_filepath": "$KEY_PATH",
-            "in_house": false
+          # Create API key JSON with properly escaped key content
+          python3 -c "
+          import json
+          with open('$KEY_PATH') as f:
+              key_content = f.read()
+          data = {
+              'key_id': '${{ secrets.APP_STORE_KEY_ID }}',
+              'issuer_id': '${{ secrets.APP_STORE_ISSUER_ID }}',
+              'key': key_content,
+              'in_house': False
           }
-          APIEOF
+          with open('/tmp/api_key.json', 'w') as f:
+              json.dump(data, f)
+          "
 
           # Setup keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
