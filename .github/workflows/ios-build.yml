@@ -34,39 +34,62 @@ jobs:
           mkdir -p ~/private_keys
           echo "${{ secrets.APP_STORE_CONNECT_KEY }}" > ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8
 
-      - name: Build Flutter iOS (unsigned)
-        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+      - name: Install fastlane
+        run: gem install fastlane
 
-      - name: Archive (unsigned)
+      - name: Setup keychain & signing
         run: |
-          cd ios
-          xcodebuild archive \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -archivePath ${{ runner.temp }}/Runner.xcarchive \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
+          # Create a temporary keychain for CI
+          security create-keychain -p "ci_password" ci_keychain.keychain-db
+          security set-keychain-settings -lut 21600 ci_keychain.keychain-db
+          security unlock-keychain -p "ci_password" ci_keychain.keychain-db
+          security list-keychains -d user -s ci_keychain.keychain-db login.keychain-db
 
-      - name: Export & Sign IPA
+          # Create API key JSON for fastlane
+          cat > /tmp/api_key.json << EOF
+          {
+            "key_id": "${{ secrets.APP_STORE_KEY_ID }}",
+            "issuer_id": "${{ secrets.APP_STORE_ISSUER_ID }}",
+            "key": "$(cat ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8 | tail -n +2 | head -n -1 | tr -d '\n')",
+            "in_house": false
+          }
+          EOF
+
+          # Create distribution certificate
+          fastlane run create_keychain \
+            name:"ci_keychain" \
+            password:"ci_password" \
+            unlock:true \
+            timeout:21600 \
+            add_to_search_list:true 2>/dev/null || true
+
+          # Get or create distribution certificate
+          fastlane run get_certificates \
+            api_key_path:"/tmp/api_key.json" \
+            keychain_path:"$(pwd)/ci_keychain.keychain-db" \
+            keychain_password:"ci_password" \
+            platform:"ios" \
+            type:"appstore"
+
+          # Get or create App Store provisioning profile
+          fastlane run get_provisioning_profile \
+            api_key_path:"/tmp/api_key.json" \
+            app_identifier:"com.comeback.app" \
+            platform:"ios" \
+            type:"appstore"
+
+      - name: Build Flutter iOS
         run: |
-          xcodebuild -exportArchive \
-            -archivePath ${{ runner.temp }}/Runner.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath ${{ runner.temp }}/ipa \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }}
+          flutter build ipa \
+            --release \
+            --export-options-plist=ios/ExportOptions.plist \
+            --build-number=${{ github.run_number }}
 
       - name: Upload to TestFlight
         run: |
           xcrun altool --upload-app \
             --type ios \
-            --file "${{ runner.temp }}/ipa/Runner.ipa" \
+            --file build/ios/ipa/*.ipa \
             --apiKey ${{ secrets.APP_STORE_KEY_ID }} \
             --apiIssuer ${{ secrets.APP_STORE_ISSUER_ID }}
         env:
@@ -77,5 +100,5 @@ jobs:
         if: always()
         with:
           name: comeback-ios
-          path: ${{ runner.temp }}/ipa/*.ipa
+          path: build/ios/ipa/*.ipa
           if-no-files-found: ignore
