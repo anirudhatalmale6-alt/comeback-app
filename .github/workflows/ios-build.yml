@@ -42,7 +42,6 @@ jobs:
           mkdir -p "$HOME/private_keys"
           echo '${{ secrets.APP_STORE_CONNECT_KEY }}' > "$KEY_PATH"
 
-          # Create API key JSON
           python3 -c "
           import json
           with open('$KEY_PATH') as f:
@@ -57,7 +56,6 @@ jobs:
               json.dump(data, f)
           "
 
-          # Setup keychain
           KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
           security set-keychain-settings -lut 21600 "$KC"
@@ -74,76 +72,113 @@ jobs:
             certs = Spaceship::ConnectAPI::Certificate.all
             certs.each do |cert|
               if cert.certificate_type == "DISTRIBUTION" || cert.certificate_type == "IOS_DISTRIBUTION"
-                puts "Revoking certificate: #{cert.id} (#{cert.display_name})"
+                puts "Revoking: #{cert.id} (#{cert.display_name})"
                 cert.delete!
               end
             end
-            puts "Done revoking orphaned certificates"
           '
+        continue-on-error: true
 
       - name: Get certificate & profile
-        id: signing
         run: |
           KC="$HOME/Library/Keychains/$KEYCHAIN_PATH"
 
-          # Create fresh distribution certificate
           fastlane run get_certificates \
             api_key_path:"/tmp/api_key.json" \
             keychain_path:"$KC" \
             keychain_password:"$KEYCHAIN_PASSWORD" \
             platform:"ios"
 
-          # Get App Store provisioning profile
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/api_key.json" \
             app_identifier:"com.comeback.app" \
             platform:"ios" \
             output_path:"/tmp/profiles"
 
-          # Find the profile UUID
+          # Install profile and save identity info
           PROFILE_PATH=$(ls /tmp/profiles/*.mobileprovision 2>/dev/null | head -1)
           if [ -z "$PROFILE_PATH" ]; then
-            PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision 2>/dev/null | head -1)
+            PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision 2>/dev/null | tail -1)
           fi
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
-          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
-
-          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
-          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
-          echo "Found profile: $PROFILE_NAME ($PROFILE_UUID)"
-
-          # Install profile
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" 2>/dev/null || true
+
+          # Get signing identity from keychain
+          SIGN_ID=$(security find-identity -v -p codesigning "$KC" | grep "Apple Distribution" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "SIGN_ID=$SIGN_ID" >> "$GITHUB_ENV"
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "PROFILE_PATH=$PROFILE_PATH" >> "$GITHUB_ENV"
+          echo "Signing identity: $SIGN_ID"
+          echo "Profile UUID: $PROFILE_UUID"
 
       - name: Build unsigned Flutter
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
 
-      - name: Archive & Export with fastlane
-        env:
-          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: 120
-          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: 5
+      - name: Archive unsigned
         run: |
           cd ios
-          fastlane run build_app \
-            workspace:"Runner.xcworkspace" \
-            scheme:"Runner" \
-            configuration:"Release" \
-            export_method:"app-store" \
-            export_team_id:"UUKQ5CU4Q6" \
-            codesigning_identity:"Apple Distribution" \
-            output_directory:"/tmp/ipa" \
-            output_name:"ComeBackSalon.ipa" \
-            skip_build_archive:false \
-            clean:false \
-            xcargs:"DEVELOPMENT_TEAM=UUKQ5CU4Q6 PROVISIONING_PROFILE_SPECIFIER='${{ steps.signing.outputs.PROFILE_NAME }}'"
+          xcodebuild archive \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath /tmp/Runner.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
+
+      - name: Sign archive
+        run: |
+          APP="/tmp/Runner.xcarchive/Products/Applications/Runner.app"
+
+          # Embed provisioning profile
+          cp "$PROFILE_PATH" "$APP/embedded.mobileprovision"
+
+          # Extract entitlements from profile
+          security cms -D -i "$PROFILE_PATH" > /tmp/profile.plist
+          /usr/libexec/PlistBuddy -x -c "Print Entitlements" /tmp/profile.plist > /tmp/entitlements.plist
+
+          # Sign all frameworks and dylibs
+          find "$APP/Frameworks" -type d -name "*.framework" | while read fw; do
+            codesign --force --sign "$SIGN_ID" --timestamp "$fw"
+          done
+          find "$APP/Frameworks" -name "*.dylib" | while read dylib; do
+            codesign --force --sign "$SIGN_ID" --timestamp "$dylib"
+          done
+
+          # Sign app extensions if any
+          find "$APP/PlugIns" -type d -name "*.appex" 2>/dev/null | while read ext; do
+            codesign --force --sign "$SIGN_ID" --entitlements /tmp/entitlements.plist --timestamp "$ext"
+          done
+
+          # Sign the main app
+          codesign --force --sign "$SIGN_ID" --entitlements /tmp/entitlements.plist --timestamp "$APP"
+
+          echo "Signing complete. Verifying..."
+          codesign --verify --deep --strict "$APP"
+
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath /tmp/Runner.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath /tmp/ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }}
 
       - name: Upload to TestFlight
         run: |
-          fastlane run upload_to_testflight \
-            api_key_path:"/tmp/api_key.json" \
-            ipa:"/tmp/ipa/ComeBackSalon.ipa" \
-            skip_waiting_for_build_processing:true
+          xcrun altool --upload-app \
+            --type ios \
+            --file /tmp/ipa/*.ipa \
+            --apiKey ${{ secrets.APP_STORE_KEY_ID }} \
+            --apiIssuer ${{ secrets.APP_STORE_ISSUER_ID }}
+        env:
+          API_PRIVATE_KEYS_DIR: ~/private_keys
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
