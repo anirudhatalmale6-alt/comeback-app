@@ -117,34 +117,27 @@ jobs:
         run: |
           cd ios
 
-          # Update project.pbxproj for manual signing on Runner target
           python3 << 'PYEOF'
-          import re
+          import re, os
 
           with open('Runner.xcodeproj/project.pbxproj', 'r') as f:
               content = f.read()
 
-          # Set CODE_SIGN_STYLE to Manual
           content = content.replace('CODE_SIGN_STYLE = Automatic', 'CODE_SIGN_STYLE = Manual')
 
-          import os
           profile_name = os.environ['PROFILE_NAME']
-          profile_uuid = os.environ['PROFILE_UUID']
 
-          # Add PROVISIONING_PROFILE_SPECIFIER after each DEVELOPMENT_TEAM = UUKQ5CU4Q6 line
-          # Only if not already present
           if 'PROVISIONING_PROFILE_SPECIFIER' not in content:
               content = content.replace(
                   'DEVELOPMENT_TEAM = UUKQ5CU4Q6;',
                   f'DEVELOPMENT_TEAM = UUKQ5CU4Q6;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "{profile_name}";'
               )
 
-          # Add CODE_SIGN_IDENTITY if not already "Apple Distribution"
           content = content.replace(
               '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer"',
               '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"'
           )
-          # Also set for any generic CODE_SIGN_IDENTITY
+
           if 'CODE_SIGN_IDENTITY = "Apple Distribution"' not in content:
               content = content.replace(
                   'DEVELOPMENT_TEAM = UUKQ5CU4Q6;',
@@ -157,13 +150,11 @@ jobs:
           print("Project configured for manual signing")
           PYEOF
 
-          # Update ExportOptions.plist for manual signing
           python3 << PYEOF2
           import plistlib, os
 
           opts = {
               'method': 'app-store-connect',
-              'destination': 'upload',
               'teamID': 'UUKQ5CU4Q6',
               'signingStyle': 'manual',
               'uploadSymbols': True,
@@ -178,29 +169,49 @@ jobs:
           print(f"ExportOptions configured with profile: {os.environ['PROFILE_NAME']}")
           PYEOF2
 
-      - name: Build Flutter iOS
-        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
-
-      - name: Archive with signing
+      - name: Build IPA
         run: |
-          cd ios
-          xcodebuild archive \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -archivePath /tmp/Runner.xcarchive \
-            -destination 'generic/platform=iOS' \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8" \
-            -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }}
+          flutter build ipa \
+            --release \
+            --build-number=${{ github.run_number }} \
+            --export-options-plist=ios/ExportOptions.plist
 
-      - name: Export & upload
+      - name: Verify archive contents
         run: |
+          echo "=== App bundle frameworks ==="
+          ls -la build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Frameworks/ 2>/dev/null || echo "No Frameworks dir"
+          echo ""
+          echo "=== flutter_assets ==="
+          ls build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Frameworks/App.framework/ 2>/dev/null || echo "No App.framework"
+          echo ""
+          echo "=== IPA output ==="
+          ls -la build/ios/ipa/ 2>/dev/null || echo "No IPA"
+          echo ""
+          echo "=== Check App.framework has AOT snapshot ==="
+          file build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Frameworks/App.framework/App 2>/dev/null || echo "App binary not found"
+
+      - name: Upload to App Store Connect
+        run: |
+          python3 << 'PYEOF'
+          import plistlib, os
+          opts = {
+              'method': 'app-store-connect',
+              'destination': 'upload',
+              'teamID': 'UUKQ5CU4Q6',
+              'signingStyle': 'manual',
+              'uploadSymbols': True,
+              'provisioningProfiles': {
+                  'com.comeback.app': os.environ['PROFILE_NAME']
+              }
+          }
+          with open('/tmp/UploadOptions.plist', 'wb') as f:
+              plistlib.dump(opts, f)
+          PYEOF
+
           xcodebuild -exportArchive \
-            -archivePath /tmp/Runner.xcarchive \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            -exportPath /tmp/ipa \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist /tmp/UploadOptions.plist \
+            -exportPath /tmp/upload \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8" \
             -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
