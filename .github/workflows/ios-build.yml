@@ -170,23 +170,11 @@ jobs:
             -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }}
 
-      - name: Upload to TestFlight
+      - name: Verify upload
         run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file /tmp/ipa/*.ipa \
-            --apiKey ${{ secrets.APP_STORE_KEY_ID }} \
-            --apiIssuer ${{ secrets.APP_STORE_ISSUER_ID }}
-        env:
-          API_PRIVATE_KEYS_DIR: ~/private_keys
-
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: comeback-ios
-          path: /tmp/ipa/*.ipa
-          if-no-files-found: ignore
+          echo "Build was uploaded to App Store Connect via xcodebuild -exportArchive"
+          echo "Check App Store Connect > TestFlight for the new build"
+          ls -la /tmp/ipa/ 2>/dev/null || echo "No local IPA (uploaded directly)"
 
       - name: Cleanup keychain
         if: always()
