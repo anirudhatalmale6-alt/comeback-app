@@ -95,27 +95,93 @@ jobs:
             platform:"ios" \
             output_path:"/tmp/profiles"
 
-          # Install profile and save identity info
           PROFILE_PATH=$(ls /tmp/profiles/*.mobileprovision 2>/dev/null | head -1)
           if [ -z "$PROFILE_PATH" ]; then
             PROFILE_PATH=$(ls "$HOME/Library/MobileDevice/Provisioning Profiles/"*.mobileprovision 2>/dev/null | tail -1)
           fi
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" 2>/dev/null || true
 
-          # Get signing identity from keychain
           SIGN_ID=$(security find-identity -v -p codesigning "$KC" | grep "Apple Distribution" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "SIGN_ID=$SIGN_ID" >> "$GITHUB_ENV"
           echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
           echo "PROFILE_PATH=$PROFILE_PATH" >> "$GITHUB_ENV"
           echo "Signing identity: $SIGN_ID"
           echo "Profile UUID: $PROFILE_UUID"
+          echo "Profile Name: $PROFILE_NAME"
 
-      - name: Build unsigned Flutter
+      - name: Configure manual signing
+        run: |
+          cd ios
+
+          # Update project.pbxproj for manual signing on Runner target
+          python3 << 'PYEOF'
+          import re
+
+          with open('Runner.xcodeproj/project.pbxproj', 'r') as f:
+              content = f.read()
+
+          # Set CODE_SIGN_STYLE to Manual
+          content = content.replace('CODE_SIGN_STYLE = Automatic', 'CODE_SIGN_STYLE = Manual')
+
+          import os
+          profile_name = os.environ['PROFILE_NAME']
+          profile_uuid = os.environ['PROFILE_UUID']
+
+          # Add PROVISIONING_PROFILE_SPECIFIER after each DEVELOPMENT_TEAM = UUKQ5CU4Q6 line
+          # Only if not already present
+          if 'PROVISIONING_PROFILE_SPECIFIER' not in content:
+              content = content.replace(
+                  'DEVELOPMENT_TEAM = UUKQ5CU4Q6;',
+                  f'DEVELOPMENT_TEAM = UUKQ5CU4Q6;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "{profile_name}";'
+              )
+
+          # Add CODE_SIGN_IDENTITY if not already "Apple Distribution"
+          content = content.replace(
+              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer"',
+              '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution"'
+          )
+          # Also set for any generic CODE_SIGN_IDENTITY
+          if 'CODE_SIGN_IDENTITY = "Apple Distribution"' not in content:
+              content = content.replace(
+                  'DEVELOPMENT_TEAM = UUKQ5CU4Q6;',
+                  'CODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tDEVELOPMENT_TEAM = UUKQ5CU4Q6;'
+              )
+
+          with open('Runner.xcodeproj/project.pbxproj', 'w') as f:
+              f.write(content)
+
+          print("Project configured for manual signing")
+          PYEOF
+
+          # Update ExportOptions.plist for manual signing
+          python3 << PYEOF2
+          import plistlib, os
+
+          opts = {
+              'method': 'app-store-connect',
+              'destination': 'upload',
+              'teamID': 'UUKQ5CU4Q6',
+              'signingStyle': 'manual',
+              'uploadSymbols': True,
+              'provisioningProfiles': {
+                  'com.comeback.app': os.environ['PROFILE_NAME']
+              }
+          }
+
+          with open('ExportOptions.plist', 'wb') as f:
+              plistlib.dump(opts, f)
+
+          print(f"ExportOptions configured with profile: {os.environ['PROFILE_NAME']}")
+          PYEOF2
+
+      - name: Build Flutter iOS
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
 
-      - name: Archive unsigned
+      - name: Archive with signing
         run: |
           cd ios
           xcodebuild archive \
@@ -124,42 +190,12 @@ jobs:
             -configuration Release \
             -archivePath /tmp/Runner.xcarchive \
             -destination 'generic/platform=iOS' \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8" \
+            -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
+            -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }}
 
-      - name: Sign archive
-        run: |
-          APP="/tmp/Runner.xcarchive/Products/Applications/Runner.app"
-
-          # Embed provisioning profile
-          cp "$PROFILE_PATH" "$APP/embedded.mobileprovision"
-
-          # Extract entitlements from profile
-          security cms -D -i "$PROFILE_PATH" > /tmp/profile.plist
-          /usr/libexec/PlistBuddy -x -c "Print Entitlements" /tmp/profile.plist > /tmp/entitlements.plist
-
-          # Sign all frameworks and dylibs
-          find "$APP/Frameworks" -type d -name "*.framework" | while read fw; do
-            codesign --force --sign "$SIGN_ID" --timestamp "$fw"
-          done
-          find "$APP/Frameworks" -name "*.dylib" | while read dylib; do
-            codesign --force --sign "$SIGN_ID" --timestamp "$dylib"
-          done
-
-          # Sign app extensions if any
-          find "$APP/PlugIns" -type d -name "*.appex" 2>/dev/null | while read ext; do
-            codesign --force --sign "$SIGN_ID" --entitlements /tmp/entitlements.plist --timestamp "$ext"
-          done
-
-          # Sign the main app
-          codesign --force --sign "$SIGN_ID" --entitlements /tmp/entitlements.plist --timestamp "$APP"
-
-          echo "Signing complete. Verifying..."
-          codesign --verify --deep --strict "$APP"
-
-      - name: Export IPA
+      - name: Export & upload
         run: |
           xcodebuild -exportArchive \
             -archivePath /tmp/Runner.xcarchive \
@@ -169,12 +205,6 @@ jobs:
             -authenticationKeyPath "$HOME/private_keys/AuthKey_${{ secrets.APP_STORE_KEY_ID }}.p8" \
             -authenticationKeyID ${{ secrets.APP_STORE_KEY_ID }} \
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_ISSUER_ID }}
-
-      - name: Verify upload
-        run: |
-          echo "Build was uploaded to App Store Connect via xcodebuild -exportArchive"
-          echo "Check App Store Connect > TestFlight for the new build"
-          ls -la /tmp/ipa/ 2>/dev/null || echo "No local IPA (uploaded directly)"
 
       - name: Cleanup keychain
         if: always()
