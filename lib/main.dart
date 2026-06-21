@@ -19,14 +19,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  } catch (e) {
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(child: Text('Firebase init error: $e')),
+      ),
+    ));
+    return;
+  }
+  try {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (_) {}
   final notificationService = NotificationService();
   try {
     await notificationService.initialize();
-  } catch (_) {
-    // FCM not fully configured yet - app still works without push notifications
-  }
+  } catch (_) {}
   runApp(ComeBackApp(notificationService: notificationService));
 }
 
