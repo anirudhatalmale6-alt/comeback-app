@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'package:comeback_app/services/auth_service.dart';
 import 'package:comeback_app/services/firestore_service.dart';
@@ -10,6 +11,11 @@ import 'package:comeback_app/screens/owner/owner_dashboard.dart';
 import 'package:comeback_app/screens/employee/employee_dashboard.dart';
 import 'package:comeback_app/utils/app_theme.dart';
 import 'package:comeback_app/firebase_options.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +51,11 @@ class _AppBootstrapState extends State<AppBootstrap> {
         const Duration(seconds: 10),
         onTimeout: () => throw Exception('Firebase init timed out after 10s'),
       );
+
+      try {
+        FirebaseMessaging.onBackgroundMessage(
+            _firebaseMessagingBackgroundHandler);
+      } catch (_) {}
 
       setState(() => _status = 'Firebase OK. Setting up notifications...');
 
