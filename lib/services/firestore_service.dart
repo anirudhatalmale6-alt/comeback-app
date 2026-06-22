@@ -133,8 +133,6 @@ class FirestoreService {
     return _pageAlerts
         .where('employeeId', isEqualTo: employeeId)
         .where('status', isEqualTo: 'active')
-        .orderBy('createdAt', descending: true)
-        .limit(1)
         .snapshots()
         .map((snap) {
       if (snap.docs.isEmpty) return null;

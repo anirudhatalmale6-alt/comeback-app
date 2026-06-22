@@ -36,12 +36,17 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     final uid = auth.getCurrentUser()?.uid;
     if (uid == null) return;
 
-    _alertSub = firestore.getActivePageForEmployee(uid).listen((alert) {
-      if (!mounted) return;
-      if (alert != null && alert.isActive && !_alarmShowing) {
-        _showAlarmOverlay(alert);
-      }
-    });
+    _alertSub = firestore.getActivePageForEmployee(uid).listen(
+      (alert) {
+        if (!mounted) return;
+        if (alert != null && alert.isActive && !_alarmShowing) {
+          _showAlarmOverlay(alert);
+        }
+      },
+      onError: (e) {
+        debugPrint('Page alert listener error: $e');
+      },
+    );
   }
 
   Future<void> _showAlarmOverlay(PageAlert alert) async {
