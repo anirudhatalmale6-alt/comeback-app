@@ -172,7 +172,7 @@ class FirestoreService {
         .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snap) => snap.docs
-            .map((d) => ChatMessage.fromMap(d.data()! as Map<String, dynamic>))
+            .map((d) => ChatMessage.fromMap(d.data()! as Map<String, dynamic>, id: d.id))
             .toList());
   }
 

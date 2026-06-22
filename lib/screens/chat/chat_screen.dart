@@ -44,23 +44,34 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
     final message = ChatMessage(
       id: const Uuid().v4(),
       senderId: _myUid,
-      senderName: '',
+      senderName: widget.otherUserName.isEmpty ? 'Me' : '',
       text: text,
       timestamp: DateTime.now(),
       chatRoomId: _chatRoomId,
     );
 
-    _firestoreService.sendMessage(message);
     _controller.clear();
 
-    // Scroll to bottom after send
+    try {
+      await _firestoreService.sendMessage(message);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -115,6 +126,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   return const Center(
                     child: CircularProgressIndicator(
                       color: Color(0xFF00897B),
+                    ),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Error loading messages:\n${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+                      ),
                     ),
                   );
                 }
