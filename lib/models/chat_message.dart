@@ -8,6 +8,7 @@ class ChatMessage {
   final DateTime timestamp;
   final bool isGroupMessage;
   final String chatRoomId;
+  final String? imageUrl;
 
   ChatMessage({
     required this.id,
@@ -17,6 +18,7 @@ class ChatMessage {
     required this.timestamp,
     this.isGroupMessage = false,
     required this.chatRoomId,
+    this.imageUrl,
   });
 
   factory ChatMessage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -24,10 +26,11 @@ class ChatMessage {
       id: id ?? map['id'] as String,
       senderId: map['senderId'] as String,
       senderName: map['senderName'] as String,
-      text: map['text'] as String,
+      text: map['text'] as String? ?? '',
       timestamp: (map['timestamp'] as Timestamp).toDate(),
       isGroupMessage: map['isGroupMessage'] as bool? ?? false,
       chatRoomId: map['chatRoomId'] as String,
+      imageUrl: map['imageUrl'] as String?,
     );
   }
 
@@ -39,6 +42,9 @@ class ChatMessage {
       'timestamp': Timestamp.fromDate(timestamp),
       'isGroupMessage': isGroupMessage,
       'chatRoomId': chatRoomId,
+      if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
+
+  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
 }

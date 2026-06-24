@@ -13,4 +13,10 @@ class StorageService {
   Future<void> deleteProfilePhoto(String uid) {
     return _storage.ref('profile_photos/$uid.jpg').delete();
   }
+
+  Future<String> uploadChatImage(String chatRoomId, String messageId, File file) async {
+    final ref = _storage.ref('chat_images/$chatRoomId/$messageId.jpg');
+    await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+    return ref.getDownloadURL();
+  }
 }

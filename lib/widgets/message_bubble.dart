@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MessageBubble extends StatelessWidget {
   final String text;
   final String? senderName;
   final DateTime timestamp;
   final bool isMe;
+  final String? imageUrl;
 
   const MessageBubble({
     super.key,
@@ -13,10 +15,13 @@ class MessageBubble extends StatelessWidget {
     this.senderName,
     required this.timestamp,
     required this.isMe,
+    this.imageUrl,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Column(
@@ -55,14 +60,49 @@ class MessageBubble extends StatelessWidget {
                 ),
               ],
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 15,
-                color: isMe ? Colors.white : Colors.grey.shade900,
-                height: 1.3,
-              ),
+            clipBehavior: Clip.hardEdge,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (hasImage)
+                  GestureDetector(
+                    onTap: () => _showFullImage(context, imageUrl!),
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl!,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        height: 150,
+                        color: Colors.grey.shade300,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF00897B),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (_, __, ___) => Container(
+                        height: 100,
+                        color: Colors.grey.shade300,
+                        child: const Center(
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (text.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: isMe ? Colors.white : Colors.grey.shade900,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           Padding(
@@ -73,6 +113,31 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showFullImage(BuildContext context, String url) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.contain,
+                placeholder: (_, __) => const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

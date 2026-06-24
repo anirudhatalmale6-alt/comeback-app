@@ -170,7 +170,7 @@ class FirestoreService {
         .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snap) => snap.docs
-            .map((d) => ChatMessage.fromMap(d.data()! as Map<String, dynamic>, id: d.id))
+            .map((d) => ChatMessage.fromMap(d.data(), id: d.id))
             .toList());
   }
 
@@ -180,5 +180,20 @@ class FirestoreService {
 
   Stream<List<ChatMessage>> getGroupMessages(String ownerId) {
     return getMessages(getGroupChatRoomId(ownerId));
+  }
+
+  // ── Employee Status ──
+
+  Future<void> updateEmployeeStatus(String uid, String status) {
+    return _users.doc(uid).update({'status': status});
+  }
+
+  // ── Chat Rooms list for unread tracking ──
+
+  Stream<Map<String, dynamic>?> getChatRoomMeta(String chatRoomId) {
+    return _chatRooms.doc(chatRoomId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return doc.data() as Map<String, dynamic>?;
+    });
   }
 }

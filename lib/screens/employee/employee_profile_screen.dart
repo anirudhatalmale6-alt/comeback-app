@@ -1,13 +1,89 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:comeback_app/models/user_model.dart';
 import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/auth_service.dart';
+import 'package:comeback_app/services/storage_service.dart';
 
 class EmployeeProfileScreen extends StatelessWidget {
   final EmployeeUser employee;
   const EmployeeProfileScreen({super.key, required this.employee});
+
+  Future<void> _pickAndUploadPhoto(BuildContext context) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 75,
+    );
+    if (picked == null) return;
+
+    try {
+      final storage = context.read<StorageService>();
+      final firestore = context.read<FirestoreService>();
+      final photoUrl = await storage.uploadProfilePhoto(employee.uid, File(picked.path));
+      await firestore.updateUser(employee.uid, {'photoUrl': photoUrl});
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile photo updated!'),
+          backgroundColor: Color(0xFF00897B),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload photo: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
+
+  void _showStatusPicker(BuildContext context) {
+    final firestore = context.read<FirestoreService>();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Set Your Status',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ...EmployeeStatus.values.map((status) => ListTile(
+              leading: Icon(
+                _statusIcon(status),
+                color: _statusColor(status),
+              ),
+              title: Text(status.displayName),
+              trailing: employee.status == status
+                  ? const Icon(Icons.check_circle, color: Color(0xFF00897B))
+                  : null,
+              onTap: () {
+                firestore.updateEmployeeStatus(employee.uid, status.name);
+                Navigator.pop(ctx);
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,23 +100,42 @@ class EmployeeProfileScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            // Avatar + info
-            CircleAvatar(
-              radius: 48,
-              backgroundColor: const Color(0xFF00897B),
-              backgroundImage: employee.photoUrl != null
-                  ? NetworkImage(employee.photoUrl!)
-                  : null,
-              child: employee.photoUrl == null
-                  ? Text(
-                      employee.name[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 36,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+            // Avatar with camera button
+            GestureDetector(
+              onTap: () => _pickAndUploadPhoto(context),
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 48,
+                    backgroundColor: const Color(0xFF00897B),
+                    backgroundImage: employee.photoUrl != null
+                        ? NetworkImage(employee.photoUrl!)
+                        : null,
+                    child: employee.photoUrl == null
+                        ? Text(
+                            employee.name[0].toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 36,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF00897B),
+                        shape: BoxShape.circle,
                       ),
-                    )
-                  : null,
+                      child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -52,7 +147,41 @@ class EmployeeProfileScreen extends StatelessWidget {
               employee.phone,
               style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            // Status selector
+            GestureDetector(
+              onTap: () => _showStatusPicker(context),
+              child: Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(_statusIcon(employee.status), color: _statusColor(employee.status)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Status', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                            Text(
+                              employee.status.displayName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _statusColor(employee.status),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             // Connection code card
             Card(
               shape: RoundedRectangleBorder(
@@ -95,10 +224,8 @@ class EmployeeProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Connected salon info
             if (employee.isConnected) _ConnectedSalonCard(employee: employee),
             const SizedBox(height: 24),
-            // Disconnect button
             if (employee.isConnected)
               SizedBox(
                 width: double.infinity,
@@ -117,7 +244,6 @@ class EmployeeProfileScreen extends StatelessWidget {
                 ),
               ),
             if (employee.isConnected) const SizedBox(height: 12),
-            // Sign out button
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -174,6 +300,32 @@ class EmployeeProfileScreen extends StatelessWidget {
     final auth = context.read<AuthService>();
     auth.signOut();
   }
+
+  static IconData _statusIcon(EmployeeStatus status) {
+    switch (status) {
+      case EmployeeStatus.available:
+        return Icons.check_circle;
+      case EmployeeStatus.busy:
+        return Icons.access_time;
+      case EmployeeStatus.dayOff:
+        return Icons.wb_sunny;
+      case EmployeeStatus.doNotDisturb:
+        return Icons.do_not_disturb_on;
+    }
+  }
+
+  static Color _statusColor(EmployeeStatus status) {
+    switch (status) {
+      case EmployeeStatus.available:
+        return Colors.green;
+      case EmployeeStatus.busy:
+        return Colors.orange;
+      case EmployeeStatus.dayOff:
+        return Colors.blue;
+      case EmployeeStatus.doNotDisturb:
+        return Colors.red;
+    }
+  }
 }
 
 class _ConnectedSalonCard extends StatelessWidget {
@@ -187,10 +339,7 @@ class _ConnectedSalonCard extends StatelessWidget {
     return StreamBuilder<AppUser?>(
       stream: firestore.userStream(employee.connectedOwnerId!),
       builder: (context, snap) {
-        if (!snap.hasData) {
-          return const SizedBox.shrink();
-        }
-
+        if (!snap.hasData) return const SizedBox.shrink();
         final owner = snap.data! as OwnerUser;
 
         return Card(

@@ -1,12 +1,48 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:comeback_app/models/user_model.dart';
 import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/auth_service.dart';
+import 'package:comeback_app/services/storage_service.dart';
 
 class OwnerProfileScreen extends StatelessWidget {
   const OwnerProfileScreen({super.key});
+
+  Future<void> _pickAndUploadPhoto(BuildContext context, String uid) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 75,
+    );
+    if (picked == null) return;
+
+    try {
+      final storage = context.read<StorageService>();
+      final firestore = context.read<FirestoreService>();
+      final photoUrl = await storage.uploadProfilePhoto(uid, File(picked.path));
+      await firestore.updateUser(uid, {'photoUrl': photoUrl});
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile photo updated!'),
+          backgroundColor: Color(0xFF00897B),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload photo: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,16 +96,35 @@ class OwnerProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 48,
-              backgroundColor: const Color(0xFF00897B),
-              backgroundImage: owner.photoUrl != null ? NetworkImage(owner.photoUrl!) : null,
-              child: owner.photoUrl == null
-                  ? Text(
-                      owner.name.isNotEmpty ? owner.name[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
-                    )
-                  : null,
+            GestureDetector(
+              onTap: () => _pickAndUploadPhoto(context, owner.uid),
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 48,
+                    backgroundColor: const Color(0xFF00897B),
+                    backgroundImage: owner.photoUrl != null ? NetworkImage(owner.photoUrl!) : null,
+                    child: owner.photoUrl == null
+                        ? Text(
+                            owner.name.isNotEmpty ? owner.name[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 32),
+                          )
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF00897B),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             Text(owner.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -182,18 +237,35 @@ class OwnerProfileScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final emp = employees[index];
                   return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF00897B),
-                      backgroundImage: emp.photoUrl != null ? NetworkImage(emp.photoUrl!) : null,
-                      child: emp.photoUrl == null
-                          ? Text(
-                              emp.name.isNotEmpty ? emp.name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            )
-                          : null,
+                    leading: Stack(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: const Color(0xFF00897B),
+                          backgroundImage: emp.photoUrl != null ? NetworkImage(emp.photoUrl!) : null,
+                          child: emp.photoUrl == null
+                              ? Text(
+                                  emp.name.isNotEmpty ? emp.name[0].toUpperCase() : '?',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                )
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: _statusColor(emp.status),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     title: Text(emp.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-                    subtitle: Text(emp.phone),
+                    subtitle: Text(emp.status.displayName, style: TextStyle(color: _statusColor(emp.status), fontSize: 13)),
                     trailing: IconButton(
                       icon: const Icon(Icons.link_off, color: Colors.red),
                       onPressed: () => _confirmDisconnect(context, owner.uid, emp),
@@ -335,5 +407,18 @@ class OwnerProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _statusColor(EmployeeStatus status) {
+    switch (status) {
+      case EmployeeStatus.available:
+        return Colors.green;
+      case EmployeeStatus.busy:
+        return Colors.orange;
+      case EmployeeStatus.dayOff:
+        return Colors.blue;
+      case EmployeeStatus.doNotDisturb:
+        return Colors.red;
+    }
   }
 }

@@ -153,6 +153,46 @@ class _ConnectedView extends StatelessWidget {
   final EmployeeUser employee;
   const _ConnectedView({required this.employee});
 
+  void _showStatusPicker(BuildContext context) {
+    final firestore = context.read<FirestoreService>();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Set Your Status',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ...EmployeeStatus.values.map((status) => ListTile(
+              leading: Icon(
+                _statusIcon(status),
+                color: _statusColor(status),
+              ),
+              title: Text(status.displayName),
+              trailing: employee.status == status
+                  ? const Icon(Icons.check_circle, color: Color(0xFF00897B))
+                  : null,
+              onTap: () {
+                firestore.updateEmployeeStatus(employee.uid, status.name);
+                Navigator.pop(ctx);
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final firestore = context.read<FirestoreService>();
@@ -170,30 +210,36 @@ class _ConnectedView extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const SizedBox(height: 16),
-              // Connection status
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00897B).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, color: Color(0xFF00897B), size: 18),
-                    SizedBox(width: 6),
-                    Text(
-                      'Connected',
-                      style: TextStyle(
-                        color: Color(0xFF00897B),
-                        fontWeight: FontWeight.w600,
+              const SizedBox(height: 8),
+              // Status selector
+              GestureDetector(
+                onTap: () => _showStatusPicker(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _statusColor(employee.status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _statusColor(employee.status).withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_statusIcon(employee.status), color: _statusColor(employee.status), size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        employee.status.displayName,
+                        style: TextStyle(
+                          color: _statusColor(employee.status),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_drop_down, color: _statusColor(employee.status), size: 20),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               // Owner info card
               Card(
                 elevation: 2,
@@ -235,6 +281,25 @@ class _ConnectedView extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00897B).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle, color: Color(0xFF00897B), size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'Connected',
+                              style: TextStyle(color: Color(0xFF00897B), fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -298,6 +363,32 @@ class _ConnectedView extends StatelessWidget {
       },
     );
   }
+
+  static IconData _statusIcon(EmployeeStatus status) {
+    switch (status) {
+      case EmployeeStatus.available:
+        return Icons.check_circle;
+      case EmployeeStatus.busy:
+        return Icons.access_time;
+      case EmployeeStatus.dayOff:
+        return Icons.wb_sunny;
+      case EmployeeStatus.doNotDisturb:
+        return Icons.do_not_disturb_on;
+    }
+  }
+
+  static Color _statusColor(EmployeeStatus status) {
+    switch (status) {
+      case EmployeeStatus.available:
+        return Colors.green;
+      case EmployeeStatus.busy:
+        return Colors.orange;
+      case EmployeeStatus.dayOff:
+        return Colors.blue;
+      case EmployeeStatus.doNotDisturb:
+        return Colors.red;
+    }
+  }
 }
 
 // ── Not Connected State ──
@@ -315,7 +406,6 @@ class _NotConnectedView extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 8),
-          // Status badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -338,7 +428,6 @@ class _NotConnectedView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // Connection code card
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -350,10 +439,7 @@ class _NotConnectedView extends StatelessWidget {
                 children: [
                   const Text(
                     'Your Connection Code',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -382,10 +468,7 @@ class _NotConnectedView extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text(
                     'Share this code with your salon owner',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -393,7 +476,6 @@ class _NotConnectedView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // Pending requests
           StreamBuilder<List<ConnectionRequest>>(
             stream: firestore.getConnectionRequests(employee.uid),
             builder: (context, snap) {
@@ -405,10 +487,7 @@ class _NotConnectedView extends StatelessWidget {
                 children: [
                   const Text(
                     'Pending Requests',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   ...requests.map((req) => _RequestCard(request: req)),
@@ -484,7 +563,7 @@ class _RequestCard extends StatelessWidget {
   }
 }
 
-// ── Group Chat Tab (redirects to group chat if connected) ──
+// ── Group Chat Tab ──
 
 class _GroupChatPage extends StatelessWidget {
   final EmployeeUser employee;

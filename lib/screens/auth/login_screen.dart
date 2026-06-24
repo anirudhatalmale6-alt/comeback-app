@@ -18,12 +18,22 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _loading = false;
   bool _obscurePassword = true;
+  bool _usePhone = false;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  String _buildEmail() {
+    final input = _emailCtrl.text.trim();
+    if (_usePhone) {
+      final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+      return '$digits@comeback.phone';
+    }
+    return input;
   }
 
   Future<void> _login() async {
@@ -35,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final firestore = context.read<FirestoreService>();
 
       final cred = await auth.signIn(
-        _emailCtrl.text.trim(),
+        _buildEmail(),
         _passwordCtrl.text,
       );
 
@@ -62,6 +72,75 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showForgotPassword() {
+    final resetEmailCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset Password'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter the email address you used to sign up. We\'ll send you a link to reset your password.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: resetEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final email = resetEmailCtrl.text.trim();
+              if (email.isEmpty || !email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid email')),
+                );
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await context.read<AuthService>().resetPassword(email);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password reset email sent! Check your inbox.'),
+                    backgroundColor: Color(0xFF00897B),
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to send reset email: ${_friendlyError(e)}'),
+                    backgroundColor: Colors.red.shade700,
+                  ),
+                );
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00897B)),
+            child: const Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _friendlyError(dynamic e) {
     final msg = e.toString().toLowerCase();
     if (msg.contains('user-not-found')) return 'No account found with this email.';
@@ -84,11 +163,10 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // App logo / title
-                Icon(
+                const Icon(
                   Icons.notifications_active_rounded,
                   size: 64,
-                  color: const Color(0xFF00897B),
+                  color: Color(0xFF00897B),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -106,8 +184,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-
-                // Login card
                 Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(
@@ -127,20 +203,80 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
+                          // Email/Phone toggle
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() { _usePhone = false; _emailCtrl.clear(); }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: !_usePhone ? const Color(0xFF00897B) : Colors.grey.shade200,
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(8),
+                                        bottomLeft: Radius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Email',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: !_usePhone ? Colors.white : Colors.grey.shade700,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() { _usePhone = true; _emailCtrl.clear(); }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _usePhone ? const Color(0xFF00897B) : Colors.grey.shade200,
+                                      borderRadius: const BorderRadius.only(
+                                        topRight: Radius.circular(8),
+                                        bottomRight: Radius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Phone',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: _usePhone ? Colors.white : Colors.grey.shade700,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
                           TextFormField(
                             controller: _emailCtrl,
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: _usePhone ? TextInputType.phone : TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: const Icon(Icons.email_outlined),
+                              labelText: _usePhone ? 'Phone Number' : 'Email',
+                              prefixIcon: Icon(_usePhone ? Icons.phone_outlined : Icons.email_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
+                              hintText: _usePhone ? '1234567890' : null,
                             ),
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty) return 'Email is required';
-                              if (!v.contains('@')) return 'Enter a valid email';
+                              if (v == null || v.trim().isEmpty) {
+                                return _usePhone ? 'Phone number is required' : 'Email is required';
+                              }
+                              if (_usePhone) {
+                                final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                                if (digits.length != 10) return 'Phone must be exactly 10 digits';
+                              } else {
+                                if (!v.contains('@')) return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),
@@ -171,7 +307,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _showForgotPassword,
+                              child: const Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  color: Color(0xFF00897B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           FilledButton(
                             onPressed: _loading ? null : _login,
                             style: FilledButton.styleFrom(
@@ -201,8 +351,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Sign up link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

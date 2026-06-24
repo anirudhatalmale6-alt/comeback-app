@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:comeback_app/models/chat_message.dart';
 import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/auth_service.dart';
+import 'package:comeback_app/services/storage_service.dart';
 import 'package:comeback_app/widgets/message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -24,6 +27,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  bool _sendingImage = false;
 
   late final FirestoreService _firestoreService;
   late final String _myUid;
@@ -44,6 +48,18 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -51,7 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final message = ChatMessage(
       id: const Uuid().v4(),
       senderId: _myUid,
-      senderName: widget.otherUserName.isEmpty ? 'Me' : '',
+      senderName: '',
       text: text,
       timestamp: DateTime.now(),
       chatRoomId: _chatRoomId,
@@ -72,15 +88,53 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    _scrollToBottom();
+  }
+
+  Future<void> _sendImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 70,
+    );
+    if (picked == null) return;
+
+    setState(() => _sendingImage = true);
+
+    try {
+      final storage = context.read<StorageService>();
+      final msgId = const Uuid().v4();
+      final imageUrl = await storage.uploadChatImage(
+        _chatRoomId,
+        msgId,
+        File(picked.path),
+      );
+
+      final message = ChatMessage(
+        id: msgId,
+        senderId: _myUid,
+        senderName: '',
+        text: '',
+        timestamp: DateTime.now(),
+        chatRoomId: _chatRoomId,
+        imageUrl: imageUrl,
+      );
+
+      await _firestoreService.sendMessage(message);
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send image: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
   }
 
   @override
@@ -158,6 +212,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
 
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _scrollToBottom();
+                });
+
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -168,6 +226,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       text: msg.text,
                       timestamp: msg.timestamp,
                       isMe: msg.senderId == _myUid,
+                      imageUrl: msg.imageUrl,
                     );
                   },
                 );
@@ -183,7 +242,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildInput() {
     return Container(
       padding: EdgeInsets.only(
-        left: 12,
+        left: 8,
         right: 6,
         top: 8,
         bottom: MediaQuery.of(context).viewPadding.bottom + 8,
@@ -200,6 +259,24 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
+          // Image picker button
+          _sendingImage
+              ? const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF00897B),
+                    ),
+                  ),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.image_outlined, color: Color(0xFF00897B)),
+                  onPressed: _sendImage,
+                  tooltip: 'Send image',
+                ),
           Expanded(
             child: TextField(
               controller: _controller,

@@ -2,6 +2,28 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum UserRole { owner, employee }
 
+enum EmployeeStatus {
+  available,
+  busy,
+  dayOff,
+  doNotDisturb;
+
+  String get displayName {
+    switch (this) {
+      case EmployeeStatus.available:
+        return 'Available';
+      case EmployeeStatus.busy:
+        return 'I am busy';
+      case EmployeeStatus.dayOff:
+        return 'My day off';
+      case EmployeeStatus.doNotDisturb:
+        return 'Do Not Disturb';
+    }
+  }
+
+  bool get canBePaged => this == EmployeeStatus.available;
+}
+
 abstract class AppUser {
   final String uid;
   final String name;
@@ -106,6 +128,7 @@ class OwnerUser extends AppUser {
 class EmployeeUser extends AppUser {
   final String? connectedOwnerId;
   final String connectionCode;
+  final EmployeeStatus status;
 
   EmployeeUser({
     required super.uid,
@@ -116,9 +139,16 @@ class EmployeeUser extends AppUser {
     required super.createdAt,
     this.connectedOwnerId,
     required this.connectionCode,
+    this.status = EmployeeStatus.available,
   }) : super(role: UserRole.employee);
 
   factory EmployeeUser.fromMap(Map<String, dynamic> map) {
+    EmployeeStatus status = EmployeeStatus.available;
+    if (map['status'] != null) {
+      try {
+        status = EmployeeStatus.values.byName(map['status'] as String);
+      } catch (_) {}
+    }
     return EmployeeUser(
       uid: map['uid'] as String,
       name: map['name'] as String,
@@ -128,6 +158,7 @@ class EmployeeUser extends AppUser {
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       connectedOwnerId: map['connectedOwnerId'] as String?,
       connectionCode: map['connectionCode'] as String,
+      status: status,
     );
   }
 
@@ -143,6 +174,7 @@ class EmployeeUser extends AppUser {
       'createdAt': Timestamp.fromDate(createdAt),
       'connectedOwnerId': connectedOwnerId,
       'connectionCode': connectionCode,
+      'status': status.name,
     };
   }
 
@@ -155,6 +187,7 @@ class EmployeeUser extends AppUser {
     String? fcmToken,
     String? connectedOwnerId,
     bool clearOwner = false,
+    EmployeeStatus? status,
   }) {
     return EmployeeUser(
       uid: uid,
@@ -165,6 +198,7 @@ class EmployeeUser extends AppUser {
       createdAt: createdAt,
       connectedOwnerId: clearOwner ? null : (connectedOwnerId ?? this.connectedOwnerId),
       connectionCode: connectionCode,
+      status: status ?? this.status,
     );
   }
 }
