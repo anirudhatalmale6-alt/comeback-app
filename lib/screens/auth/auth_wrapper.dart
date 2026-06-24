@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:comeback_app/models/user_model.dart';
 import 'package:comeback_app/services/firestore_service.dart';
+import 'package:comeback_app/services/notification_service.dart';
 import 'package:comeback_app/screens/auth/login_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -52,6 +53,18 @@ class _RoleRouterState extends State<_RoleRouter> {
     _routeUser();
   }
 
+  void _saveFcmToken(String uid) {
+    try {
+      final notif = context.read<NotificationService>();
+      final firestore = context.read<FirestoreService>();
+      notif.getToken().then((token) {
+        if (token != null) {
+          firestore.updateFcmToken(uid, token);
+        }
+      });
+    } catch (_) {}
+  }
+
   Future<void> _routeUser() async {
     try {
       final firestore = context.read<FirestoreService>();
@@ -59,10 +72,10 @@ class _RoleRouterState extends State<_RoleRouter> {
 
       if (!mounted) return;
 
-      if (user is OwnerUser) {
-        Navigator.of(context).pushReplacementNamed('/owner-dashboard');
-      } else if (user is EmployeeUser) {
-        Navigator.of(context).pushReplacementNamed('/employee-dashboard');
+      if (user is OwnerUser || user is EmployeeUser) {
+        _saveFcmToken(widget.uid);
+        final route = user is OwnerUser ? '/owner-dashboard' : '/employee-dashboard';
+        Navigator.of(context).pushReplacementNamed(route);
       } else {
         // User doc not found - sign out and show login
         await FirebaseAuth.instance.signOut();

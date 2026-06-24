@@ -7,6 +7,7 @@ import 'package:comeback_app/models/user_model.dart';
 import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/auth_service.dart';
 import 'package:comeback_app/services/storage_service.dart';
+import 'package:comeback_app/screens/auth/auth_wrapper.dart';
 
 class EmployeeProfileScreen extends StatelessWidget {
   final EmployeeUser employee;
@@ -296,9 +297,15 @@ class EmployeeProfileScreen extends StatelessWidget {
     );
   }
 
-  void _signOut(BuildContext context) {
+  Future<void> _signOut(BuildContext context) async {
     final auth = context.read<AuthService>();
-    auth.signOut();
+    await auth.signOut();
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthWrapper()),
+        (_) => false,
+      );
+    }
   }
 
   static IconData _statusIcon(EmployeeStatus status) {

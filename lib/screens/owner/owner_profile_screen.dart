@@ -7,6 +7,7 @@ import 'package:comeback_app/models/user_model.dart';
 import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/auth_service.dart';
 import 'package:comeback_app/services/storage_service.dart';
+import 'package:comeback_app/screens/auth/auth_wrapper.dart';
 
 class OwnerProfileScreen extends StatelessWidget {
   const OwnerProfileScreen({super.key});
@@ -387,9 +388,15 @@ class OwnerProfileScreen extends StatelessWidget {
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(ctx);
-                  auth.signOut();
+                  await auth.signOut();
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const AuthWrapper()),
+                      (_) => false,
+                    );
+                  }
                 },
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
                 child: const Text('Sign Out'),
