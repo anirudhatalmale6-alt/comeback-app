@@ -15,19 +15,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyB2wMO6HqDUZ7EqSwWJB0AEpc0fcE1lzO8',
-    appId: '1:768545987217:android:57f8c64b295d852b29bd30',
-    messagingSenderId: '768545987217',
-    projectId: 'come-back-ce7ab',
-    storageBucket: 'come-back-ce7ab.firebasestorage.app',
+    apiKey: 'AIzaSyAt2OPAfGsHivQ6UqA0yAmFwv3mo2X8QdQ',
+    appId: '1:1056346327905:android:8ee6d494abe5727d281320',
+    messagingSenderId: '1056346327905',
+    projectId: 'come-back-8e61d',
+    storageBucket: 'come-back-8e61d.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDFB4kuo8pxdO401PQaaxWDp9JgSkFMkkY',
-    appId: '1:768545987217:ios:011a4031c6f1e0e829bd30',
-    messagingSenderId: '768545987217',
-    projectId: 'come-back-ce7ab',
-    storageBucket: 'come-back-ce7ab.firebasestorage.app',
+    apiKey: 'AIzaSyB-BkeEeTf2tpfLL8YMv8Kb6C61B7DQjFY',
+    appId: '1:1056346327905:ios:45fb153acd267327281320',
+    messagingSenderId: '1056346327905',
+    projectId: 'come-back-8e61d',
+    storageBucket: 'come-back-8e61d.firebasestorage.app',
     iosBundleId: 'com.comeback.app',
   );
 }

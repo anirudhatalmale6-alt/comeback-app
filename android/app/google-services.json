@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "768545987217",
-    "project_id": "come-back-ce7ab",
-    "storage_bucket": "come-back-ce7ab.firebasestorage.app"
+    "project_number": "1056346327905",
+    "project_id": "come-back-8e61d",
+    "storage_bucket": "come-back-8e61d.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:768545987217:android:57f8c64b295d852b29bd30",
+        "mobilesdk_app_id": "1:1056346327905:android:8ee6d494abe5727d281320",
         "android_client_info": {
           "package_name": "com.comeback.app"
         }
@@ -15,7 +15,26 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB2wMO6HqDUZ7EqSwWJB0AEpc0fcE1lzO8"
+          "current_key": "AIzaSyAt2OPAfGsHivQ6UqA0yAmFwv3mo2X8QdQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1056346327905:android:5ee463e69adf3909281320",
+        "android_client_info": {
+          "package_name": "come.comeback.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAt2OPAfGsHivQ6UqA0yAmFwv3mo2X8QdQ"
         }
       ],
       "services": {

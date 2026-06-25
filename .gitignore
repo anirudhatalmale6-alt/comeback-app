@@ -16,3 +16,5 @@ ios/Flutter/Generated.xcconfig
 *.keystore
 firebase/functions/node_modules/
 .env
+sa-key.json
+sa-key.json
