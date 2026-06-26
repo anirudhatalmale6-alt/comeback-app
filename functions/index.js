@@ -151,7 +151,7 @@ exports.onChatMessageCreated = onDocumentCreated(
           android: {
             priority: "high",
             notification: {
-              channelId: "default",
+              channelId: "chat_messages",
               sound: "default",
             },
           },

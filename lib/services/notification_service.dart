@@ -9,6 +9,8 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  static void Function(Map<String, dynamic> data)? onNotificationTap;
+
   Future<void> initialize() async {
     await _requestPermissions();
     await _initLocalNotifications();
@@ -18,6 +20,21 @@ class NotificationService {
 
     final initial = await _fcm.getInitialMessage();
     if (initial != null) _handleMessageTap(initial);
+
+    _fcm.onTokenRefresh.listen(_onTokenRefresh);
+  }
+
+  static String? _pendingTokenRefreshUid;
+  static void Function(String uid, String token)? onTokenRefresh;
+
+  void _onTokenRefresh(String token) {
+    if (_pendingTokenRefreshUid != null && onTokenRefresh != null) {
+      onTokenRefresh!(_pendingTokenRefreshUid!, token);
+    }
+  }
+
+  static void setCurrentUid(String uid) {
+    _pendingTokenRefreshUid = uid;
   }
 
   Future<void> _requestPermissions() async {
@@ -32,19 +49,20 @@ class NotificationService {
   Future<void> _initLocalNotifications() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
     );
 
     await _localNotifications.initialize(
       const InitializationSettings(android: android, iOS: ios),
-      onDidReceiveNotificationResponse: (response) {},
+      onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
 
     final androidPlugin =
         _localNotifications.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
+
     await androidPlugin?.createNotificationChannel(
         const AndroidNotificationChannel(
       'page_alerts',
@@ -53,6 +71,23 @@ class NotificationService {
       importance: Importance.max,
       playSound: true,
     ));
+
+    await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+      'chat_messages',
+      'Chat Messages',
+      description: 'New chat message notifications',
+      importance: Importance.high,
+      playSound: true,
+    ));
+  }
+
+  void _onLocalNotificationTap(NotificationResponse response) {
+    if (response.payload == null) return;
+    try {
+      final data = jsonDecode(response.payload!) as Map<String, dynamic>;
+      onNotificationTap?.call(data);
+    } catch (_) {}
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
@@ -63,37 +98,54 @@ class NotificationService {
       _playAlarmSound();
     }
 
+    final isChatMessage = data['type'] == 'chat_message';
+
     _showLocalNotification(
       title: message.notification?.title ?? 'Come Back',
       body: message.notification?.body ?? '',
       payload: jsonEncode(data),
-      channelId: isPageAlert ? 'page_alerts' : 'default',
+      channelId: isPageAlert
+          ? 'page_alerts'
+          : isChatMessage
+              ? 'chat_messages'
+              : 'chat_messages',
       isPageAlert: isPageAlert,
     );
   }
 
-  void _handleMessageTap(RemoteMessage message) {}
+  void _handleMessageTap(RemoteMessage message) {
+    final data = message.data;
+    if (data.isNotEmpty) {
+      onNotificationTap?.call(data);
+    }
+  }
 
   Future<void> _showLocalNotification({
     required String title,
     required String body,
     String? payload,
-    String channelId = 'default',
+    String channelId = 'chat_messages',
     bool isPageAlert = false,
   }) async {
     final androidDetails = AndroidNotificationDetails(
       channelId,
-      channelId == 'page_alerts' ? 'Page Alerts' : 'General',
+      channelId == 'page_alerts' ? 'Page Alerts' : 'Chat Messages',
       importance: isPageAlert ? Importance.max : Importance.high,
       priority: isPageAlert ? Priority.max : Priority.high,
       fullScreenIntent: isPageAlert,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
     );
 
     await _localNotifications.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title,
       body,
-      NotificationDetails(android: androidDetails),
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
       payload: payload,
     );
   }

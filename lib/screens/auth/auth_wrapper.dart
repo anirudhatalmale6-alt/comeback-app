@@ -62,6 +62,10 @@ class _RoleRouterState extends State<_RoleRouter> {
           firestore.updateFcmToken(uid, token);
         }
       });
+      NotificationService.setCurrentUid(uid);
+      NotificationService.onTokenRefresh = (refreshUid, token) {
+        firestore.updateFcmToken(refreshUid, token);
+      };
     } catch (_) {}
   }
 
