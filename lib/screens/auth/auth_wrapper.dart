@@ -54,19 +54,47 @@ class _RoleRouterState extends State<_RoleRouter> {
   }
 
   void _saveFcmToken(String uid) {
+    final notif = context.read<NotificationService>();
+    final firestore = context.read<FirestoreService>();
+
+    NotificationService.setCurrentUid(uid);
+    NotificationService.onTokenRefresh = (refreshUid, token) {
+      firestore.updateFcmToken(refreshUid, token);
+      firestore.updateUser(refreshUid, {'fcmDebug': 'token_from_refresh'});
+    };
+
+    _attemptTokenSave(notif, firestore, uid);
+  }
+
+  Future<void> _attemptTokenSave(
+      NotificationService notif, FirestoreService firestore, String uid) async {
     try {
-      final notif = context.read<NotificationService>();
-      final firestore = context.read<FirestoreService>();
-      notif.getToken().then((token) {
-        if (token != null) {
-          firestore.updateFcmToken(uid, token);
-        }
+      final permStatus = await notif.getPermissionStatus();
+      await firestore.updateUser(uid, {
+        'fcmDebug': 'perm=$permStatus, waiting_for_token...',
       });
-      NotificationService.setCurrentUid(uid);
-      NotificationService.onTokenRefresh = (refreshUid, token) {
-        firestore.updateFcmToken(refreshUid, token);
-      };
-    } catch (_) {}
+
+      for (int attempt = 1; attempt <= 10; attempt++) {
+        final token = await notif.getToken();
+        if (token != null) {
+          await firestore.updateFcmToken(uid, token);
+          await firestore.updateUser(uid, {
+            'fcmDebug': 'token_saved_attempt_$attempt',
+          });
+          return;
+        }
+        await Future.delayed(const Duration(seconds: 2));
+      }
+
+      final apns = await notif.getAPNSToken();
+      await firestore.updateUser(uid, {
+        'fcmDebug': 'all_attempts_failed, apns=${apns != null ? "yes" : "null"}',
+      });
+    } catch (e) {
+      try {
+        await firestore.updateUser(uid, {'fcmDebug': 'error: $e'});
+      } catch (_) {}
+    }
   }
 
   Future<void> _routeUser() async {

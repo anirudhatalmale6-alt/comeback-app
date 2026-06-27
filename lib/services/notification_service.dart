@@ -155,17 +155,37 @@ class NotificationService {
   }
 
   Future<String?> getToken() async {
-    // On iOS, APNs token must be available before FCM token can be obtained
-    String? apnsToken = await _fcm.getAPNSToken();
-    if (apnsToken == null) {
-      // Wait briefly for APNs token to become available
-      for (int i = 0; i < 5; i++) {
-        await Future.delayed(const Duration(seconds: 1));
-        apnsToken = await _fcm.getAPNSToken();
-        if (apnsToken != null) break;
+    try {
+      String? apnsToken = await _fcm.getAPNSToken();
+      if (apnsToken == null) {
+        for (int i = 0; i < 3; i++) {
+          await Future.delayed(const Duration(seconds: 1));
+          apnsToken = await _fcm.getAPNSToken();
+          if (apnsToken != null) break;
+        }
       }
+      if (apnsToken == null) return null;
+      return await _fcm.getToken();
+    } catch (e) {
+      return null;
     }
-    return _fcm.getToken();
+  }
+
+  Future<String?> getAPNSToken() async {
+    try {
+      return await _fcm.getAPNSToken();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> getPermissionStatus() async {
+    try {
+      final settings = await _fcm.getNotificationSettings();
+      return settings.authorizationStatus.toString();
+    } catch (e) {
+      return 'error: $e';
+    }
   }
 
   void dispose() {
