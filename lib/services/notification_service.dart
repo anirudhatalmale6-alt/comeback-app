@@ -154,7 +154,19 @@ class NotificationService {
     await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
   }
 
-  Future<String?> getToken() => _fcm.getToken();
+  Future<String?> getToken() async {
+    // On iOS, APNs token must be available before FCM token can be obtained
+    String? apnsToken = await _fcm.getAPNSToken();
+    if (apnsToken == null) {
+      // Wait briefly for APNs token to become available
+      for (int i = 0; i < 5; i++) {
+        await Future.delayed(const Duration(seconds: 1));
+        apnsToken = await _fcm.getAPNSToken();
+        if (apnsToken != null) break;
+      }
+    }
+    return _fcm.getToken();
+  }
 
   void dispose() {
     _audioPlayer.dispose();
