@@ -173,6 +173,13 @@ jobs:
           print(f"ExportOptions configured with profile: {os.environ['PROFILE_NAME']}")
           PYEOF2
 
+      - name: Fix entitlements for production
+        run: |
+          # Change aps-environment from development to production for App Store/TestFlight
+          plutil -replace "aps-environment" -string "production" ios/Runner/Runner.entitlements
+          echo "=== Runner.entitlements ==="
+          cat ios/Runner/Runner.entitlements
+
       - name: Build IPA
         run: |
           flutter build ipa \

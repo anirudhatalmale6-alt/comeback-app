@@ -156,15 +156,6 @@ class NotificationService {
 
   Future<String?> getToken() async {
     try {
-      String? apnsToken = await _fcm.getAPNSToken();
-      if (apnsToken == null) {
-        for (int i = 0; i < 3; i++) {
-          await Future.delayed(const Duration(seconds: 1));
-          apnsToken = await _fcm.getAPNSToken();
-          if (apnsToken != null) break;
-        }
-      }
-      if (apnsToken == null) return null;
       return await _fcm.getToken();
     } catch (e) {
       return null;

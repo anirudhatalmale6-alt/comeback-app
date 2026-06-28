@@ -74,21 +74,30 @@ class _RoleRouterState extends State<_RoleRouter> {
         'fcmDebug': 'perm=$permStatus, waiting_for_token...',
       });
 
-      for (int attempt = 1; attempt <= 10; attempt++) {
-        final token = await notif.getToken();
-        if (token != null) {
-          await firestore.updateFcmToken(uid, token);
+      for (int attempt = 1; attempt <= 15; attempt++) {
+        try {
+          final token = await notif.getToken();
+          if (token != null) {
+            await firestore.updateFcmToken(uid, token);
+            await firestore.updateUser(uid, {
+              'fcmDebug': 'token_saved_attempt_$attempt',
+            });
+            return;
+          }
           await firestore.updateUser(uid, {
-            'fcmDebug': 'token_saved_attempt_$attempt',
+            'fcmDebug': 'attempt_$attempt: token=null',
           });
-          return;
+        } catch (e) {
+          await firestore.updateUser(uid, {
+            'fcmDebug': 'attempt_$attempt: error=$e',
+          });
         }
         await Future.delayed(const Duration(seconds: 2));
       }
 
       final apns = await notif.getAPNSToken();
       await firestore.updateUser(uid, {
-        'fcmDebug': 'all_attempts_failed, apns=${apns != null ? "yes" : "null"}',
+        'fcmDebug': 'all_15_attempts_failed, apns=${apns != null ? "yes" : "null"}',
       });
     } catch (e) {
       try {
