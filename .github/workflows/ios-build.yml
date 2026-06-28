@@ -93,6 +93,7 @@ jobs:
             api_key_path:"/tmp/api_key.json" \
             app_identifier:"com.comeback.app" \
             platform:"ios" \
+            force:true \
             output_path:"/tmp/profiles"
 
           PROFILE_PATH=$(ls /tmp/profiles/*.mobileprovision 2>/dev/null | head -1)
@@ -103,6 +104,9 @@ jobs:
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" 2>/dev/null || true
+
+          echo "=== Checking profile entitlements ==="
+          /usr/bin/security cms -D -i "$PROFILE_PATH" | grep -A2 "aps-environment" || echo "WARNING: No aps-environment in profile!"
 
           SIGN_ID=$(security find-identity -v -p codesigning "$KC" | grep "Apple Distribution" | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "SIGN_ID=$SIGN_ID" >> "$GITHUB_ENV"
