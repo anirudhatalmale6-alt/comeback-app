@@ -173,12 +173,13 @@ jobs:
           print(f"ExportOptions configured with profile: {os.environ['PROFILE_NAME']}")
           PYEOF2
 
-      - name: Fix entitlements for production
+      - name: Verify entitlements before build
         run: |
-          # Change aps-environment from development to production for App Store/TestFlight
-          plutil -replace "aps-environment" -string "production" ios/Runner/Runner.entitlements
-          echo "=== Runner.entitlements ==="
+          echo "=== Runner.entitlements (source) ==="
           cat ios/Runner/Runner.entitlements
+          echo ""
+          echo "=== Checking aps-environment value ==="
+          plutil -extract "aps-environment" raw ios/Runner/Runner.entitlements
 
       - name: Build IPA
         run: |
@@ -187,19 +188,22 @@ jobs:
             --build-number=${{ github.run_number }} \
             --export-options-plist=ios/ExportOptions.plist
 
-      - name: Verify archive contents
+      - name: Verify archive entitlements
         run: |
-          echo "=== App bundle frameworks ==="
-          ls -la build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Frameworks/ 2>/dev/null || echo "No Frameworks dir"
+          APP_PATH="build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app"
+          echo "=== BINARY entitlements (what iOS actually sees) ==="
+          codesign -d --entitlements - "$APP_PATH" 2>/dev/null || echo "codesign failed"
           echo ""
-          echo "=== flutter_assets ==="
-          ls build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Frameworks/App.framework/ 2>/dev/null || echo "No App.framework"
+          echo "=== Provisioning profile aps-environment ==="
+          PROFILE_IN_APP=$(ls "$APP_PATH/embedded.mobileprovision" 2>/dev/null)
+          if [ -n "$PROFILE_IN_APP" ]; then
+            security cms -D -i "$PROFILE_IN_APP" | grep -A2 "aps-environment"
+          else
+            echo "No embedded profile found"
+          fi
           echo ""
           echo "=== IPA output ==="
           ls -la build/ios/ipa/ 2>/dev/null || echo "No IPA"
-          echo ""
-          echo "=== Check App.framework has AOT snapshot ==="
-          file build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Frameworks/App.framework/App 2>/dev/null || echo "App binary not found"
 
       - name: Upload to App Store Connect
         run: |
