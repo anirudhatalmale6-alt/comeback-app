@@ -33,6 +33,10 @@ jobs:
       - name: Flutter dependencies
         run: flutter pub get
 
+      - name: Setup Android SDK
+        run: |
+          yes | sdkmanager --install "ndk;27.0.12077973" || true
+
       - name: Setup signing
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 -d > android/app/comeback-release.keystore
