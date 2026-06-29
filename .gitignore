@@ -14,6 +14,7 @@ ios/.symlinks/
 ios/Flutter/Generated.xcconfig
 *.jks
 *.keystore
+android/key.properties
 firebase/functions/node_modules/
 .env
 sa-key.json
