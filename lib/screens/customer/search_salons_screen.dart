@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:comeback_app/services/firestore_service.dart';
+import 'package:comeback_app/screens/customer/salon_detail_screen.dart';
 
 class SearchSalonsScreen extends StatefulWidget {
   const SearchSalonsScreen({super.key});
@@ -103,9 +104,13 @@ class _SearchSalonsScreenState extends State<SearchSalonsScreen> {
                     ),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
-                      onTap: () {
-                        // TODO: Navigate to salon detail
-                      },
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              SalonDetailScreen(salonId: salon['id'] as String),
+                        ),
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
                         child: Row(

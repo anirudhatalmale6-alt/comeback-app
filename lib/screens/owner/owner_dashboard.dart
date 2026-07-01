@@ -12,6 +12,7 @@ import 'package:comeback_app/screens/chat/group_chat_screen.dart';
 import 'package:comeback_app/screens/owner/add_employee_screen.dart';
 import 'package:comeback_app/screens/owner/owner_profile_screen.dart';
 import 'package:comeback_app/screens/owner/salon_setup_screen.dart';
+import 'package:comeback_app/screens/owner/bookings_screen.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -98,6 +99,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
   Widget build(BuildContext context) {
     final pages = [
       _buildEmployeeList(),
+      const OwnerBookingsScreen(),
       GroupChatScreen(ownerId: _uid),
       const SalonSetupScreen(),
       const OwnerProfileScreen(),
@@ -115,7 +117,12 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           NavigationDestination(
             icon: Icon(Icons.people_outline),
             selectedIcon: Icon(Icons.people, color: Color(0xFF00897B)),
-            label: 'Employees',
+            label: 'Team',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_today_outlined),
+            selectedIcon: Icon(Icons.calendar_today, color: Color(0xFF00897B)),
+            label: 'Bookings',
           ),
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
@@ -158,7 +165,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => setState(() => _currentIndex = 3),
+            onPressed: () => setState(() => _currentIndex = 4),
           ),
         ],
       ),
