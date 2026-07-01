@@ -11,6 +11,8 @@ import 'package:comeback_app/screens/employee/alarm_overlay.dart';
 import 'package:comeback_app/screens/employee/employee_profile_screen.dart';
 import 'package:comeback_app/screens/chat/chat_screen.dart';
 import 'package:comeback_app/screens/chat/group_chat_screen.dart';
+import 'package:comeback_app/screens/employee/my_schedule_screen.dart';
+import 'package:comeback_app/screens/employee/my_appointments_screen.dart';
 
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({super.key});
@@ -89,6 +91,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         final employee = snapshot.data! as EmployeeUser;
         final pages = <Widget>[
           _HomePage(employee: employee),
+          const MyScheduleScreen(),
+          const EmployeeAppointmentsScreen(),
           _GroupChatPage(employee: employee),
           EmployeeProfileScreen(employee: employee),
         ];
@@ -99,7 +103,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
             selectedIndex: _currentIndex,
             onDestinationSelected: (i) => setState(() => _currentIndex = i),
             backgroundColor: Colors.white,
-            indicatorColor: const Color(0xFF00897B).withOpacity(0.15),
+            indicatorColor: const Color(0xFF00897B).withValues(alpha: 0.15),
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.home_outlined),
@@ -107,9 +111,19 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                 label: 'Home',
               ),
               NavigationDestination(
+                icon: Icon(Icons.schedule_outlined),
+                selectedIcon: Icon(Icons.schedule, color: Color(0xFF00897B)),
+                label: 'Schedule',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.calendar_today_outlined),
+                selectedIcon: Icon(Icons.calendar_today, color: Color(0xFF00897B)),
+                label: 'Appts',
+              ),
+              NavigationDestination(
                 icon: Icon(Icons.groups_outlined),
                 selectedIcon: Icon(Icons.groups, color: Color(0xFF00897B)),
-                label: 'Group Chat',
+                label: 'Chat',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outlined),
