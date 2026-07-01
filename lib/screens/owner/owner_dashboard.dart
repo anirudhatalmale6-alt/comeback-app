@@ -11,6 +11,7 @@ import 'package:comeback_app/screens/chat/chat_screen.dart';
 import 'package:comeback_app/screens/chat/group_chat_screen.dart';
 import 'package:comeback_app/screens/owner/add_employee_screen.dart';
 import 'package:comeback_app/screens/owner/owner_profile_screen.dart';
+import 'package:comeback_app/screens/owner/salon_setup_screen.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -98,6 +99,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     final pages = [
       _buildEmployeeList(),
       GroupChatScreen(ownerId: _uid),
+      const SalonSetupScreen(),
       const OwnerProfileScreen(),
     ];
 
@@ -108,7 +110,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         backgroundColor: Colors.white,
-        indicatorColor: const Color(0xFF00897B).withOpacity(0.15),
+        indicatorColor: const Color(0xFF00897B).withValues(alpha: 0.15),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.people_outline),
@@ -118,7 +120,12 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble, color: Color(0xFF00897B)),
-            label: 'Group Chat',
+            label: 'Chat',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.storefront_outlined),
+            selectedIcon: Icon(Icons.storefront, color: Color(0xFF00897B)),
+            label: 'Salon',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -151,7 +158,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => setState(() => _currentIndex = 2),
+            onPressed: () => setState(() => _currentIndex = 3),
           ),
         ],
       ),
