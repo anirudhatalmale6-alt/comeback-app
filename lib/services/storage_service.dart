@@ -19,4 +19,16 @@ class StorageService {
     await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
     return ref.getDownloadURL();
   }
+
+  Future<String> uploadFile(String path, File file) async {
+    final ref = _storage.ref(path);
+    await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+    return ref.getDownloadURL();
+  }
+
+  Future<String> uploadSalonPhoto(String salonId, String fileName, File file) async {
+    final ref = _storage.ref('salon_photos/$salonId/$fileName');
+    await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+    return ref.getDownloadURL();
+  }
 }

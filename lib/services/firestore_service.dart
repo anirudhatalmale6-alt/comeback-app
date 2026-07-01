@@ -188,6 +188,31 @@ class FirestoreService {
     return _users.doc(uid).update({'status': status});
   }
 
+  // ── Salon Search ──
+
+  Future<List<Map<String, dynamic>>> searchSalons(String query) async {
+    final q = query.toLowerCase();
+    final snap = await _db
+        .collection('salons')
+        .orderBy('businessName')
+        .limit(50)
+        .get();
+
+    return snap.docs
+        .map((d) => {'id': d.id, ...d.data()})
+        .where((s) {
+          final name = (s['businessName'] as String? ?? '').toLowerCase();
+          final addr = (s['address'] as String? ?? '').toLowerCase();
+          final city = (s['city'] as String? ?? '').toLowerCase();
+          final zip = (s['zipCode'] as String? ?? '').toLowerCase();
+          return name.contains(q) ||
+              addr.contains(q) ||
+              city.contains(q) ||
+              zip.contains(q);
+        })
+        .toList();
+  }
+
   // ── Chat Rooms list for unread tracking ──
 
   Stream<Map<String, dynamic>?> getChatRoomMeta(String chatRoomId) {

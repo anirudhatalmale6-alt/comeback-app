@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:comeback_app/screens/auth/owner_register_screen.dart';
 import 'package:comeback_app/screens/auth/employee_register_screen.dart';
+import 'package:comeback_app/screens/auth/customer_register_screen.dart';
 
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
@@ -37,11 +38,10 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 40),
 
-                // Owner card
                 _RoleCard(
                   icon: Icons.storefront_rounded,
-                  title: 'Business Owner',
-                  subtitle: 'Page employees and manage your team',
+                  title: 'Salon Owner',
+                  subtitle: 'Manage your salon, employees, and bookings',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const OwnerRegisterScreen(),
@@ -50,14 +50,25 @@ class RegisterScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                // Employee card
                 _RoleCard(
-                  icon: Icons.person_rounded,
+                  icon: Icons.badge_rounded,
                   title: 'Employee',
-                  subtitle: 'Receive pages and connect with your boss',
+                  subtitle: 'View schedule, appointments, and messages',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const EmployeeRegisterScreen(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                _RoleCard(
+                  icon: Icons.spa_rounded,
+                  title: 'Customer',
+                  subtitle: 'Find salons, book appointments, save nail photos',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CustomerRegisterScreen(),
                     ),
                   ),
                 ),

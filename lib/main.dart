@@ -9,6 +9,7 @@ import 'package:comeback_app/services/storage_service.dart';
 import 'package:comeback_app/screens/auth/auth_wrapper.dart';
 import 'package:comeback_app/screens/owner/owner_dashboard.dart';
 import 'package:comeback_app/screens/employee/employee_dashboard.dart';
+import 'package:comeback_app/screens/customer/customer_dashboard.dart';
 import 'package:comeback_app/utils/app_theme.dart';
 import 'package:comeback_app/firebase_options.dart';
 
@@ -155,6 +156,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
         routes: {
           '/owner-dashboard': (_) => const OwnerDashboard(),
           '/employee-dashboard': (_) => const EmployeeDashboard(),
+          '/customer-dashboard': (_) => const CustomerDashboard(),
         },
       ),
     );

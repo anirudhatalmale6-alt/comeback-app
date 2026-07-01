@@ -113,9 +113,16 @@ class _RoleRouterState extends State<_RoleRouter> {
 
       if (!mounted) return;
 
-      if (user is OwnerUser || user is EmployeeUser) {
+      if (user != null) {
         _saveFcmToken(widget.uid);
-        final route = user is OwnerUser ? '/owner-dashboard' : '/employee-dashboard';
+        String route;
+        if (user is OwnerUser) {
+          route = '/owner-dashboard';
+        } else if (user is CustomerUser) {
+          route = '/customer-dashboard';
+        } else {
+          route = '/employee-dashboard';
+        }
         Navigator.of(context).pushReplacementNamed(route);
       } else {
         // User doc not found - sign out and show login

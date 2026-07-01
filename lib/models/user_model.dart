@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum UserRole { owner, employee }
+enum UserRole { owner, employee, customer }
 
 enum EmployeeStatus {
   available,
@@ -47,10 +47,13 @@ abstract class AppUser {
 
   static AppUser fromMap(Map<String, dynamic> map) {
     final role = UserRole.values.byName(map['role'] as String);
-    if (role == UserRole.owner) {
-      return OwnerUser.fromMap(map);
-    } else {
-      return EmployeeUser.fromMap(map);
+    switch (role) {
+      case UserRole.owner:
+        return OwnerUser.fromMap(map);
+      case UserRole.employee:
+        return EmployeeUser.fromMap(map);
+      case UserRole.customer:
+        return CustomerUser.fromMap(map);
     }
   }
 }
@@ -199,6 +202,76 @@ class EmployeeUser extends AppUser {
       connectedOwnerId: clearOwner ? null : (connectedOwnerId ?? this.connectedOwnerId),
       connectionCode: connectionCode,
       status: status ?? this.status,
+    );
+  }
+}
+
+class CustomerUser extends AppUser {
+  final String? email;
+  final String? birthday;
+  final List<String> favoriteSalonIds;
+
+  CustomerUser({
+    required super.uid,
+    required super.name,
+    required super.phone,
+    this.email,
+    super.photoUrl,
+    super.fcmToken,
+    required super.createdAt,
+    this.birthday,
+    this.favoriteSalonIds = const [],
+  }) : super(role: UserRole.customer);
+
+  factory CustomerUser.fromMap(Map<String, dynamic> map) {
+    return CustomerUser(
+      uid: map['uid'] as String,
+      name: map['name'] as String,
+      phone: map['phone'] as String? ?? '',
+      email: map['email'] as String?,
+      photoUrl: map['photoUrl'] as String?,
+      fcmToken: map['fcmToken'] as String?,
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      birthday: map['birthday'] as String?,
+      favoriteSalonIds: List<String>.from(map['favoriteSalonIds'] ?? []),
+    );
+  }
+
+  @override
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'name': name,
+      'phone': phone,
+      'email': email,
+      'photoUrl': photoUrl,
+      'role': role.name,
+      'fcmToken': fcmToken,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'birthday': birthday,
+      'favoriteSalonIds': favoriteSalonIds,
+    };
+  }
+
+  CustomerUser copyWith({
+    String? name,
+    String? phone,
+    String? email,
+    String? photoUrl,
+    String? fcmToken,
+    String? birthday,
+    List<String>? favoriteSalonIds,
+  }) {
+    return CustomerUser(
+      uid: uid,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      photoUrl: photoUrl ?? this.photoUrl,
+      fcmToken: fcmToken ?? this.fcmToken,
+      createdAt: createdAt,
+      birthday: birthday ?? this.birthday,
+      favoriteSalonIds: favoriteSalonIds ?? this.favoriteSalonIds,
     );
   }
 }

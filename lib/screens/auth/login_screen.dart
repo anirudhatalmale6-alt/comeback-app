@@ -54,11 +54,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = await firestore.getUser(cred.user!.uid);
       if (!mounted) return;
 
+      String route;
       if (user is OwnerUser) {
-        Navigator.of(context).pushReplacementNamed('/owner-dashboard');
+        route = '/owner-dashboard';
+      } else if (user is CustomerUser) {
+        route = '/customer-dashboard';
       } else {
-        Navigator.of(context).pushReplacementNamed('/employee-dashboard');
+        route = '/employee-dashboard';
       }
+      Navigator.of(context).pushReplacementNamed(route);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -178,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Employee Paging System',
+                  'Nail Salon Management',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey.shade600,
                   ),

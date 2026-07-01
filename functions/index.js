@@ -20,7 +20,11 @@ exports.onPageAlertCreated = onDocumentCreated(
 
     const employee = employeeDoc.data();
     const token = employee.fcmToken;
-    if (!token) return;
+    if (!token) {
+      console.log(`No FCM token for employee ${alert.employeeId} - skipping notification`);
+      return;
+    }
+    console.log(`Sending page alert to employee ${alert.employeeId}, token: ${token.substring(0, 20)}...`);
 
     let ownerName = "Your Boss";
     if (alert.ownerId) {
@@ -53,18 +57,24 @@ exports.onPageAlertCreated = onDocumentCreated(
         apns: {
           payload: {
             aps: {
+              alert: {
+                title: "You're Being Paged!",
+                body: `${ownerName} needs you right now!`,
+              },
               sound: "default",
               badge: 1,
-              "content-available": 1,
+              "mutable-content": 1,
             },
           },
           headers: {
             "apns-priority": "10",
+            "apns-push-type": "alert",
           },
         },
       });
+      console.log(`Page alert notification sent successfully to ${alert.employeeId}`);
     } catch (err) {
-      console.error("Failed to send page alert notification:", err);
+      console.error("Failed to send page alert notification:", err.code, err.message);
     }
   }
 );
@@ -137,7 +147,11 @@ exports.onChatMessageCreated = onDocumentCreated(
       if (!recipientDoc.exists) return;
 
       const token = recipientDoc.data().fcmToken;
-      if (!token) return;
+      if (!token) {
+        console.log(`No FCM token for recipient ${recipientId} - skipping`);
+        return;
+      }
+      console.log(`Sending chat notification to ${recipientId}, token: ${token.substring(0, 20)}...`);
 
       try {
         await messaging.send({
@@ -158,14 +172,21 @@ exports.onChatMessageCreated = onDocumentCreated(
           apns: {
             payload: {
               aps: {
+                alert: { title, body },
                 sound: "default",
                 badge: 1,
+                "mutable-content": 1,
               },
+            },
+            headers: {
+              "apns-priority": "10",
+              "apns-push-type": "alert",
             },
           },
         });
+        console.log(`Chat notification sent successfully to ${recipientId}`);
       } catch (err) {
-        console.error(`Failed to notify ${recipientId}:`, err);
+        console.error(`Failed to notify ${recipientId}:`, err.code, err.message);
       }
     });
 
