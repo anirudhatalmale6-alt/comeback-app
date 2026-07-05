@@ -29,5 +29,51 @@ service cloud.firestore {
         allow read, write: if isAuth();
       }
     }
+
+    match /salons/{salonId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+    }
+
+    match /salon_photos/{photoId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAuth();
+    }
+
+    match /business_hours/{hourId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+    }
+
+    match /services/{serviceId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAuth();
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+    }
+
+    match /employee_schedules/{scheduleId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+    }
+
+    match /schedule_requests/{requestId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+    }
+
+    match /customer_nail_photos/{photoId} {
+      allow read: if isAuth();
+      allow create, delete: if isAuth();
+    }
+
+    match /password_reset_tokens/{tokenId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+    }
   }
 }

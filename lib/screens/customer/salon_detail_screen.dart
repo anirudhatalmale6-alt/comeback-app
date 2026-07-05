@@ -16,6 +16,21 @@ class SalonDetailScreen extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot>(
       stream: db.collection('salons').doc(salonId).snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+                  const SizedBox(height: 16),
+                  const Text('Could not load salon details'),
+                ],
+              ),
+            ),
+          );
+        }
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Scaffold(
             appBar: AppBar(),

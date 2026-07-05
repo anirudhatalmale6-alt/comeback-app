@@ -27,6 +27,35 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     return StreamBuilder<AppUser?>(
       stream: firestore.userStream(uid),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text('Something went wrong:\n${snapshot.error}',
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () async {
+                        await FirebaseAuth.instance.signOut();
+                        if (context.mounted) {
+                          Navigator.of(context)
+                              .pushNamedAndRemoveUntil('/', (_) => false);
+                        }
+                      },
+                      child: const Text('Sign Out & Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         final user = snapshot.data;
         if (user == null || user is! CustomerUser) {
           return const Scaffold(
