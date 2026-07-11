@@ -8,6 +8,7 @@ import 'package:comeback_app/screens/customer/search_salons_screen.dart';
 import 'package:comeback_app/screens/customer/customer_profile_screen.dart';
 import 'package:comeback_app/screens/customer/my_appointments_screen.dart';
 import 'package:comeback_app/screens/customer/nail_photos_screen.dart';
+import 'package:comeback_app/screens/customer/favorite_salons_screen.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -64,7 +65,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
         }
 
         final pages = [
-          _HomeTab(customer: user),
+          _HomeTab(
+            customer: user,
+            onNavigate: (i) => setState(() => _currentIndex = i),
+          ),
           const SearchSalonsScreen(),
           const MyAppointmentsScreen(),
           const NailPhotosScreen(),
@@ -112,7 +116,8 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
 class _HomeTab extends StatelessWidget {
   final CustomerUser customer;
-  const _HomeTab({required this.customer});
+  final ValueChanged<int> onNavigate;
+  const _HomeTab({required this.customer, required this.onNavigate});
 
   @override
   Widget build(BuildContext context) {
@@ -175,9 +180,7 @@ class _HomeTab extends StatelessWidget {
               title: 'Find a Salon',
               subtitle: 'Search salons near you',
               color: const Color(0xFF00897B),
-              onTap: () {
-                // Navigate to search tab
-              },
+              onTap: () => onNavigate(1),
             ),
             const SizedBox(height: 12),
             _QuickActionCard(
@@ -187,7 +190,12 @@ class _HomeTab extends StatelessWidget {
                   ? 'No favorites yet'
                   : '${customer.favoriteSalonIds.length} saved salons',
               color: Colors.pink,
-              onTap: () {},
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FavoriteSalonsScreen(),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             _QuickActionCard(
@@ -195,7 +203,7 @@ class _HomeTab extends StatelessWidget {
               title: 'My Appointments',
               subtitle: 'View upcoming bookings',
               color: Colors.blue,
-              onTap: () {},
+              onTap: () => onNavigate(2),
             ),
             const SizedBox(height: 12),
             _QuickActionCard(
@@ -203,7 +211,7 @@ class _HomeTab extends StatelessWidget {
               title: 'My Nail Photos',
               subtitle: 'Save designs for next visit',
               color: Colors.purple,
-              onTap: () {},
+              onTap: () => onNavigate(3),
             ),
           ],
         ),
