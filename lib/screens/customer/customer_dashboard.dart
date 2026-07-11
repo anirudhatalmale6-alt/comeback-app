@@ -9,6 +9,7 @@ import 'package:comeback_app/screens/customer/customer_profile_screen.dart';
 import 'package:comeback_app/screens/customer/my_appointments_screen.dart';
 import 'package:comeback_app/screens/customer/nail_photos_screen.dart';
 import 'package:comeback_app/screens/customer/favorite_salons_screen.dart';
+import 'package:comeback_app/screens/customer/customer_messages_screen.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -127,11 +128,12 @@ class _HomeTab extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.chat_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Messages coming soon')),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CustomerMessagesScreen(),
+              ),
+            ),
           ),
         ],
       ),

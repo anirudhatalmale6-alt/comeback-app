@@ -80,6 +80,15 @@ class NotificationService {
       importance: Importance.high,
       playSound: true,
     ));
+
+    await androidPlugin?.createNotificationChannel(
+        const AndroidNotificationChannel(
+      'appointments',
+      'Appointment Updates',
+      description: 'Updates when a salon accepts or declines your appointment',
+      importance: Importance.high,
+      playSound: true,
+    ));
   }
 
   void _onLocalNotificationTap(NotificationResponse response) {
@@ -98,7 +107,7 @@ class NotificationService {
       _playAlarmSound();
     }
 
-    final isChatMessage = data['type'] == 'chat_message';
+    final isAppointmentUpdate = data['type'] == 'appointment_update';
 
     _showLocalNotification(
       title: message.notification?.title ?? 'Come Back',
@@ -106,8 +115,8 @@ class NotificationService {
       payload: jsonEncode(data),
       channelId: isPageAlert
           ? 'page_alerts'
-          : isChatMessage
-              ? 'chat_messages'
+          : isAppointmentUpdate
+              ? 'appointments'
               : 'chat_messages',
       isPageAlert: isPageAlert,
     );

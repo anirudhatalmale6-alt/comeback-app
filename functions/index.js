@@ -1,4 +1,4 @@
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -75,6 +75,120 @@ exports.onPageAlertCreated = onDocumentCreated(
       console.log(`Page alert notification sent successfully to ${alert.employeeId}`);
     } catch (err) {
       console.error("Failed to send page alert notification:", err.code, err.message);
+    }
+  }
+);
+
+// Notify the customer when the owner accepts / declines / reschedules their appointment
+exports.onAppointmentStatusChanged = onDocumentUpdated(
+  "appointments/{appointmentId}",
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+    if (!before || !after) return;
+
+    // Only fire when the status actually changed
+    if (before.status === after.status) return;
+
+    const customerId = after.customerUserId;
+    if (!customerId) return;
+
+    // Map the new status to a customer-facing message
+    const statusMessages = {
+      confirmed: {
+        title: "Appointment Confirmed 🎉",
+        body: "Your appointment has been accepted",
+      },
+      denied: {
+        title: "Appointment Declined",
+        body: "Your appointment request was declined",
+      },
+      suggested_new_time: {
+        title: "New Time Suggested",
+        body: "The salon suggested a new time for your appointment",
+      },
+      checked_in: {
+        title: "Checked In",
+        body: "You're checked in for your appointment",
+      },
+      completed: {
+        title: "Appointment Completed",
+        body: "Thanks for visiting! Hope to see you again soon",
+      },
+    };
+
+    const msg = statusMessages[after.status];
+    if (!msg) return; // status we don't notify on (e.g. pending, no_show)
+
+    // Enrich the body with the salon name + date/time when available
+    let salonName = "";
+    if (after.salonId) {
+      const salonDoc = await db.doc(`salons/${after.salonId}`).get();
+      if (salonDoc.exists) {
+        salonName = salonDoc.data().businessName || "";
+      }
+    }
+    const whenParts = [];
+    if (after.date) whenParts.push(after.date);
+    if (after.time) whenParts.push(`at ${after.time}`);
+    const when = whenParts.join(" ");
+
+    let body = msg.body;
+    if (after.status === "suggested_new_time" && after.suggestedDate) {
+      const suggested = [after.suggestedDate, after.suggestedTime]
+        .filter(Boolean)
+        .join(" at ");
+      body = `${salonName || "The salon"} suggested ${suggested}`;
+    } else if (salonName) {
+      body = `${msg.body}${when ? ` for ${when}` : ""} at ${salonName}`;
+    } else if (when) {
+      body = `${msg.body} for ${when}`;
+    }
+
+    const customerDoc = await db.doc(`users/${customerId}`).get();
+    if (!customerDoc.exists) return;
+
+    const token = customerDoc.data().fcmToken;
+    if (!token) {
+      console.log(`No FCM token for customer ${customerId} - skipping appointment notification`);
+      return;
+    }
+    console.log(`Sending appointment ${after.status} notification to ${customerId}`);
+
+    try {
+      await messaging.send({
+        token,
+        notification: { title: msg.title, body },
+        data: {
+          type: "appointment_update",
+          appointmentId: event.params.appointmentId,
+          status: after.status,
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "appointments",
+            sound: "default",
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              alert: { title: msg.title, body },
+              sound: "default",
+              badge: 1,
+              "mutable-content": 1,
+            },
+          },
+          headers: {
+            "apns-priority": "10",
+            "apns-push-type": "alert",
+          },
+        },
+      });
+      console.log(`Appointment notification sent successfully to ${customerId}`);
+    } catch (err) {
+      console.error(`Failed to send appointment notification to ${customerId}:`, err.code, err.message);
     }
   }
 );

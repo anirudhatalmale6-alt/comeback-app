@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:comeback_app/models/salon_model.dart';
 import 'package:comeback_app/screens/customer/book_appointment_screen.dart';
+import 'package:comeback_app/screens/chat/chat_screen.dart';
 
 class SalonDetailScreen extends StatelessWidget {
   final String salonId;
@@ -120,12 +121,15 @@ class SalonDetailScreen extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Messaging coming soon')),
-                            );
-                          },
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                otherUserId: salon.ownerUserId,
+                                otherUserName: salon.businessName,
+                              ),
+                            ),
+                          ),
                           icon: const Icon(Icons.chat_outlined),
                           label: const Text('Message Owner'),
                           style: OutlinedButton.styleFrom(

@@ -154,13 +154,33 @@ class FirestoreService {
     final roomRef = _chatRooms.doc(roomId);
     final msgRef = roomRef.collection('messages').doc(message.id);
 
-    final batch = _db.batch();
-    batch.set(roomRef, {
-      'lastMessage': message.text,
+    final roomMeta = <String, dynamic>{
+      'lastMessage': message.imageUrl != null && message.text.isEmpty
+          ? '📷 Photo'
+          : message.text,
       'lastMessageAt': Timestamp.fromDate(message.timestamp),
-    }, SetOptions(merge: true));
+    };
+    // Track participants for 1:1 rooms so each side can list conversations.
+    if (!roomId.startsWith('group_')) {
+      roomMeta['participants'] = roomId.split('_');
+    }
+
+    final batch = _db.batch();
+    batch.set(roomRef, roomMeta, SetOptions(merge: true));
     batch.set(msgRef, message.toMap());
     await batch.commit();
+  }
+
+  // ── Conversations list (1:1) ──
+
+  Stream<List<Map<String, dynamic>>> getConversations(String uid) {
+    return _chatRooms
+        .where('participants', arrayContains: uid)
+        .orderBy('lastMessageAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>})
+            .toList());
   }
 
   Stream<List<ChatMessage>> getMessages(String chatRoomId) {
