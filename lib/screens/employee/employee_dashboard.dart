@@ -13,6 +13,7 @@ import 'package:comeback_app/screens/chat/chat_screen.dart';
 import 'package:comeback_app/screens/chat/group_chat_screen.dart';
 import 'package:comeback_app/screens/employee/my_schedule_screen.dart';
 import 'package:comeback_app/screens/employee/my_appointments_screen.dart';
+import 'package:comeback_app/widgets/tryon_banner.dart';
 
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({super.key});
@@ -154,9 +155,21 @@ class _HomePage extends StatelessWidget {
         foregroundColor: Colors.white,
         centerTitle: true,
       ),
-      body: employee.isConnected
-          ? _ConnectedView(employee: employee)
-          : _NotConnectedView(employee: employee),
+      body: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: TryOnBanner(
+              subtitle: 'Preview looks and share them with clients',
+            ),
+          ),
+          Expanded(
+            child: employee.isConnected
+                ? _ConnectedView(employee: employee)
+                : _NotConnectedView(employee: employee),
+          ),
+        ],
+      ),
     );
   }
 }

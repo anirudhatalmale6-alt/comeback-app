@@ -13,6 +13,7 @@ import 'package:comeback_app/screens/owner/add_employee_screen.dart';
 import 'package:comeback_app/screens/owner/owner_profile_screen.dart';
 import 'package:comeback_app/screens/owner/salon_setup_screen.dart';
 import 'package:comeback_app/screens/owner/bookings_screen.dart';
+import 'package:comeback_app/widgets/tryon_banner.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -178,7 +179,16 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ),
         child: const Icon(Icons.add),
       ),
-      body: StreamBuilder<DocumentSnapshot>(
+      body: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: TryOnBanner(
+              subtitle: 'Preview looks and recommend them to clients',
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
         builder: (context, ownerSnapshot) {
           if (ownerSnapshot.connectionState == ConnectionState.waiting) {
@@ -324,6 +334,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
             },
           );
         },
+            ),
+          ),
+        ],
       ),
     );
   }
