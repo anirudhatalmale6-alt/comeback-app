@@ -75,5 +75,16 @@ service cloud.firestore {
       allow read: if isAuth();
       allow create, update: if isAuth();
     }
+
+    // Virtual Nail Try-On design library.
+    // Any signed-in user can browse. Uploads are allowed for signed-in users
+    // (salons/admin); a design can only be deleted by the account that created it.
+    match /nail_designs/{designId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+                    && request.resource.data.uploadedByUserId == request.auth.uid;
+      allow delete: if isAuth()
+                    && resource.data.uploadedByUserId == request.auth.uid;
+    }
   }
 }

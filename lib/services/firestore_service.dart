@@ -3,6 +3,7 @@ import 'package:comeback_app/models/user_model.dart';
 import 'package:comeback_app/models/connection_request.dart';
 import 'package:comeback_app/models/page_alert.dart';
 import 'package:comeback_app/models/chat_message.dart';
+import 'package:comeback_app/models/nail_design_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -11,6 +12,7 @@ class FirestoreService {
   CollectionReference get _connectionRequests => _db.collection('connection_requests');
   CollectionReference get _pageAlerts => _db.collection('page_alerts');
   CollectionReference get _chatRooms => _db.collection('chat_rooms');
+  CollectionReference get _nailDesigns => _db.collection('nail_designs');
 
   // ── Users ──
 
@@ -240,5 +242,44 @@ class FirestoreService {
       if (!doc.exists) return null;
       return doc.data() as Map<String, dynamic>?;
     });
+  }
+
+  // ── Nail Design Library (Virtual Try-On) ──
+
+  Future<String> addNailDesign(NailDesign design) async {
+    final ref = await _nailDesigns.add(design.toMap());
+    return ref.id;
+  }
+
+  Future<void> deleteNailDesign(String designId) {
+    return _nailDesigns.doc(designId).delete();
+  }
+
+  /// The full shared library a customer can browse — every salon's designs plus
+  /// global/admin designs, newest first. Category/keyword filtering is applied
+  /// client-side against [NailDesign.searchTokens].
+  Stream<List<NailDesign>> getLibraryDesigns({int limit = 300}) {
+    return _nailDesigns
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => NailDesign.fromMap(
+                d.data()! as Map<String, dynamic>,
+                id: d.id))
+            .toList());
+  }
+
+  /// Designs owned by a single salon — used on the owner's manage screen.
+  Stream<List<NailDesign>> getSalonDesigns(String salonId) {
+    return _nailDesigns
+        .where('salonId', isEqualTo: salonId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => NailDesign.fromMap(
+                d.data()! as Map<String, dynamic>,
+                id: d.id))
+            .toList());
   }
 }

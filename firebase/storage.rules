@@ -30,5 +30,13 @@ service firebase.storage {
                    && request.resource.size < 10 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
+
+    // Nail-design tiles for Virtual Try-On (path: nail_designs/{ownerKey}/{fileName})
+    match /nail_designs/{ownerKey}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
   }
 }
