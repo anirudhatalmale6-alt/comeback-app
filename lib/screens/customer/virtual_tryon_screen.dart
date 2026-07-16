@@ -77,6 +77,14 @@ const List<BundledDesign> kBundledDesigns = [
 /// The design shown before the customer picks anything.
 const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
 
+/// A nail's base width as a fraction of the editor box, and its height-to-width
+/// ratio. Kept as shared constants so auto-placement and rendering stay in sync
+/// (a drift between the two would size nails wrongly). The ratio is a little
+/// under 1.4 so nails read full and natural over the nail bed rather than
+/// pencil-thin.
+const double kNailBaseWidthFactor = 0.125;
+const double kNailAspectRatio = 1.34;
+
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'.
 ImageProvider designProvider(String id) {
@@ -201,8 +209,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             Offset(n.dx * _photoImgSize.width, n.dy * _photoImgSize.height))
         .toList();
     final poses = computeNailPoses(lmImg);
-    final baseW = _boxSize.width * 0.12;
-    final baseH = baseW * 1.45;
+    final baseW = _boxSize.width * kNailBaseWidthFactor;
+    final baseH = baseW * kNailAspectRatio;
     final asset = _currentDesign ?? kDefaultDesign;
     setState(() {
       _nails.clear();
@@ -631,8 +639,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   Widget _buildNail(int i, Size box) {
     final n = _nails[i];
-    final baseW = box.width * 0.12;
-    final baseH = baseW * 1.45;
+    final baseW = box.width * kNailBaseWidthFactor;
+    final baseH = baseW * kNailAspectRatio;
     final w = baseW * n.scale;
     // Length is a style choice on top of the auto-fitted size: longer nails
     // extend the free-edge without changing the nail's width.

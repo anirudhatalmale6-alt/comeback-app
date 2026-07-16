@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:comeback_app/models/user_model.dart';
-import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/utils/app_theme.dart';
 
 class ConnectionCodeDisplay extends StatelessWidget {

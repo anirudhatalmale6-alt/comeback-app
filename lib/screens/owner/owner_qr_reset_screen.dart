@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:comeback_app/models/user_model.dart';
 
 class OwnerQrResetScreen extends StatefulWidget {
   final String employeeId;
@@ -25,7 +24,6 @@ class _OwnerQrResetScreenState extends State<OwnerQrResetScreen> {
   final _passwordCtrl = TextEditingController();
   bool _verified = false;
   String? _resetToken;
-  DateTime? _expiresAt;
   bool _loading = false;
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
@@ -80,14 +78,12 @@ class _OwnerQrResetScreenState extends State<OwnerQrResetScreen> {
 
     setState(() {
       _resetToken = token;
-      _expiresAt = expires;
     });
 
     Future.delayed(const Duration(minutes: 2), () {
       if (mounted) {
         setState(() {
           _resetToken = null;
-          _expiresAt = null;
         });
       }
     });
