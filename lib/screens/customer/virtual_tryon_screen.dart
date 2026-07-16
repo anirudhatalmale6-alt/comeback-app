@@ -14,6 +14,7 @@ import 'package:comeback_app/models/chat_message.dart';
 import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/storage_service.dart';
 import 'package:comeback_app/screens/chat/chat_screen.dart';
+import 'package:comeback_app/widgets/nail_overlay.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 class BundledDesign {
@@ -36,17 +37,25 @@ const List<BundledDesign> kBundledDesigns = [
 ];
 
 /// One design placed on a nail: where it sits, how big, and its angle.
+///
+/// The `init*` fields remember the pose the nail was first placed at (from the
+/// auto-layout) so a single nail can be reset without disturbing the others.
 class _Nail {
   Offset center;
   double scale;
   double rotation;
   String asset;
+  final Offset initCenter;
+  final double initScale;
+  final double initRotation;
   _Nail({
     required this.center,
     required this.scale,
     required this.rotation,
     required this.asset,
-  });
+  })  : initCenter = center,
+        initScale = scale,
+        initRotation = rotation;
 }
 
 class VirtualTryOnScreen extends StatefulWidget {
@@ -100,17 +109,20 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _currentDesign = asset;
       if (_nails.isEmpty) {
         if (_boxSize == Size.zero) return;
+        // x, y, rotation, scale - each finger gets its own size and angle so
+        // the fan looks like a real spread hand (pinky/thumb smaller, middle
+        // longest) rather than five identical stamps.
         const spots = [
-          [0.30, 0.46, -0.5],
-          [0.42, 0.33, -0.22],
-          [0.52, 0.28, 0.0],
-          [0.63, 0.33, 0.22],
-          [0.74, 0.46, 0.5],
+          [0.30, 0.47, -0.50, 0.72],
+          [0.42, 0.34, -0.22, 0.92],
+          [0.52, 0.29, 0.00, 1.05],
+          [0.63, 0.34, 0.22, 0.90],
+          [0.74, 0.47, 0.50, 0.80],
         ];
         for (final s in spots) {
           _nails.add(_Nail(
             center: Offset(_boxSize.width * s[0], _boxSize.height * s[1]),
-            scale: 1.0,
+            scale: s[3].toDouble(),
             rotation: s[2].toDouble(),
             asset: asset,
           ));
@@ -144,6 +156,18 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     setState(() {
       _nails.removeAt(_selected!);
       _selected = null;
+    });
+  }
+
+  /// Snap just the selected nail back to the pose the auto-layout gave it,
+  /// leaving every other nail untouched.
+  void _resetSelected() {
+    if (_selected == null) return;
+    setState(() {
+      final n = _nails[_selected!];
+      n.center = n.initCenter;
+      n.scale = n.initScale;
+      n.rotation = n.initRotation;
     });
   }
 
@@ -376,7 +400,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   Widget _buildNail(int i, Size box) {
     final n = _nails[i];
     final baseW = box.width * 0.12;
-    final baseH = baseW * 1.5;
+    final baseH = baseW * 1.45;
     final w = baseW * n.scale;
     final h = baseH * n.scale;
     final selected = _selected == i;
@@ -390,12 +414,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
+            // Rotate around the cuticle (bottom-centre) so the base stays
+            // anchored to the finger while the tip swings, like a real nail.
             child: Transform.rotate(
               angle: n.rotation,
-              child: Opacity(
-                opacity: 0.92,
-                child: Image.asset(n.asset, fit: BoxFit.fill),
-              ),
+              alignment: Alignment.bottomCenter,
+              child: NailOverlay(asset: n.asset),
             ),
           ),
           if (selected)
@@ -466,13 +490,19 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             label: const Text('Change photo'),
           ),
           const Spacer(),
-          if (_selected != null)
+          if (_selected != null) ...[
+            TextButton.icon(
+              onPressed: _resetSelected,
+              icon: const Icon(Icons.restart_alt, size: 18),
+              label: const Text('Reset'),
+            ),
             TextButton.icon(
               onPressed: _removeSelected,
               icon: const Icon(Icons.delete_outline,
                   size: 18, color: Colors.red),
               label: const Text('Remove', style: TextStyle(color: Colors.red)),
             ),
+          ],
         ],
       ),
     );
