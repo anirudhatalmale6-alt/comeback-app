@@ -19,24 +19,70 @@ import 'package:comeback_app/screens/customer/guided_capture_screen.dart';
 import 'package:comeback_app/services/hand_geometry.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
+/// [asset] doubles as the design's identity.
 class BundledDesign {
   final String name;
   final String asset;
-  const BundledDesign(this.name, this.asset);
+  final String category;
+  const BundledDesign(this.name, this.asset, this.category);
 }
 
-const List<BundledDesign> kBundledDesigns = [
-  BundledDesign('Ballet Pink', 'assets/nail_designs/ballet_pink.png'),
-  BundledDesign('Classic Red', 'assets/nail_designs/classic_red.png'),
-  BundledDesign('French Tip', 'assets/nail_designs/french_tip.png'),
-  BundledDesign('Nude', 'assets/nail_designs/nude_beige.png'),
-  BundledDesign('Gold Glitter', 'assets/nail_designs/gold_glitter.png'),
-  BundledDesign('Sunset Ombre', 'assets/nail_designs/sunset_ombre.png'),
-  BundledDesign('Lilac', 'assets/nail_designs/lilac.png'),
-  BundledDesign('Ocean Blue', 'assets/nail_designs/ocean_blue.png'),
-  BundledDesign('Polka Dots', 'assets/nail_designs/polka_dots.png'),
-  BundledDesign('Midnight', 'assets/nail_designs/midnight_black.png'),
+/// Category order shown as chips above the design strip. 'My Uploads' is
+/// appended in the UI so the customer's own images always have a home.
+const List<String> kDesignCategories = [
+  'Solids',
+  'French',
+  'Glitter',
+  'Ombré',
+  'Patterns',
 ];
+
+/// The full built-in catalog. Every swatch is original artwork generated for
+/// this app (no third-party assets), grouped by category.
+const List<BundledDesign> kBundledDesigns = [
+  // Solids
+  BundledDesign('Classic Red', 'assets/nail_designs/classic_red.png', 'Solids'),
+  BundledDesign('Ballet Pink', 'assets/nail_designs/ballet_pink.png', 'Solids'),
+  BundledDesign('Nude', 'assets/nail_designs/nude_beige.png', 'Solids'),
+  BundledDesign('Coral', 'assets/nail_designs/coral.png', 'Solids'),
+  BundledDesign('Burgundy', 'assets/nail_designs/burgundy.png', 'Solids'),
+  BundledDesign('Lilac', 'assets/nail_designs/lilac.png', 'Solids'),
+  BundledDesign('Mint', 'assets/nail_designs/mint.png', 'Solids'),
+  BundledDesign('Ocean Blue', 'assets/nail_designs/ocean_blue.png', 'Solids'),
+  BundledDesign('Pure White', 'assets/nail_designs/pure_white.png', 'Solids'),
+  BundledDesign('Midnight', 'assets/nail_designs/midnight_black.png', 'Solids'),
+  // French
+  BundledDesign('Classic', 'assets/nail_designs/french_tip.png', 'French'),
+  BundledDesign('Pink', 'assets/nail_designs/french_pink.png', 'French'),
+  BundledDesign('Gold', 'assets/nail_designs/french_gold.png', 'French'),
+  BundledDesign('Black', 'assets/nail_designs/french_black.png', 'French'),
+  // Glitter
+  BundledDesign('Gold', 'assets/nail_designs/gold_glitter.png', 'Glitter'),
+  BundledDesign('Silver', 'assets/nail_designs/silver_glitter.png', 'Glitter'),
+  BundledDesign('Rose', 'assets/nail_designs/rose_glitter.png', 'Glitter'),
+  BundledDesign('Holo', 'assets/nail_designs/holo_glitter.png', 'Glitter'),
+  // Ombré
+  BundledDesign('Sunset', 'assets/nail_designs/sunset_ombre.png', 'Ombré'),
+  BundledDesign('Pink', 'assets/nail_designs/pink_ombre.png', 'Ombré'),
+  BundledDesign('Blue', 'assets/nail_designs/blue_ombre.png', 'Ombré'),
+  BundledDesign('Purple', 'assets/nail_designs/purple_ombre.png', 'Ombré'),
+  // Patterns
+  BundledDesign('Polka Dots', 'assets/nail_designs/polka_dots.png', 'Patterns'),
+  BundledDesign('Stripes', 'assets/nail_designs/stripes.png', 'Patterns'),
+  BundledDesign('Leopard', 'assets/nail_designs/leopard.png', 'Patterns'),
+  BundledDesign('Marble', 'assets/nail_designs/marble.png', 'Patterns'),
+  BundledDesign('Hearts', 'assets/nail_designs/hearts.png', 'Patterns'),
+];
+
+/// The design shown before the customer picks anything.
+const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
+
+/// Resolves a design id to an image: bundled assets keep their `assets/...`
+/// path; custom uploads are absolute file paths starting with '/'.
+ImageProvider designProvider(String id) {
+  if (id.startsWith('/')) return FileImage(File(id));
+  return AssetImage(id);
+}
 
 /// One design placed on a nail: where it sits, how big, and its angle.
 ///
@@ -80,6 +126,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // selected nail can override these for that finger only.
   NailShape _shape = NailShape.almond;
   double _lengthFactor = 1.0;
+  // Which category strip is showing, and the customer's own uploaded designs.
+  String _category = kDesignCategories.first;
+  final List<String> _customDesigns = [];
   bool _busy = false;
 
   final GlobalKey _captureKey = GlobalKey();
@@ -133,7 +182,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _pendingLandmarks = result.normalizedLandmarks;
       _selected = null;
       _nails.clear();
-      _currentDesign ??= kBundledDesigns[0].asset;
+      _currentDesign ??= kDefaultDesign;
     });
   }
 
@@ -154,7 +203,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final poses = computeNailPoses(lmImg);
     final baseW = _boxSize.width * 0.12;
     final baseH = baseW * 1.45;
-    final asset = _currentDesign ?? kBundledDesigns[0].asset;
+    final asset = _currentDesign ?? kDefaultDesign;
     setState(() {
       _nails.clear();
       for (final pose in poses) {
@@ -215,6 +264,24 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         }
       }
     });
+  }
+
+  /// Lets the customer bring their own inspiration image (a design they saw
+  /// online, a photo from a magazine, etc.) and try it on like any swatch.
+  Future<void> _pickCustomDesign() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1000,
+      maxHeight: 1000,
+      imageQuality: 90,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (!_customDesigns.contains(picked.path)) {
+        _customDesigns.insert(0, picked.path);
+      }
+    });
+    _applyDesign(picked.path);
   }
 
   void _addNail() {
@@ -555,6 +622,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         ),
         _buildToolbar(),
         if (_nails.isNotEmpty) _buildPerNailHint(),
+        _buildCategoryChips(),
         _buildDesignStrip(),
         _buildActions(),
       ],
@@ -585,7 +653,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             child: Transform.rotate(
               angle: n.rotation,
               alignment: Alignment.bottomCenter,
-              child: NailOverlay(asset: n.asset, shape: n.shape),
+              child: NailOverlay(
+                  image: designProvider(n.asset), shape: n.shape),
             ),
           ),
           if (selected)
@@ -689,51 +758,138 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  Widget _buildDesignStrip() {
+  Widget _buildCategoryChips() {
+    final cats = [...kDesignCategories, 'My Uploads'];
     return Container(
-      height: 92,
+      height: 44,
       color: Colors.white,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: kBundledDesigns.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: cats.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final d = kBundledDesigns[i];
-          final active = _currentDesign == d.asset;
+          final c = cats[i];
+          final active = _category == c;
           return GestureDetector(
-            onTap: () => _applyDesign(d.asset),
-            child: Column(
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: active ? const Color(0xFF00897B) : Colors.grey.shade300,
-                      width: active ? 2.5 : 1,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Image.asset(d.asset, fit: BoxFit.contain),
+            onTap: () => setState(() => _category = c),
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFF00897B) : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: active ? const Color(0xFF00897B) : Colors.grey.shade300,
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  width: 56,
-                  child: Text(
-                    d.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10),
-                  ),
+              ),
+              child: Text(
+                c,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                  color: active ? Colors.white : Colors.black87,
                 ),
-              ],
+              ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildDesignStrip() {
+    final isUploads = _category == 'My Uploads';
+    final designs =
+        kBundledDesigns.where((d) => d.category == _category).toList();
+    // In My Uploads the first tile is the "add" button; then the user's images.
+    final itemCount =
+        isUploads ? _customDesigns.length + 1 : designs.length;
+
+    return Container(
+      height: 92,
+      color: Colors.white,
+      child: itemCount == 0
+          ? Center(
+              child: Text('No designs in this category',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+            )
+          : ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              itemCount: itemCount,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, i) {
+                if (isUploads && i == 0) return _buildUploadTile();
+                final id = isUploads
+                    ? _customDesigns[i - 1]
+                    : designs[i].asset;
+                final name = isUploads ? 'My photo' : designs[i].name;
+                return _buildDesignTile(id, name);
+              },
+            ),
+    );
+  }
+
+  Widget _buildDesignTile(String id, String name) {
+    final active = _currentDesign == id;
+    return GestureDetector(
+      onTap: () => _applyDesign(id),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: active ? const Color(0xFF00897B) : Colors.grey.shade300,
+                width: active ? 2.5 : 1,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image(image: designProvider(id), fit: BoxFit.cover),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: 56,
+            child: Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadTile() {
+    return GestureDetector(
+      onTap: _pickCustomDesign,
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2F1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF00897B)),
+            ),
+            child: const Icon(Icons.add_a_photo_outlined,
+                color: Color(0xFF00897B)),
+          ),
+          const SizedBox(height: 4),
+          const SizedBox(
+            width: 56,
+            child: Text('Upload',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10)),
+          ),
+        ],
       ),
     );
   }

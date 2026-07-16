@@ -207,12 +207,12 @@ class _NailFinishPainter extends CustomPainter {
 /// The widget fills its parent box; the caller sizes/positions/rotates it and
 /// picks the [shape] of the free-edge.
 class NailOverlay extends StatelessWidget {
-  final String asset;
+  final ImageProvider image;
   final double opacity;
   final NailShape shape;
   const NailOverlay({
     super.key,
-    required this.asset,
+    required this.image,
     this.opacity = 0.92,
     this.shape = NailShape.almond,
   });
@@ -229,7 +229,7 @@ class NailOverlay extends StatelessWidget {
             clipper: _NailClipper(shape),
             // BoxFit.cover so the design fills the whole nail silhouette; the
             // artwork is scaled, never stretched out of proportion.
-            child: Image.asset(asset, fit: BoxFit.cover),
+            child: Image(image: image, fit: BoxFit.cover),
           ),
         ),
         CustomPaint(painter: _NailFinishPainter(shape)),
