@@ -15,6 +15,8 @@ import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/storage_service.dart';
 import 'package:comeback_app/screens/chat/chat_screen.dart';
 import 'package:comeback_app/widgets/nail_overlay.dart';
+import 'package:comeback_app/screens/customer/guided_capture_screen.dart';
+import 'package:comeback_app/services/hand_geometry.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 class BundledDesign {
@@ -75,6 +77,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final GlobalKey _captureKey = GlobalKey();
   Size _boxSize = Size.zero;
 
+  // Set when a photo arrives from the guided camera: the photo's pixel size and
+  // the detected hand landmarks (normalized) awaiting auto-placement.
+  Size _photoImgSize = Size.zero;
+  List<Offset>? _pendingLandmarks;
+
   // Baselines captured at gesture start so pinch/rotate feel natural.
   double _startScale = 1;
   double _startRot = 0;
@@ -91,9 +98,68 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     if (picked == null) return;
     setState(() {
       _photo = File(picked.path);
+      _photoImgSize = Size.zero;
+      _pendingLandmarks = null;
       _nails.clear();
       _selected = null;
       _currentDesign = null;
+    });
+  }
+
+  /// Opens the guided camera; on return, loads the standardized photo and
+  /// queues its detected landmarks so nails are auto-placed once the editor
+  /// has laid out.
+  Future<void> _openGuidedCapture() async {
+    final result = await Navigator.push<GuidedCaptureResult>(
+      context,
+      MaterialPageRoute(builder: (_) => const GuidedCaptureScreen()),
+    );
+    if (result == null || !mounted) return;
+    final bytes = await result.imageFile.readAsBytes();
+    final decoded = await decodeImageFromList(bytes);
+    if (!mounted) return;
+    setState(() {
+      _photo = result.imageFile;
+      _photoImgSize =
+          Size(decoded.width.toDouble(), decoded.height.toDouble());
+      _pendingLandmarks = result.normalizedLandmarks;
+      _selected = null;
+      _nails.clear();
+      _currentDesign ??= kBundledDesigns[0].asset;
+    });
+  }
+
+  /// Places one nail per detected finger, mapping landmark image coordinates
+  /// into the editor box. Runs once after the photo lays out; the user can
+  /// still fine-tune or Reset each nail afterwards.
+  void _autoPlaceNails() {
+    final lm = _pendingLandmarks;
+    if (lm == null || _boxSize == Size.zero || _photoImgSize == Size.zero) {
+      return;
+    }
+    _pendingLandmarks = null;
+    final fit = FitTransform.contain(_photoImgSize, _boxSize);
+    final lmImg = lm
+        .map((n) =>
+            Offset(n.dx * _photoImgSize.width, n.dy * _photoImgSize.height))
+        .toList();
+    final poses = computeNailPoses(lmImg);
+    final baseW = _boxSize.width * 0.12;
+    final baseH = baseW * 1.45;
+    final asset = _currentDesign ?? kBundledDesigns[0].asset;
+    setState(() {
+      _nails.clear();
+      for (final pose in poses) {
+        final centerBox = fit.imageToBox(pose.center);
+        final lenBox = pose.length * fit.scale;
+        _nails.add(_Nail(
+          center: centerBox,
+          scale: (lenBox / baseH).clamp(0.2, 5.0),
+          rotation: pose.rotation,
+          asset: asset,
+        ));
+      }
+      _currentDesign = asset;
     });
   }
 
@@ -320,6 +386,24 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
             const SizedBox(height: 28),
+            if (Platform.isAndroid) ...[
+              FilledButton.icon(
+                onPressed: _openGuidedCapture,
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('Auto Try-On (Beta)'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(240, 50),
+                  backgroundColor: const Color(0xFF7E57C2),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Guided camera — finds your nails automatically',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+              const SizedBox(height: 18),
+            ],
             FilledButton.icon(
               onPressed: () => _pickPhoto(ImageSource.camera),
               icon: const Icon(Icons.camera_alt),
@@ -353,6 +437,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 _boxSize = Size(constraints.maxWidth, constraints.maxHeight);
+                if (_pendingLandmarks != null) {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _autoPlaceNails());
+                }
                 return RepaintBoundary(
                   key: _captureKey,
                   child: Stack(

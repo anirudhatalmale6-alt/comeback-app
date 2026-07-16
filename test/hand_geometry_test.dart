@@ -49,6 +49,32 @@ void main() {
     });
   });
 
+  group('rotateNormalized', () {
+    const p = Offset(0.2, 0.3);
+    test('0 turns is identity', () {
+      expect(rotateNormalized(p, 0), p);
+    });
+    test('four 90° turns return to start', () {
+      var q = p;
+      for (var i = 0; i < 4; i++) {
+        q = rotateNormalized(q, 1);
+      }
+      expect(q.dx, closeTo(p.dx, 1e-12));
+      expect(q.dy, closeTo(p.dy, 1e-12));
+    });
+    test('180 twice returns to start; stays in unit square', () {
+      final r = rotateNormalized(rotateNormalized(p, 2), 2);
+      expect(r.dx, closeTo(p.dx, 1e-12));
+      expect(r.dy, closeTo(p.dy, 1e-12));
+      final s = rotateNormalized(p, 1);
+      expect(s.dx, inInclusiveRange(0.0, 1.0));
+      expect(s.dy, inInclusiveRange(0.0, 1.0));
+    });
+    test('negative turns normalize (−1 == 3)', () {
+      expect(rotateNormalized(p, -1), rotateNormalized(p, 3));
+    });
+  });
+
   group('FitTransform.contain', () {
     test('letterboxes a portrait image inside a wider box', () {
       final f = FitTransform.contain(const Size(300, 450), const Size(300, 500));

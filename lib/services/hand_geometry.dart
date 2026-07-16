@@ -46,6 +46,24 @@ const double kNailWidthFactor = 0.60;
 /// centre sits, so the nail tip lands near the fingertip.
 const double kNailBacksetFactor = 0.26;
 
+/// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
+/// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
+/// sensor's orientation to the upright, saved-photo orientation (back camera,
+/// no mirroring). Any device-specific flip is a one-line change here.
+Offset rotateNormalized(Offset p, int quarterTurnsCw) {
+  final q = ((quarterTurnsCw % 4) + 4) % 4;
+  switch (q) {
+    case 1: // 90° CW
+      return Offset(1 - p.dy, p.dx);
+    case 2: // 180°
+      return Offset(1 - p.dx, 1 - p.dy);
+    case 3: // 270° CW
+      return Offset(p.dy, 1 - p.dx);
+    default:
+      return p;
+  }
+}
+
 /// Computes a [NailPose] per finger from [landmarks] (21 image-pixel points).
 /// Fingers whose joints are degenerate (too close) are skipped.
 List<NailPose> computeNailPoses(List<Offset> landmarks) {
