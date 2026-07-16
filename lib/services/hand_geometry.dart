@@ -39,12 +39,12 @@ const List<List<int>> kFingerJoints = [
 /// How long the nail is relative to the tip→joint segment, and how wide it is
 /// relative to its own length. Tuned on real hand photos; adjustable from
 /// on-device tester feedback.
-const double kNailLengthFactor = 0.92;
-const double kNailWidthFactor = 0.60;
+const double kNailLengthFactor = 0.80;
+const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
 /// centre sits, so the nail tip lands near the fingertip.
-const double kNailBacksetFactor = 0.26;
+const double kNailBacksetFactor = 0.30;
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
