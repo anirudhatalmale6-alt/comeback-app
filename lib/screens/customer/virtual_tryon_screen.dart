@@ -47,6 +47,8 @@ class _Nail {
   double scale;
   double rotation;
   String asset;
+  NailShape shape;
+  double lengthFactor;
   final Offset initCenter;
   final double initScale;
   final double initRotation;
@@ -55,6 +57,8 @@ class _Nail {
     required this.scale,
     required this.rotation,
     required this.asset,
+    this.shape = NailShape.almond,
+    this.lengthFactor = 1.0,
   })  : initCenter = center,
         initScale = scale,
         initRotation = rotation;
@@ -72,6 +76,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final List<_Nail> _nails = [];
   int? _selected;
   String? _currentDesign;
+  // The shape/length applied to new nails and to "all nails" edits. A single
+  // selected nail can override these for that finger only.
+  NailShape _shape = NailShape.almond;
+  double _lengthFactor = 1.0;
   bool _busy = false;
 
   final GlobalKey _captureKey = GlobalKey();
@@ -157,6 +165,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           scale: (lenBox / baseH).clamp(0.2, 5.0),
           rotation: pose.rotation,
           asset: asset,
+          shape: _shape,
+          lengthFactor: _lengthFactor,
         ));
       }
       _currentDesign = asset;
@@ -191,6 +201,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             scale: s[3].toDouble(),
             rotation: s[2].toDouble(),
             asset: asset,
+            shape: _shape,
+            lengthFactor: _lengthFactor,
           ));
         }
       } else if (_selected != null) {
@@ -216,6 +228,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         scale: 1.0,
         rotation: 0,
         asset: _currentDesign!,
+        shape: _shape,
+        lengthFactor: _lengthFactor,
       ));
       _selected = _nails.length - 1;
     });
@@ -246,7 +260,58 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _nails.clear();
       _selected = null;
       _currentDesign = null;
+      _shape = NailShape.almond;
+      _lengthFactor = 1.0;
     });
+  }
+
+  /// Applies a shape to the selected nail only, or to every nail (and future
+  /// nails) when nothing is selected.
+  void _applyShape(NailShape shape) {
+    setState(() {
+      if (_selected != null) {
+        _nails[_selected!].shape = shape;
+      } else {
+        _shape = shape;
+        for (final n in _nails) {
+          n.shape = shape;
+        }
+      }
+    });
+  }
+
+  /// Applies a length multiplier (Short/Medium/Long) with the same
+  /// selected-nail-vs-all behaviour as [_applyShape].
+  void _applyLength(double factor) {
+    setState(() {
+      if (_selected != null) {
+        _nails[_selected!].lengthFactor = factor;
+      } else {
+        _lengthFactor = factor;
+        for (final n in _nails) {
+          n.lengthFactor = factor;
+        }
+      }
+    });
+  }
+
+  Future<void> _openShapeSheet() async {
+    final sel = _selected != null ? _nails[_selected!] : null;
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => _ShapeLengthSheet(
+        target: sel != null
+            ? 'this nail'
+            : (_nails.isEmpty ? 'new nails' : 'all nails'),
+        initialShape: sel?.shape ?? _shape,
+        initialLength: sel?.lengthFactor ?? _lengthFactor,
+        onShape: _applyShape,
+        onLength: _applyLength,
+      ),
+    );
   }
 
   Future<Uint8List?> _capture() async {
@@ -355,6 +420,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       appBar: AppBar(
         title: const Text('Virtual Nail Try-On'),
         actions: [
+          if (_photo != null)
+            IconButton(
+              tooltip: 'Nail shape & length',
+              icon: const Icon(Icons.brush_outlined),
+              onPressed: _busy ? null : _openShapeSheet,
+            ),
           if (_photo != null)
             IconButton(
               tooltip: 'Start over',
@@ -495,7 +566,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final baseW = box.width * 0.12;
     final baseH = baseW * 1.45;
     final w = baseW * n.scale;
-    final h = baseH * n.scale;
+    // Length is a style choice on top of the auto-fitted size: longer nails
+    // extend the free-edge without changing the nail's width.
+    final h = baseH * n.scale * n.lengthFactor;
     final selected = _selected == i;
 
     return Positioned(
@@ -512,7 +585,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             child: Transform.rotate(
               angle: n.rotation,
               alignment: Alignment.bottomCenter,
-              child: NailOverlay(asset: n.asset),
+              child: NailOverlay(asset: n.asset, shape: n.shape),
             ),
           ),
           if (selected)
@@ -819,6 +892,158 @@ class _SalonPickerSheetState extends State<_SalonPickerSheet> {
                             );
                           },
                         ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for picking a nail shape (Square/Round/Almond/Coffin/Stiletto)
+/// and length (Short/Medium/Long). Changes apply live as they're tapped so the
+/// customer sees them on the photo behind the sheet.
+class _ShapeLengthSheet extends StatefulWidget {
+  final String target;
+  final NailShape initialShape;
+  final double initialLength;
+  final ValueChanged<NailShape> onShape;
+  final ValueChanged<double> onLength;
+  const _ShapeLengthSheet({
+    required this.target,
+    required this.initialShape,
+    required this.initialLength,
+    required this.onShape,
+    required this.onLength,
+  });
+
+  @override
+  State<_ShapeLengthSheet> createState() => _ShapeLengthSheetState();
+}
+
+class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
+  static const _lengths = [
+    ('Short', 0.78),
+    ('Medium', 1.0),
+    ('Long', 1.28),
+  ];
+
+  late NailShape _shape = widget.initialShape;
+  late double _length = widget.initialLength;
+
+  @override
+  Widget build(BuildContext context) {
+    const teal = Color(0xFF00897B);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Shape & length — applies to ${widget.target}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 14),
+            const Text('Shape',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (final s in NailShape.values)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _shape = s);
+                      widget.onShape(s);
+                    },
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 54,
+                          height: 78,
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _shape == s ? teal : Colors.grey.shade300,
+                              width: _shape == s ? 2.5 : 1,
+                            ),
+                          ),
+                          child: NailShapePreview(shape: s),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          s.label,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: _shape == s ? teal : Colors.grey.shade700,
+                            fontWeight:
+                                _shape == s ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const Text('Length',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                for (final l in _lengths) ...[
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _length = l.$2);
+                        widget.onLength(l.$2);
+                      },
+                      child: Container(
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _length == l.$2 ? teal : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: Text(
+                          l.$1,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color:
+                                _length == l.$2 ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (l != _lengths.last) const SizedBox(width: 10),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                child: const Text('Done'),
+              ),
             ),
           ],
         ),
