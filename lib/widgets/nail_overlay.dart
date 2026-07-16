@@ -54,43 +54,82 @@ class _NailFinishPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final path = nailSilhouette(size);
+    final rect = Offset.zero & size;
     canvas.save();
     canvas.clipPath(path);
 
-    // Glossy highlight - an offset radial sheen towards the upper third.
-    final gloss = Paint()
-      ..shader = ui.Gradient.radial(
-        Offset(size.width * 0.42, size.height * 0.32),
-        size.width * 0.6,
-        [
-          Colors.white.withValues(alpha: 0.35),
-          Colors.white.withValues(alpha: 0.0),
-        ],
-        [0.0, 1.0],
-      );
-    canvas.drawRect(Offset.zero & size, gloss);
+    // Convex curvature: darken the left and right edges so the nail reads as
+    // rounded (light bends off the sides) rather than a flat cut-out.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, size.height / 2),
+          Offset(size.width, size.height / 2),
+          [
+            Colors.black.withValues(alpha: 0.17),
+            Colors.black.withValues(alpha: 0.0),
+            Colors.black.withValues(alpha: 0.17),
+          ],
+          [0.0, 0.5, 1.0],
+        ),
+    );
+
+    // Soft overall sheen towards the tip.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          Offset(size.width * 0.42, size.height * 0.30),
+          size.width * 0.62,
+          [
+            Colors.white.withValues(alpha: 0.26),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ),
+    );
+
+    // Bright specular streak down the length for a glossy, curved highlight.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(size.width * 0.32, 0),
+          Offset(size.width * 0.52, 0),
+          [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.32),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+          [0.0, 0.5, 1.0],
+        ),
+    );
 
     // Soft shading at the cuticle for a rounded, 3D base.
-    final shade = Paint()
-      ..shader = ui.Gradient.linear(
-        Offset(0, size.height * 0.70),
-        Offset(0, size.height),
-        [
-          Colors.black.withValues(alpha: 0.0),
-          Colors.black.withValues(alpha: 0.18),
-        ],
-      );
-    canvas.drawRect(Offset.zero & size, shade);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, size.height * 0.70),
+          Offset(0, size.height),
+          [
+            Colors.black.withValues(alpha: 0.0),
+            Colors.black.withValues(alpha: 0.18),
+          ],
+        ),
+    );
     canvas.restore();
 
-    // Feathered rim: a blurred translucent white stroke hugging the silhouette
-    // so the edge dissolves into the skin instead of a crisp cut-out line.
-    final rim = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..color = Colors.white.withValues(alpha: 0.22)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
-    canvas.drawPath(path, rim);
+    // Feathered rim: a blurred translucent stroke hugging the silhouette so the
+    // edge dissolves into the skin instead of a crisp cut-out line.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..color = Colors.white.withValues(alpha: 0.18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.4),
+    );
   }
 
   @override

@@ -193,6 +193,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             asset: asset,
           ));
         }
+      } else if (_selected != null) {
+        // A nail is selected: re-skin just that one, so users can build a
+        // custom set with a different design per finger.
+        _nails[_selected!].asset = asset;
       } else {
         for (final n in _nails) {
           n.asset = asset;
@@ -479,6 +483,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
         ),
         _buildToolbar(),
+        if (_nails.isNotEmpty) _buildPerNailHint(),
         _buildDesignStrip(),
         _buildActions(),
       ],
@@ -592,6 +597,21 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildPerNailHint() {
+    final selected = _selected != null;
+    return Container(
+      width: double.infinity,
+      color: selected ? const Color(0xFFEDE7F6) : Colors.grey.shade50,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      child: Text(
+        selected
+            ? 'This nail is selected — pick a design to change just this one'
+            : 'Tip: tap one nail to style it on its own, or pick a design to change all',
+        style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
       ),
     );
   }
