@@ -60,6 +60,16 @@ const double kNailWidthFactor = 0.56;
 /// values pull the nail short / down the finger.)
 const double kNailBacksetFactor = 0.16;
 
+/// The pinky gets its own, smaller backset. Its tip→DIP segment is the shortest
+/// of the five, so MediaPipe landmark noise is a bigger FRACTION of it and the
+/// pinky tip maps shortest — across tester shots the pinky nail reads low most
+/// often while the other four cap the tip. A lower backset pushes the pinky nail
+/// further up so it lands on the tip like the rest.
+const double kNailPinkyBacksetFactor = 0.06;
+
+/// The tip landmark index of the pinky (MediaPipe Hands).
+const int kPinkyTipIndex = 20;
+
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
 /// sensor's orientation to the upright, saved-photo orientation (back camera,
@@ -99,9 +109,11 @@ List<NailPose> computeNailPoses(List<Offset> landmarks) {
     // Rotating (0,-1) by θ gives (sinθ, -cosθ); solve for dir → θ.
     final rotation = math.atan2(dirX, -dirY);
 
+    final backset =
+        fj[0] == kPinkyTipIndex ? kNailPinkyBacksetFactor : kNailBacksetFactor;
     final center = Offset(
-      tip.dx - dirX * (length * kNailBacksetFactor),
-      tip.dy - dirY * (length * kNailBacksetFactor),
+      tip.dx - dirX * (length * backset),
+      tip.dy - dirY * (length * backset),
     );
     poses.add(NailPose(
       center: center,
