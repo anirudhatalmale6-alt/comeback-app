@@ -50,13 +50,15 @@ const double kNailLengthFactor = 0.52;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
-/// centre sits. At 0.35 the nail's free-edge rides a touch PAST the fingertip
-/// landmark and the body sits over the nail plate toward the cuticle — the look
-/// of an applied nail capping the tip. This deliberately biases toward the tip:
-/// MediaPipe's tip landmark sits a hair inside the visible fingertip, so a 0.50
-/// backset left the nail reading low ("under the real nail"); pushing it forward
-/// lands it on top of the natural nail instead. (Higher values pull it short.)
-const double kNailBacksetFactor = 0.35;
+/// centre sits. This is deliberately LOW (0.16) so the nail rides up and caps
+/// the fingertip. On-device the MediaPipe tip landmark maps well SHORT of the
+/// visible fingertip (confirmed across tester shots: at backset 0.50 and even
+/// 0.35 the nails still read low, sitting under the real nail), so the anatomical
+/// ~0.50 value leaves a gap above every nail. Pushing the free-edge forward
+/// closes that gap and lands the nail on top of the natural nail. If a future
+/// build fixes the landmark mapping this can climb back toward 0.35. (Higher
+/// values pull the nail short / down the finger.)
+const double kNailBacksetFactor = 0.16;
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
