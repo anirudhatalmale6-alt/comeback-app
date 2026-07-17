@@ -43,8 +43,10 @@ const double kNailLengthFactor = 0.80;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
-/// centre sits, so the nail tip lands near the fingertip.
-const double kNailBacksetFactor = 0.30;
+/// centre sits. At ~0.45 the painted free-edge lands right at the fingertip and
+/// the nail sits back over the nail bed, rather than perching on the very tip
+/// and overshooting (which left the natural nail showing as a white gap).
+const double kNailBacksetFactor = 0.45;
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera

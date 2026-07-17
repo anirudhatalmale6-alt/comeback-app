@@ -656,11 +656,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(
-            // Rotate around the cuticle (bottom-centre) so the base stays
-            // anchored to the finger while the tip swings, like a real nail.
+            // Rotate around the nail's own centre. The box is positioned centred
+            // on the finger's nail centre (see Positioned above), so the pivot
+            // must be the centre too - rotating about the bottom edge instead
+            // swings the nail off its target as the finger angle grows (the
+            // thumb/pinky "floating nail" bug).
             child: Transform.rotate(
               angle: n.rotation,
-              alignment: Alignment.bottomCenter,
+              alignment: Alignment.center,
               child: NailOverlay(
                   image: designProvider(n.asset), shape: n.shape),
             ),
