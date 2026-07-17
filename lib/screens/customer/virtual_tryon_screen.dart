@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -82,12 +83,12 @@ const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
 /// (a drift between the two would size nails wrongly).
 ///
 /// For auto-placed nails the width works out to length / ratio, so a smaller
-/// ratio = wider nail. At ~1.0 the auto nail comes out close to square (a touch
-/// taller than wide) which matches a natural nail plate: paired with the 0.52
-/// length it sits on the plate — full width without bulging past the sides, base
-/// at the cuticle rather than under it.
+/// ratio = wider nail. At 0.88 the auto nail comes out a touch wider than the
+/// tip→plate length, which matches a natural nail plate covering the finger
+/// width: paired with the 0.52 length it caps the fingertip — full width without
+/// bulging past the sides.
 const double kNailBaseWidthFactor = 0.125;
-const double kNailAspectRatio = 0.92;
+const double kNailAspectRatio = 0.88;
 
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'.
@@ -739,6 +740,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  // Smallest comfortable touch target (logical px). A small nail is only ~30px
+  // wide, which is hard to tap; the hit box is padded out to at least this so
+  // the nail is easy to select and drag even when the artwork is tiny.
+  static const double _kMinTouch = 48;
+
   Widget _buildNail(int i, Size box) {
     final n = _nails[i];
     final baseW = box.width * kNailBaseWidthFactor;
@@ -749,20 +755,27 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final h = baseH * n.scale * n.lengthFactor;
     final selected = _selected == i;
 
+    // The hit box is the nail padded out to a minimum touch size and centred on
+    // the same point, so tapping/dragging is easy without enlarging the artwork.
+    final hitW = math.max(w, _kMinTouch);
+    final hitH = math.max(h, _kMinTouch);
+
     return Positioned(
-      left: n.center.dx - w / 2,
-      top: n.center.dy - h / 2,
-      width: w,
-      height: h,
+      left: n.center.dx - hitW / 2,
+      top: n.center.dy - hitH / 2,
+      width: hitW,
+      height: hitH,
       child: Stack(
         clipBehavior: Clip.none,
+        alignment: Alignment.center,
         children: [
-          Positioned.fill(
-            // Rotate around the nail's own centre. The box is positioned centred
-            // on the finger's nail centre (see Positioned above), so the pivot
-            // must be the centre too - rotating about the bottom edge instead
-            // swings the nail off its target as the finger angle grows (the
-            // thumb/pinky "floating nail" bug).
+          // The nail artwork, at its true size, centred in the hit box. Rotate
+          // around its own centre (the box is centred on the finger's nail
+          // centre) - rotating about an edge would swing it off the target as
+          // the finger angle grows (the thumb/pinky "floating nail" bug).
+          SizedBox(
+            width: w,
+            height: h,
             child: Transform.rotate(
               angle: n.rotation,
               alignment: Alignment.center,
@@ -774,8 +787,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
           ),
           if (selected)
-            Positioned.fill(
-              child: IgnorePointer(
+            IgnorePointer(
+              child: SizedBox(
+                width: w,
+                height: h,
                 child: Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.white, width: 1.5),
@@ -784,6 +799,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 ),
               ),
             ),
+          // Full hit box: the enlarged, easy-to-hit tap/drag target.
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -804,8 +820,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
           if (selected)
             Positioned(
-              top: -14,
-              right: -14,
+              // Hug the artwork's top-right corner within the padded hit box.
+              top: (hitH - h) / 2 - 14,
+              right: (hitW - w) / 2 - 14,
               child: GestureDetector(
                 onTap: _removeSelected,
                 child: Container(

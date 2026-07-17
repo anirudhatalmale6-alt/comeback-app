@@ -40,22 +40,23 @@ const List<List<int>> kFingerJoints = [
 /// relative to its own length. Tuned on real hand photos; adjustable from
 /// on-device tester feedback.
 ///
-/// Principled value: a real nail PLATE (cuticle → free edge) is about half the
-/// distal phalanx, and the tip→DIP-joint segment we measure IS that phalanx, so
-/// the nail length should be ~0.50 of it. With the tip anchored at the fingertip
-/// (backset 0.50) this lands the base right at the cuticle — the nail sits ON
-/// the nail plate, not running under the cuticle onto the finger (which is what
-/// 0.68 did) and not overshooting the tip (0.80). Width is held at the tuned
-/// value via kNailAspectRatio.
-const double kNailLengthFactor = 0.58;
+/// The real nail PLATE (cuticle → free edge) is a bit under half the distal
+/// phalanx, and the tip→DIP-joint segment we measure IS that phalanx, so the
+/// nail length is ~0.52 of it. Paired with the backset below the nail caps the
+/// fingertip — it sits on the plate, not running down the finger past the
+/// cuticle (which is what 0.58/0.68 did) and not overshooting into a long blob.
+/// Verified by rendering the geometry onto a hand skeleton (placement_render_test).
+const double kNailLengthFactor = 0.52;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
-/// centre sits. At 0.50 the nail's free-edge lands exactly at the fingertip and
-/// the whole nail extends back over the bed toward the cuticle. (Lower values
-/// push the tip out past the fingertip; higher values pull it short and leave
-/// natural nail showing beyond the tip.)
-const double kNailBacksetFactor = 0.50;
+/// centre sits. At 0.35 the nail's free-edge rides a touch PAST the fingertip
+/// landmark and the body sits over the nail plate toward the cuticle — the look
+/// of an applied nail capping the tip. This deliberately biases toward the tip:
+/// MediaPipe's tip landmark sits a hair inside the visible fingertip, so a 0.50
+/// backset left the nail reading low ("under the real nail"); pushing it forward
+/// lands it on top of the natural nail instead. (Higher values pull it short.)
+const double kNailBacksetFactor = 0.35;
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
