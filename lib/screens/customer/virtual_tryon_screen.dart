@@ -147,6 +147,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   Size _photoImgSize = Size.zero;
   List<Offset>? _pendingLandmarks;
 
+  // The photo's measured ambient light, applied to every painted nail so they
+  // sit in the same light as the hand. Reset to neutral on each new photo and
+  // filled in once the photo is decoded and averaged.
+  AmbientLight _ambient = AmbientLight.neutral;
+
   // Baselines captured at gesture start so pinch/rotate feel natural.
   double _startScale = 1;
   double _startRot = 0;
@@ -165,11 +170,75 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _photo = File(picked.path);
       _photoImgSize = Size.zero;
       _pendingLandmarks = null;
+      _ambient = AmbientLight.neutral;
       _nails.clear();
       _selected = null;
       _currentDesign = null;
     });
+    // Measure the photo light in the background; nails restyle once it lands.
+    try {
+      final bytes = await picked.readAsBytes();
+      final decoded = await decodeImageFromList(bytes);
+      final ambient = await _computeAmbient(decoded);
+      if (mounted) setState(() => _ambient = ambient);
+    } catch (_) {
+      // Fall back to neutral light if the photo can't be sampled.
+    }
   }
+
+  /// Measures the photo's average light by shrinking it to a tiny thumbnail and
+  /// averaging the pixels, then turns that into a gentle per-channel scale for
+  /// the nails: darker photo → darker nail, warm/cool room → warm/cool nail.
+  /// Runs once per photo, entirely on-device (a downscale + average, no AI).
+  Future<AmbientLight> _computeAmbient(ui.Image image) async {
+    const n = 24;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(0, 0, n.toDouble(), n.toDouble()),
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+    final small = await recorder.endRecording().toImage(n, n);
+    final data = await small.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (data == null) return AmbientLight.neutral;
+    final bytes = data.buffer.asUint8List();
+    double rs = 0, gs = 0, bs = 0;
+    int count = 0;
+    for (int i = 0; i + 3 < bytes.length; i += 4) {
+      final a = bytes[i + 3];
+      if (a < 8) continue; // skip transparent
+      rs += bytes[i];
+      gs += bytes[i + 1];
+      bs += bytes[i + 2];
+      count++;
+    }
+    if (count == 0) return AmbientLight.neutral;
+    final r = rs / count, g = gs / count, b = bs / count;
+    final lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+    final gray = (r + g + b) / 3.0;
+
+    // Brightness: aim nails at the scene's exposure, referenced to a well-lit
+    // photo (~0.55), softened toward 1 and clamped so it never crushes/blooms.
+    double brightness = lum / 0.55;
+    brightness = _mix(1.0, brightness, 0.55).clamp(0.80, 1.12);
+
+    // Colour cast: how each channel deviates from neutral gray, softened and
+    // clamped so the tint stays subtle (a hint of warmth, not a colour wash).
+    double cast(double c) {
+      final ratio = gray <= 0 ? 1.0 : c / gray;
+      return _mix(1.0, ratio, 0.5).clamp(0.92, 1.10);
+    }
+
+    return AmbientLight(
+      brightness * cast(r),
+      brightness * cast(g),
+      brightness * cast(b),
+    );
+  }
+
+  static double _mix(double a, double b, double t) => a + (b - a) * t;
 
   /// Opens the guided camera; on return, loads the standardized photo and
   /// queues its detected landmarks so nails are auto-placed once the editor
@@ -183,11 +252,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final bytes = await result.imageFile.readAsBytes();
     final decoded = await decodeImageFromList(bytes);
     if (!mounted) return;
+    final ambient = await _computeAmbient(decoded);
+    if (!mounted) return;
     setState(() {
       _photo = result.imageFile;
       _photoImgSize =
           Size(decoded.width.toDouble(), decoded.height.toDouble());
       _pendingLandmarks = result.normalizedLandmarks;
+      _ambient = ambient;
       _selected = null;
       _nails.clear();
       _currentDesign ??= kDefaultDesign;
@@ -337,6 +409,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _currentDesign = null;
       _shape = NailShape.almond;
       _lengthFactor = 1.0;
+      // Keep _ambient: the same photo (and its light) is still loaded.
     });
   }
 
@@ -665,7 +738,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               angle: n.rotation,
               alignment: Alignment.center,
               child: NailOverlay(
-                  image: designProvider(n.asset), shape: n.shape),
+                  image: designProvider(n.asset),
+                  shape: n.shape,
+                  ambient: _ambient),
             ),
           ),
           if (selected)

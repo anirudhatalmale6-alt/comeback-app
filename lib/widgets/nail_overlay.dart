@@ -1,6 +1,31 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
+/// A measurement of the photo's ambient light, used to tint the painted nails so
+/// they sit in the SAME light as the hand instead of glowing like a flat sticker
+/// pasted on top. It is a simple per-channel scale (a diagonal colour matrix):
+/// a dim photo darkens the nail, a warm room warms it, a cool room cools it.
+///
+/// The scales are derived on-device by averaging the photo's colour once when it
+/// loads (see [_VirtualTryOnScreenState._computeAmbient]) — no AI, no cloud.
+class AmbientLight {
+  final double rScale, gScale, bScale;
+  const AmbientLight(this.rScale, this.gScale, this.bScale);
+
+  /// No adjustment (used before a photo's light has been measured).
+  static const neutral = AmbientLight(1, 1, 1);
+
+  bool get isNeutral => rScale == 1 && gScale == 1 && bScale == 1;
+
+  /// A diagonal colour matrix that applies the per-channel scale.
+  ColorFilter get filter => ColorFilter.matrix(<double>[
+        rScale, 0, 0, 0, 0,
+        0, gScale, 0, 0, 0,
+        0, 0, bScale, 0, 0,
+        0, 0, 0, 1, 0,
+      ]);
+}
+
 /// The nail-tip styles a customer can pick, matching what a technician offers.
 enum NailShape { square, round, almond, coffin, stiletto }
 
@@ -95,11 +120,23 @@ class _ContactShadowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = nailSilhouette(size, shape).shift(const Offset(0, 1.5));
-    final paint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.28)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5);
-    canvas.drawPath(path, paint);
+    final base = nailSilhouette(size, shape);
+    // Two-layer grounding: a broad, soft ambient-occlusion pool that spreads
+    // onto the skin, plus a tighter, darker contact line right under the edge.
+    // Together they stop the nail reading as a flat cut-out floating on the
+    // photo and instead sit it into the finger.
+    canvas.drawPath(
+      base.shift(const Offset(0.4, 2.6)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5),
+    );
+    canvas.drawPath(
+      base.shift(const Offset(0.2, 1.0)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.24)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.6),
+    );
   }
 
   @override
@@ -181,18 +218,52 @@ class _NailFinishPainter extends CustomPainter {
           ],
         ),
     );
-    canvas.restore();
 
-    // Feathered rim: a blurred translucent stroke hugging the silhouette so the
-    // edge dissolves into the skin instead of a crisp cut-out line.
+    // Tight specular hotspot: the small, bright pinpoint where the light source
+    // reflects off the glossy curve. This single hotspot is the strongest "wet
+    // gel" cue — without it a coloured nail reads matte/sticker even with the
+    // softer sheen above.
+    canvas.drawCircle(
+      Offset(size.width * 0.40, size.height * 0.26),
+      size.width * 0.20,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          Offset(size.width * 0.40, size.height * 0.26),
+          size.width * 0.20,
+          [
+            Colors.white.withValues(alpha: 0.62),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ),
+    );
+
+    // Free-edge reflection: a thin bright band just below the tip, as a real
+    // nail catches light along its rounded free edge.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, size.height * 0.03),
+          Offset(0, size.height * 0.17),
+          [
+            Colors.white.withValues(alpha: 0.22),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ),
+    );
+
+    // Skin-blending edge: a soft DARK inner rim (micro contact shadow), not a
+    // white halo. A white outline made the nail pop off the skin like a sticker;
+    // a faint dark rim lets the edge recede into the finger instead.
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8
-        ..color = Colors.white.withValues(alpha: 0.18)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.4),
+        ..strokeWidth = 1.6
+        ..color = Colors.black.withValues(alpha: 0.16)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.1),
     );
+    canvas.restore();
   }
 
   @override
@@ -210,15 +281,30 @@ class NailOverlay extends StatelessWidget {
   final ImageProvider image;
   final double opacity;
   final NailShape shape;
+
+  /// The measured photo light. The design artwork is tinted by this so it sits
+  /// in the same light as the hand. Defaults to no adjustment.
+  final AmbientLight ambient;
+
   const NailOverlay({
     super.key,
     required this.image,
     this.opacity = 0.92,
     this.shape = NailShape.almond,
+    this.ambient = AmbientLight.neutral,
   });
 
   @override
   Widget build(BuildContext context) {
+    // BoxFit.cover so the design fills the whole nail silhouette; the artwork is
+    // scaled, never stretched out of proportion.
+    Widget design = Image(image: image, fit: BoxFit.cover);
+    // Match the design to the photo's ambient light (dim/warm/cool) so it reads
+    // as painted-in-scene, not pasted-on. The gloss highlights are added AFTER
+    // this in the finish painter, so nails stay glossy even in a dim room.
+    if (!ambient.isNeutral) {
+      design = ColorFiltered(colorFilter: ambient.filter, child: design);
+    }
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -227,9 +313,7 @@ class NailOverlay extends StatelessWidget {
           opacity: opacity,
           child: ClipPath(
             clipper: _NailClipper(shape),
-            // BoxFit.cover so the design fills the whole nail silhouette; the
-            // artwork is scaled, never stretched out of proportion.
-            child: Image(image: image, fit: BoxFit.cover),
+            child: design,
           ),
         ),
         CustomPaint(painter: _NailFinishPainter(shape)),
