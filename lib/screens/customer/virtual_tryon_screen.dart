@@ -79,11 +79,14 @@ const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
 
 /// A nail's base width as a fraction of the editor box, and its height-to-width
 /// ratio. Kept as shared constants so auto-placement and rendering stay in sync
-/// (a drift between the two would size nails wrongly). The ratio is a little
-/// under 1.4 so nails read full and natural over the nail bed rather than
-/// pencil-thin.
+/// (a drift between the two would size nails wrongly).
+///
+/// For auto-placed nails the width works out to length / ratio, so a smaller
+/// ratio = wider nail. Lowered to ~1.18 after real device shots showed the
+/// almond nails sitting too narrow — natural nail and skin were peeking out on
+/// both sides. At 1.18 the colour fills the whole nail bed edge-to-edge.
 const double kNailBaseWidthFactor = 0.125;
-const double kNailAspectRatio = 1.34;
+const double kNailAspectRatio = 1.18;
 
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'.
