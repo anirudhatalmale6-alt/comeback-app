@@ -40,14 +40,14 @@ const List<List<int>> kFingerJoints = [
 /// relative to its own length. Tuned on real hand photos; adjustable from
 /// on-device tester feedback.
 ///
-/// 0.80 → 0.58 → 0.68. At 0.80 the nail was almost the whole distal segment and
-/// ran past the fingertip as a claw. 0.58 fixed the claw but was slightly too
-/// short — with the tip anchored near the fingertip, the base no longer reached
-/// the cuticle so a strip of natural nail showed below the colour. 0.68 with the
-/// backset at 0.50 (tip exactly at the fingertip) lets the extra length extend
-/// DOWN toward the cuticle to cover the whole bed, without pushing the tip back
-/// out past the fingertip. (Width is held steady via kNailAspectRatio.)
-const double kNailLengthFactor = 0.68;
+/// Principled value: a real nail PLATE (cuticle → free edge) is about half the
+/// distal phalanx, and the tip→DIP-joint segment we measure IS that phalanx, so
+/// the nail length should be ~0.50 of it. With the tip anchored at the fingertip
+/// (backset 0.50) this lands the base right at the cuticle — the nail sits ON
+/// the nail plate, not running under the cuticle onto the finger (which is what
+/// 0.68 did) and not overshooting the tip (0.80). Width is held at the tuned
+/// value via kNailAspectRatio.
+const double kNailLengthFactor = 0.52;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
