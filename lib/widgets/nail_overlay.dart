@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
@@ -27,21 +28,75 @@ class AmbientLight {
 }
 
 /// The nail-tip styles a customer can pick, matching what a technician offers.
-enum NailShape { square, round, almond, coffin, stiletto }
+/// Nine salon shapes, ordered natural → dramatic.
+enum NailShape {
+  round,
+  oval,
+  almond,
+  square,
+  squoval,
+  coffin,
+  ballerina,
+  stiletto,
+  lipstick,
+}
 
 extension NailShapeLabel on NailShape {
   String get label {
     switch (this) {
-      case NailShape.square:
-        return 'Square';
       case NailShape.round:
         return 'Round';
+      case NailShape.oval:
+        return 'Oval';
       case NailShape.almond:
         return 'Almond';
+      case NailShape.square:
+        return 'Square';
+      case NailShape.squoval:
+        return 'Squoval';
       case NailShape.coffin:
         return 'Coffin';
+      case NailShape.ballerina:
+        return 'Ballerina';
       case NailShape.stiletto:
         return 'Stiletto';
+      case NailShape.lipstick:
+        return 'Lipstick';
+    }
+  }
+}
+
+/// The surface finish a customer can pick — changes how light plays on the nail.
+enum NailFinish { gloss, matte, chrome, catEye, jelly, glitter, velvet }
+
+extension NailFinishLabel on NailFinish {
+  String get label {
+    switch (this) {
+      case NailFinish.gloss:
+        return 'Gloss';
+      case NailFinish.matte:
+        return 'Matte';
+      case NailFinish.chrome:
+        return 'Chrome';
+      case NailFinish.catEye:
+        return 'Cat Eye';
+      case NailFinish.jelly:
+        return 'Jelly';
+      case NailFinish.glitter:
+        return 'Glitter';
+      case NailFinish.velvet:
+        return 'Velvet';
+    }
+  }
+
+  /// How opaque the colour layer is for this finish. Jelly is translucent so the
+  /// nail underneath shows through; every other finish is near-solid gel polish.
+  double get opacity {
+    switch (this) {
+      case NailFinish.jelly:
+        return 0.80;
+      default:
+        return 0.96;
     }
   }
 }
@@ -53,26 +108,25 @@ extension NailShapeLabel on NailShape {
 /// the free-edge (tip) at the TOP; only the sides and tip differ. Keeping the
 /// cuticle at the bottom lets callers anchor scaling/rotation there, exactly as
 /// a real nail grows from its base.
-Path nailSilhouette(Size s, [NailShape shape = NailShape.almond]) {
+Path nailSilhouette(Size s, [NailShape shape = NailShape.oval]) {
   final w = s.width, h = s.height;
   final p = Path();
   // Cuticle (bottom) - a soft curve shared by every shape.
   p.moveTo(w * 0.18, h * 0.88);
   p.quadraticBezierTo(w * 0.50, h * 1.02, w * 0.82, h * 0.88);
   switch (shape) {
-    case NailShape.square:
-      // Near-parallel sides, flat free-edge with softly rounded corners.
-      p.cubicTo(w * 0.88, h * 0.62, w * 0.90, h * 0.40, w * 0.90, h * 0.20);
-      p.cubicTo(w * 0.90, h * 0.07, w * 0.81, h * 0.04, w * 0.70, h * 0.04);
-      p.lineTo(w * 0.30, h * 0.04);
-      p.cubicTo(w * 0.19, h * 0.04, w * 0.10, h * 0.07, w * 0.10, h * 0.20);
-      p.cubicTo(w * 0.10, h * 0.40, w * 0.12, h * 0.62, w * 0.18, h * 0.88);
-      break;
     case NailShape.round:
       // Gently tapered sides curving into a semicircular tip.
       p.cubicTo(w * 0.90, h * 0.64, w * 0.92, h * 0.42, w * 0.86, h * 0.24);
       p.cubicTo(w * 0.80, h * 0.04, w * 0.20, h * 0.04, w * 0.14, h * 0.24);
       p.cubicTo(w * 0.08, h * 0.42, w * 0.10, h * 0.64, w * 0.18, h * 0.88);
+      break;
+    case NailShape.oval:
+      // Full egg shape: bellies wide at the middle then rounds softly to the
+      // tip (no point). The most natural, flattering everyday shape.
+      p.cubicTo(w * 0.98, h * 0.62, w * 0.94, h * 0.28, w * 0.70, h * 0.10);
+      p.cubicTo(w * 0.58, h * 0.02, w * 0.42, h * 0.02, w * 0.30, h * 0.10);
+      p.cubicTo(w * 0.06, h * 0.28, w * 0.02, h * 0.62, w * 0.18, h * 0.88);
       break;
     case NailShape.almond:
       // Belly out at the sides, then taper to a soft point at the tip so it
@@ -82,6 +136,23 @@ Path nailSilhouette(Size s, [NailShape shape = NailShape.almond]) {
       p.quadraticBezierTo(w * 0.46, 0, w * 0.34, h * 0.14);
       p.cubicTo(w * 0.12, h * 0.40, w * 0.06, h * 0.68, w * 0.18, h * 0.88);
       break;
+    case NailShape.square:
+      // Near-parallel sides, flat free-edge with softly rounded corners.
+      p.cubicTo(w * 0.88, h * 0.62, w * 0.90, h * 0.40, w * 0.90, h * 0.20);
+      p.cubicTo(w * 0.90, h * 0.07, w * 0.81, h * 0.04, w * 0.70, h * 0.04);
+      p.lineTo(w * 0.30, h * 0.04);
+      p.cubicTo(w * 0.19, h * 0.04, w * 0.10, h * 0.07, w * 0.10, h * 0.20);
+      p.cubicTo(w * 0.10, h * 0.40, w * 0.12, h * 0.62, w * 0.18, h * 0.88);
+      break;
+    case NailShape.squoval:
+      // Square body but with generously rounded top corners — the "squared
+      // oval" everyone asks for.
+      p.cubicTo(w * 0.89, h * 0.62, w * 0.91, h * 0.40, w * 0.90, h * 0.24);
+      p.cubicTo(w * 0.89, h * 0.10, w * 0.80, h * 0.05, w * 0.66, h * 0.05);
+      p.lineTo(w * 0.34, h * 0.05);
+      p.cubicTo(w * 0.20, h * 0.05, w * 0.11, h * 0.10, w * 0.10, h * 0.24);
+      p.cubicTo(w * 0.09, h * 0.40, w * 0.11, h * 0.62, w * 0.18, h * 0.88);
+      break;
     case NailShape.coffin:
       // Sides taper inwards to a flat, narrow "ballerina" tip.
       p.cubicTo(w * 0.92, h * 0.66, w * 0.85, h * 0.38, w * 0.74, h * 0.12);
@@ -90,10 +161,26 @@ Path nailSilhouette(Size s, [NailShape shape = NailShape.almond]) {
       p.lineTo(w * 0.26, h * 0.12);
       p.cubicTo(w * 0.15, h * 0.38, w * 0.08, h * 0.66, w * 0.18, h * 0.88);
       break;
+    case NailShape.ballerina:
+      // Like a coffin but longer and more sharply tapered to a slimmer flat tip.
+      p.cubicTo(w * 0.91, h * 0.64, w * 0.82, h * 0.34, w * 0.70, h * 0.08);
+      p.lineTo(w * 0.62, h * 0.02);
+      p.lineTo(w * 0.38, h * 0.02);
+      p.lineTo(w * 0.30, h * 0.08);
+      p.cubicTo(w * 0.18, h * 0.34, w * 0.09, h * 0.64, w * 0.18, h * 0.88);
+      break;
     case NailShape.stiletto:
       // Sides taper all the way to a sharp point at the tip.
       p.cubicTo(w * 0.92, h * 0.64, w * 0.80, h * 0.34, w * 0.50, h * 0.02);
       p.cubicTo(w * 0.20, h * 0.34, w * 0.08, h * 0.64, w * 0.18, h * 0.88);
+      break;
+    case NailShape.lipstick:
+      // A diagonal "lipstick bullet" tip: one high corner slashing down across
+      // the free edge to the opposite side.
+      p.cubicTo(w * 0.94, h * 0.60, w * 0.94, h * 0.34, w * 0.90, h * 0.14);
+      p.lineTo(w * 0.86, h * 0.08);
+      p.lineTo(w * 0.16, h * 0.34);
+      p.cubicTo(w * 0.10, h * 0.56, w * 0.10, h * 0.72, w * 0.18, h * 0.88);
       break;
   }
   p.close();
@@ -123,8 +210,6 @@ class _ContactShadowPainter extends CustomPainter {
     final base = nailSilhouette(size, shape);
     // Two-layer grounding: a broad, soft ambient-occlusion pool that spreads
     // onto the skin, plus a tighter, darker contact line right under the edge.
-    // Together they stop the nail reading as a flat cut-out floating on the
-    // photo and instead sit it into the finger.
     canvas.drawPath(
       base.shift(const Offset(0.4, 2.6)),
       Paint()
@@ -144,22 +229,19 @@ class _ContactShadowPainter extends CustomPainter {
       oldDelegate.shape != shape;
 }
 
-/// Paints the finishing touches on top of the design: a glossy highlight near
-/// the tip, a subtle darkened cuticle for depth, and a feathered rim so the
-/// edge blends into the surrounding skin rather than ending in a hard line.
+/// Paints the finishing touches on top of the design. Each [NailFinish] plays
+/// with light differently — a wet gloss, a flat matte, a metallic chrome, a
+/// magnetic cat-eye streak, a translucent jelly, sparkling glitter or a soft
+/// velvet — all on top of a shared rounded-nail shading so it reads 3D. Ends
+/// with a soft dark inner rim so the edge sinks into the skin (no sticker halo).
 class _NailFinishPainter extends CustomPainter {
   final NailShape shape;
-  const _NailFinishPainter(this.shape);
+  final NailFinish finish;
+  const _NailFinishPainter(this.shape, this.finish);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = nailSilhouette(size, shape);
-    final rect = Offset.zero & size;
-    canvas.save();
-    canvas.clipPath(path);
-
-    // Convex curvature: darken the left and right edges so the nail reads as
-    // rounded (light bends off the sides) rather than a flat cut-out.
+  // Convex side-shading + rounded cuticle base, shared by all finishes so the
+  // nail always reads as a curved surface rather than a flat cut-out.
+  void _base(Canvas canvas, Size size, Rect rect, {double sides = 0.17}) {
     canvas.drawRect(
       rect,
       Paint()
@@ -167,15 +249,25 @@ class _NailFinishPainter extends CustomPainter {
           Offset(0, size.height / 2),
           Offset(size.width, size.height / 2),
           [
-            Colors.black.withValues(alpha: 0.17),
+            Colors.black.withValues(alpha: sides),
             Colors.black.withValues(alpha: 0.0),
-            Colors.black.withValues(alpha: 0.17),
+            Colors.black.withValues(alpha: sides),
           ],
           [0.0, 0.5, 1.0],
         ),
     );
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, size.height * 0.70),
+          Offset(0, size.height),
+          [Colors.black.withValues(alpha: 0.0), Colors.black.withValues(alpha: 0.18)],
+        ),
+    );
+  }
 
-    // Soft overall sheen towards the tip.
+  void _sheen(Canvas canvas, Size size, Rect rect, double strength) {
     canvas.drawRect(
       rect,
       Paint()
@@ -183,46 +275,14 @@ class _NailFinishPainter extends CustomPainter {
           Offset(size.width * 0.42, size.height * 0.30),
           size.width * 0.62,
           [
-            Colors.white.withValues(alpha: 0.26),
+            Colors.white.withValues(alpha: strength),
             Colors.white.withValues(alpha: 0.0),
           ],
         ),
     );
+  }
 
-    // Bright specular streak down the length for a glossy, curved highlight.
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(size.width * 0.32, 0),
-          Offset(size.width * 0.52, 0),
-          [
-            Colors.white.withValues(alpha: 0.0),
-            Colors.white.withValues(alpha: 0.32),
-            Colors.white.withValues(alpha: 0.0),
-          ],
-          [0.0, 0.5, 1.0],
-        ),
-    );
-
-    // Soft shading at the cuticle for a rounded, 3D base.
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(0, size.height * 0.70),
-          Offset(0, size.height),
-          [
-            Colors.black.withValues(alpha: 0.0),
-            Colors.black.withValues(alpha: 0.18),
-          ],
-        ),
-    );
-
-    // Tight specular hotspot: the small, bright pinpoint where the light source
-    // reflects off the glossy curve. This single hotspot is the strongest "wet
-    // gel" cue — without it a coloured nail reads matte/sticker even with the
-    // softer sheen above.
+  void _hotspot(Canvas canvas, Size size, double strength) {
     canvas.drawCircle(
       Offset(size.width * 0.40, size.height * 0.26),
       size.width * 0.20,
@@ -231,14 +291,31 @@ class _NailFinishPainter extends CustomPainter {
           Offset(size.width * 0.40, size.height * 0.26),
           size.width * 0.20,
           [
-            Colors.white.withValues(alpha: 0.62),
+            Colors.white.withValues(alpha: strength),
             Colors.white.withValues(alpha: 0.0),
           ],
         ),
     );
+  }
 
-    // Free-edge reflection: a thin bright band just below the tip, as a real
-    // nail catches light along its rounded free edge.
+  void _specularStreak(Canvas canvas, Size size, Rect rect, double strength) {
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(size.width * 0.32, 0),
+          Offset(size.width * 0.52, 0),
+          [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: strength),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+          [0.0, 0.5, 1.0],
+        ),
+    );
+  }
+
+  void _tipReflection(Canvas canvas, Size size, Rect rect) {
     canvas.drawRect(
       rect,
       Paint()
@@ -251,10 +328,128 @@ class _NailFinishPainter extends CustomPainter {
           ],
         ),
     );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = nailSilhouette(size, shape);
+    final rect = Offset.zero & size;
+    canvas.save();
+    canvas.clipPath(path);
+
+    switch (finish) {
+      case NailFinish.gloss:
+        _base(canvas, size, rect);
+        _sheen(canvas, size, rect, 0.26);
+        _specularStreak(canvas, size, rect, 0.32);
+        _hotspot(canvas, size, 0.62);
+        _tipReflection(canvas, size, rect);
+        break;
+
+      case NailFinish.jelly:
+        // Translucent but very wet-looking: strong sheen and hotspot.
+        _base(canvas, size, rect, sides: 0.12);
+        _sheen(canvas, size, rect, 0.30);
+        _specularStreak(canvas, size, rect, 0.30);
+        _hotspot(canvas, size, 0.70);
+        _tipReflection(canvas, size, rect);
+        break;
+
+      case NailFinish.matte:
+        // Flat, no reflections. A faint even veil + gentle curvature only.
+        _base(canvas, size, rect, sides: 0.20);
+        canvas.drawRect(
+          rect,
+          Paint()..color = Colors.white.withValues(alpha: 0.05),
+        );
+        break;
+
+      case NailFinish.velvet:
+        // Soft suede: a broad, directional low sheen, no hard specular.
+        _base(canvas, size, rect, sides: 0.20);
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(0, size.height * 0.10),
+              Offset(0, size.height * 0.95),
+              [
+                Colors.white.withValues(alpha: 0.14),
+                Colors.white.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.10),
+              ],
+              [0.0, 0.45, 1.0],
+            ),
+        );
+        break;
+
+      case NailFinish.chrome:
+        // Mirror metal: high-contrast horizontal reflection bands + a crisp
+        // highlight, so it reads like polished chrome catching the room.
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(0, 0),
+              Offset(0, size.height),
+              [
+                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.10),
+                Colors.black.withValues(alpha: 0.42),
+                Colors.white.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.30),
+              ],
+              [0.0, 0.28, 0.5, 0.72, 1.0],
+            ),
+        );
+        _base(canvas, size, rect, sides: 0.20);
+        _hotspot(canvas, size, 0.75);
+        break;
+
+      case NailFinish.catEye:
+        // Magnetic cat-eye: a bright, narrow light bar down the length over a
+        // darkened base, like light caught in the magnetic pigment.
+        canvas.drawRect(rect, Paint()..color = Colors.black.withValues(alpha: 0.16));
+        _base(canvas, size, rect, sides: 0.14);
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(size.width * 0.34, 0),
+              Offset(size.width * 0.56, 0),
+              [
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              [0.0, 0.5, 1.0],
+            ),
+        );
+        break;
+
+      case NailFinish.glitter:
+        // Sparkle: many tiny bright specks (seeded so they don't dance between
+        // repaints) plus a soft sheen so the flecks sit in a shiny coat.
+        _base(canvas, size, rect, sides: 0.14);
+        _sheen(canvas, size, rect, 0.18);
+        final rnd = math.Random(7);
+        for (int i = 0; i < 46; i++) {
+          final x = rnd.nextDouble() * size.width;
+          final y = rnd.nextDouble() * size.height;
+          final r = 0.4 + rnd.nextDouble() * 1.1;
+          final a = 0.35 + rnd.nextDouble() * 0.5;
+          canvas.drawCircle(
+            Offset(x, y),
+            r,
+            Paint()..color = Colors.white.withValues(alpha: a),
+          );
+        }
+        _hotspot(canvas, size, 0.30);
+        break;
+    }
 
     // Skin-blending edge: a soft DARK inner rim (micro contact shadow), not a
-    // white halo. A white outline made the nail pop off the skin like a sticker;
-    // a faint dark rim lets the edge recede into the finger instead.
+    // white halo, so the nail edge recedes into the skin.
     canvas.drawPath(
       path,
       Paint()
@@ -268,19 +463,19 @@ class _NailFinishPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _NailFinishPainter oldDelegate) =>
-      oldDelegate.shape != shape;
+      oldDelegate.shape != shape || oldDelegate.finish != finish;
 }
 
 /// A single nail: the chosen design rendered INSIDE a natural nail-shaped
-/// template (mask), with a contact shadow, gloss and feathered edges so it
-/// reads as a real nail rather than a flat PNG pasted on the photo.
+/// template (mask), with a contact shadow, the chosen finish and feathered
+/// edges so it reads as a real nail rather than a flat PNG pasted on the photo.
 ///
 /// The widget fills its parent box; the caller sizes/positions/rotates it and
-/// picks the [shape] of the free-edge.
+/// picks the [shape] and [finish].
 class NailOverlay extends StatelessWidget {
   final ImageProvider image;
-  final double opacity;
   final NailShape shape;
+  final NailFinish finish;
 
   /// The measured photo light. The design artwork is tinted by this so it sits
   /// in the same light as the hand. Defaults to no adjustment.
@@ -289,8 +484,8 @@ class NailOverlay extends StatelessWidget {
   const NailOverlay({
     super.key,
     required this.image,
-    this.opacity = 0.92,
-    this.shape = NailShape.almond,
+    this.shape = NailShape.oval,
+    this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
   });
 
@@ -299,9 +494,6 @@ class NailOverlay extends StatelessWidget {
     // BoxFit.cover so the design fills the whole nail silhouette; the artwork is
     // scaled, never stretched out of proportion.
     Widget design = Image(image: image, fit: BoxFit.cover);
-    // Match the design to the photo's ambient light (dim/warm/cool) so it reads
-    // as painted-in-scene, not pasted-on. The gloss highlights are added AFTER
-    // this in the finish painter, so nails stay glossy even in a dim room.
     if (!ambient.isNeutral) {
       design = ColorFiltered(colorFilter: ambient.filter, child: design);
     }
@@ -310,62 +502,55 @@ class NailOverlay extends StatelessWidget {
       children: [
         CustomPaint(painter: _ContactShadowPainter(shape)),
         Opacity(
-          opacity: opacity,
+          opacity: finish.opacity,
           child: ClipPath(
             clipper: _NailClipper(shape),
             child: design,
           ),
         ),
-        CustomPaint(painter: _NailFinishPainter(shape)),
+        CustomPaint(painter: _NailFinishPainter(shape, finish)),
       ],
     );
   }
 }
 
-/// A small solid-colour preview of a nail [shape], used in the shape picker so
-/// the customer sees the actual silhouette (not an icon) before choosing.
+/// A small solid-colour preview of a nail [shape] with a given [finish], used in
+/// the pickers so the customer sees the actual silhouette and surface (not an
+/// icon) before choosing.
 class NailShapePreview extends StatelessWidget {
   final NailShape shape;
+  final NailFinish finish;
   final Color color;
   const NailShapePreview({
     super.key,
-    required this.shape,
+    this.shape = NailShape.oval,
+    this.finish = NailFinish.gloss,
     this.color = const Color(0xFFDF6E8C),
   });
 
   @override
-  Widget build(BuildContext context) =>
-      CustomPaint(painter: _ShapeFillPainter(shape, color));
+  Widget build(BuildContext context) => CustomPaint(
+        painter: _ShapeFillPainter(shape, finish, color),
+      );
 }
 
 class _ShapeFillPainter extends CustomPainter {
   final NailShape shape;
+  final NailFinish finish;
   final Color color;
-  const _ShapeFillPainter(this.shape, this.color);
+  const _ShapeFillPainter(this.shape, this.finish, this.color);
 
   @override
   void paint(Canvas canvas, Size size) {
     final path = nailSilhouette(size, shape);
     canvas.drawPath(path, Paint()..color = color);
-    canvas.save();
-    canvas.clipPath(path);
-    // A hint of gloss so the swatch reads as a glossy nail, not a flat blob.
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = ui.Gradient.radial(
-          Offset(size.width * 0.42, size.height * 0.30),
-          size.width * 0.60,
-          [
-            Colors.white.withValues(alpha: 0.35),
-            Colors.white.withValues(alpha: 0.0),
-          ],
-        ),
-    );
-    canvas.restore();
+    // Reuse the real finish painter so previews match what lands on the nail.
+    _NailFinishPainter(shape, finish).paint(canvas, size);
   }
 
   @override
   bool shouldRepaint(covariant _ShapeFillPainter oldDelegate) =>
-      oldDelegate.shape != shape || oldDelegate.color != color;
+      oldDelegate.shape != shape ||
+      oldDelegate.finish != finish ||
+      oldDelegate.color != color;
 }

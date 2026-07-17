@@ -39,15 +39,22 @@ const List<List<int>> kFingerJoints = [
 /// How long the nail is relative to the tip→joint segment, and how wide it is
 /// relative to its own length. Tuned on real hand photos; adjustable from
 /// on-device tester feedback.
-const double kNailLengthFactor = 0.80;
+///
+/// Lowered 0.80→0.58: at 0.80 the nail was almost the whole distal segment, so
+/// on long straight fingers it ran well past the fingertip and read as a long
+/// pointy claw floating on the background. A real nail bed is ~half the distal
+/// segment, so 0.58 keeps the nail on the bed with its tip at the fingertip.
+/// (Width is preserved separately via kNailAspectRatio, so shorter here does not
+/// mean skinnier.)
+const double kNailLengthFactor = 0.58;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
-/// centre sits. At ~0.42 the painted free-edge reaches right up to the fingertip
-/// while the nail still sits back over the nail bed. (Was 0.45, which left a
-/// sliver of natural nail showing beyond the tip on some fingers; 0.30 and below
-/// over-shot the tip and left the natural nail as a white gap at the base.)
-const double kNailBacksetFactor = 0.42;
+/// centre sits. At ~0.47 the painted free-edge lands right at the fingertip and
+/// the whole nail sits back over the nail bed. (Lower values push the tip out
+/// past the fingertip; higher values pull it short and leave natural nail
+/// showing beyond the tip.)
+const double kNailBacksetFactor = 0.47;
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
