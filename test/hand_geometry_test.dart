@@ -47,6 +47,31 @@ void main() {
         expect(p.width, closeTo(p.length * kNailWidthFactor, 0.01));
       }
     });
+
+    test('ring and pinky nails are pulled inward toward the hand', () {
+      final lm = _spreadHand();
+      final poses = computeNailPoses(lm);
+      // Order matches kFingerJoints: thumb, index, middle, ring, pinky.
+      final ringCenter = poses[3].center;
+      final pinkyCenter = poses[4].center;
+      // The lateral term moves each outer nail toward its inner neighbour, so
+      // its centre sits inboard (smaller x) of the raw fingertip landmark.
+      expect(ringCenter.dx, lessThan(lm[kRingTipIndex].dx));
+      expect(pinkyCenter.dx, lessThan(lm[kPinkyTipIndex].dx));
+    });
+
+    test('thumb uses its smaller backset (nail rides closer to the tip)', () {
+      final lm = List<Offset>.filled(21, Offset.zero);
+      lm[4] = const Offset(100, 100); // thumb tip
+      lm[3] = const Offset(100, 150); // thumb joint below
+      final p = computeNailPoses(lm).first;
+      // With the thumb backset (0.04) the centre sits only slightly back from
+      // the tip — much less than the default backset would give.
+      final backDist = p.center.dy - 100;
+      expect(backDist,
+          closeTo(50 * kNailLengthFactor * kNailThumbBacksetFactor, 0.01));
+      expect(backDist, lessThan(50 * kNailLengthFactor * kNailBacksetFactor));
+    });
   });
 
   group('rotateNormalized', () {

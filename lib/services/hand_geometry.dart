@@ -60,15 +60,40 @@ const double kNailWidthFactor = 0.56;
 /// values pull the nail short / down the finger.)
 const double kNailBacksetFactor = 0.16;
 
-/// The pinky gets its own, smaller backset. Its tip→DIP segment is the shortest
-/// of the five, so MediaPipe landmark noise is a bigger FRACTION of it and the
-/// pinky tip maps shortest — across tester shots the pinky nail reads low most
-/// often while the other four cap the tip. A lower backset pushes the pinky nail
-/// further up so it lands on the tip like the rest.
-const double kNailPinkyBacksetFactor = 0.06;
+/// The pinky gets its own backset. Its tip→DIP segment is the shortest of the
+/// five, so MediaPipe landmark noise is a bigger FRACTION of it and the pinky
+/// tip maps shortest — the pinky nail reads low. A lower backset pushes it up.
+/// Was 0.06, which over-projected it forward along the pinky's diagonal axis and
+/// threw the nail sideways; 0.10 keeps the lift while the lateral term (below)
+/// handles the sideways drift directly.
+const double kNailPinkyBacksetFactor = 0.10;
 
-/// The tip landmark index of the pinky (MediaPipe Hands).
+/// The thumb reads consistently LOW on the tester's device (its axis is diagonal
+/// and its distal phalanx is stubby, so the tip landmark lands short). A small
+/// backset pushes the thumb nail forward along its axis to cap the tip.
+const double kNailThumbBacksetFactor = 0.04;
+
+/// Tip landmark indices (MediaPipe Hands).
+const int kThumbTipIndex = 4;
+const int kMiddleTipIndex = 12;
+const int kRingTipIndex = 16;
 const int kPinkyTipIndex = 20;
+
+/// Outer-finger tips (ring, pinky) are detected slightly OUTWARD of the true
+/// nail on this device, so the nail drifts away from the hand's midline. We pull
+/// each outer nail back toward its neighbouring INNER finger by a fraction of
+/// nail width. Direction is taken from the neighbour landmark (ring→middle,
+/// pinky→ring), so it is orientation-independent — it works for either hand and
+/// any photo rotation without needing to know screen left/right. The pinky drifts
+/// more than the ring, hence the larger factor.
+const Map<int, int> kLateralNeighborTip = {
+  kRingTipIndex: kMiddleTipIndex,
+  kPinkyTipIndex: kRingTipIndex,
+};
+const Map<int, double> kLateralInwardFactor = {
+  kRingTipIndex: 0.18,
+  kPinkyTipIndex: 0.32,
+};
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera
@@ -109,12 +134,33 @@ List<NailPose> computeNailPoses(List<Offset> landmarks) {
     // Rotating (0,-1) by θ gives (sinθ, -cosθ); solve for dir → θ.
     final rotation = math.atan2(dirX, -dirY);
 
-    final backset =
-        fj[0] == kPinkyTipIndex ? kNailPinkyBacksetFactor : kNailBacksetFactor;
-    final center = Offset(
+    double backset = kNailBacksetFactor;
+    if (fj[0] == kThumbTipIndex) {
+      backset = kNailThumbBacksetFactor;
+    } else if (fj[0] == kPinkyTipIndex) {
+      backset = kNailPinkyBacksetFactor;
+    }
+    var center = Offset(
       tip.dx - dirX * (length * backset),
       tip.dy - dirY * (length * backset),
     );
+
+    // Pull outer-finger (ring/pinky) nails inward toward their neighbour to
+    // undo MediaPipe's outward tip bias. Perpendicular-agnostic: we simply move
+    // a fraction of the nail width along the direction to the neighbour tip.
+    final neighborIdx = kLateralNeighborTip[fj[0]];
+    if (neighborIdx != null && neighborIdx < landmarks.length) {
+      final nb = landmarks[neighborIdx];
+      final lx = nb.dx - tip.dx, ly = nb.dy - tip.dy;
+      final ln = math.sqrt(lx * lx + ly * ly);
+      if (ln > 1e-3) {
+        final f = kLateralInwardFactor[fj[0]]!;
+        center = Offset(
+          center.dx + (lx / ln) * width * f,
+          center.dy + (ly / ln) * width * f,
+        );
+      }
+    }
     poses.add(NailPose(
       center: center,
       rotation: rotation,
