@@ -40,21 +40,22 @@ const List<List<int>> kFingerJoints = [
 /// relative to its own length. Tuned on real hand photos; adjustable from
 /// on-device tester feedback.
 ///
-/// Lowered 0.80→0.58: at 0.80 the nail was almost the whole distal segment, so
-/// on long straight fingers it ran well past the fingertip and read as a long
-/// pointy claw floating on the background. A real nail bed is ~half the distal
-/// segment, so 0.58 keeps the nail on the bed with its tip at the fingertip.
-/// (Width is preserved separately via kNailAspectRatio, so shorter here does not
-/// mean skinnier.)
-const double kNailLengthFactor = 0.58;
+/// 0.80 → 0.58 → 0.68. At 0.80 the nail was almost the whole distal segment and
+/// ran past the fingertip as a claw. 0.58 fixed the claw but was slightly too
+/// short — with the tip anchored near the fingertip, the base no longer reached
+/// the cuticle so a strip of natural nail showed below the colour. 0.68 with the
+/// backset at 0.50 (tip exactly at the fingertip) lets the extra length extend
+/// DOWN toward the cuticle to cover the whole bed, without pushing the tip back
+/// out past the fingertip. (Width is held steady via kNailAspectRatio.)
+const double kNailLengthFactor = 0.68;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
-/// centre sits. At ~0.47 the painted free-edge lands right at the fingertip and
-/// the whole nail sits back over the nail bed. (Lower values push the tip out
-/// past the fingertip; higher values pull it short and leave natural nail
-/// showing beyond the tip.)
-const double kNailBacksetFactor = 0.47;
+/// centre sits. At 0.50 the nail's free-edge lands exactly at the fingertip and
+/// the whole nail extends back over the bed toward the cuticle. (Lower values
+/// push the tip out past the fingertip; higher values pull it short and leave
+/// natural nail showing beyond the tip.)
+const double kNailBacksetFactor = 0.50;
 
 /// Rotates a NORMALIZED point (each coord 0–1) within the unit square by
 /// [quarterTurnsCw] * 90° clockwise. Used to convert landmarks from the camera

@@ -82,13 +82,12 @@ const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
 /// (a drift between the two would size nails wrongly).
 ///
 /// For auto-placed nails the width works out to length / ratio, so a smaller
-/// ratio = wider nail. Lowered to ~0.86 alongside the shorter kNailLengthFactor
-/// (0.58): the shorter nail would otherwise come out skinnier too, so the ratio
-/// drops to hold the on-screen width steady while the nail gets shorter. Net
-/// effect vs before: same width covering the nail bed, but no longer overshooting
-/// the fingertip.
+/// ratio = wider nail. Tracks kNailLengthFactor so on-screen WIDTH stays put as
+/// the length is tuned: at length 0.68 an aspect of ~1.01 gives the same width
+/// as before while the nail covers the whole bed. Net effect: full-width nails,
+/// tip at the fingertip, no overshoot.
 const double kNailBaseWidthFactor = 0.125;
-const double kNailAspectRatio = 0.86;
+const double kNailAspectRatio = 1.01;
 
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'.
