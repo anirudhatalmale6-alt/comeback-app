@@ -47,7 +47,7 @@ const List<List<int>> kFingerJoints = [
 /// the nail plate, not running under the cuticle onto the finger (which is what
 /// 0.68 did) and not overshooting the tip (0.80). Width is held at the tuned
 /// value via kNailAspectRatio.
-const double kNailLengthFactor = 0.52;
+const double kNailLengthFactor = 0.58;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail

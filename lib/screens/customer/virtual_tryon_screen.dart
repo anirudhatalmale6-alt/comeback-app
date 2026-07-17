@@ -87,7 +87,7 @@ const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
 /// length it sits on the plate — full width without bulging past the sides, base
 /// at the cuticle rather than under it.
 const double kNailBaseWidthFactor = 0.125;
-const double kNailAspectRatio = 1.0;
+const double kNailAspectRatio = 0.92;
 
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'.
@@ -860,15 +860,42 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   Widget _buildPerNailHint() {
-    final selected = _selected != null;
+    // When a nail is selected, show a Size slider so it can be resized reliably.
+    // Pinch-to-zoom also works, but on a small nail the pinch target is tiny, so
+    // the slider is the dependable way to size it up or down. Drag still moves it.
+    if (_selected != null) {
+      final n = _nails[_selected!];
+      return Container(
+        width: double.infinity,
+        color: const Color(0xFFEDE7F6),
+        padding: const EdgeInsets.only(left: 12, right: 6),
+        child: Row(
+          children: [
+            const Icon(Icons.zoom_out_map,
+                size: 16, color: Color(0xFF5E35B1)),
+            const SizedBox(width: 4),
+            const Text('Size', style: TextStyle(fontSize: 12)),
+            Expanded(
+              child: Slider(
+                value: n.scale.clamp(0.35, 4.0),
+                min: 0.35,
+                max: 4.0,
+                onChanged: (v) => setState(() => n.scale = v),
+              ),
+            ),
+            const Text('drag to move',
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+            const SizedBox(width: 6),
+          ],
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
-      color: selected ? const Color(0xFFEDE7F6) : Colors.grey.shade50,
+      color: Colors.grey.shade50,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       child: Text(
-        selected
-            ? 'This nail is selected — pick a design to change just this one'
-            : 'Tip: tap one nail to style it on its own, or pick a design to change all',
+        'Tip: tap a nail to select it, then use the Size slider or drag to move it',
         style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
       ),
     );
