@@ -276,8 +276,11 @@ class _HandGuidePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final cx = w / 2;
-    // Guide occupies the central ~64% of the height.
-    final palmTop = h * 0.30, palmBottom = h * 0.74;
+    // Guide occupies the central ~64% of the height. palmTop sits low enough
+    // that even the longest finger (up to palmH above palmTop) stays on-screen
+    // with a top margin that clears the status banner — earlier the fingertips
+    // overshot the top edge and were clipped.
+    final palmTop = h * 0.42, palmBottom = h * 0.74;
     final palmHalf = w * 0.20;
 
     final path = Path();
@@ -286,12 +289,15 @@ class _HandGuidePainter extends CustomPainter {
       Rect.fromLTRB(cx - palmHalf, palmTop, cx + palmHalf, palmBottom),
       Radius.circular(w * 0.10),
     ));
-    // Four fingers + thumb as rounded capsules radiating upward.
+    // Four fingers as rounded capsules radiating upward. Widths are kept below
+    // the centre-to-centre spacing so adjacent fingers stay separated by a clean
+    // gap — this is a lightly-spread hand, not a mitten. (Earlier the capsules
+    // were wide enough to overlap, which drew the outlines crossing each other.)
     final fingers = [
-      [-0.15, 0.92, 0.30], // dx frac, length frac of palm height, width frac
-      [-0.05, 1.00, 0.30],
-      [0.05, 0.95, 0.30],
-      [0.15, 0.82, 0.28],
+      [-0.15, 0.90, 0.22], // dx frac, length frac of palm height, width frac
+      [-0.05, 1.00, 0.23], // middle — longest
+      [0.05, 0.95, 0.22],
+      [0.15, 0.80, 0.19], // pinky — shortest, thinnest
     ];
     final palmH = palmBottom - palmTop;
     for (final f in fingers) {
