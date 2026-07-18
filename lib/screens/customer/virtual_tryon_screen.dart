@@ -736,6 +736,20 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       Center(
                         child: Image.file(_photo!, fit: BoxFit.contain),
                       ),
+                      // Tapping empty photo space deselects the current nail
+                      // (hides its X badge and outline) without deleting it.
+                      // Sits UNDER the nails, so tapping a nail still selects it;
+                      // only taps that miss every nail reach this layer.
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (_selected != null) {
+                              setState(() => _selected = null);
+                            }
+                          },
+                        ),
+                      ),
                       for (int i = 0; i < _nails.length; i++)
                         _buildNail(i, _boxSize),
                       if (_currentDesign == null)
@@ -936,7 +950,18 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
             const Text('drag to move',
                 style: TextStyle(fontSize: 10, color: Colors.grey)),
-            const SizedBox(width: 6),
+            // Explicit way to dismiss the selection (and its X badge) without
+            // deleting the nail. Tapping empty photo space does the same.
+            TextButton(
+              onPressed: () => setState(() => _selected = null),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, 32),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                foregroundColor: const Color(0xFF5E35B1),
+              ),
+              child: const Text('Done', style: TextStyle(fontSize: 13)),
+            ),
+            const SizedBox(width: 2),
           ],
         ),
       );
@@ -946,7 +971,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       color: Colors.grey.shade50,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       child: Text(
-        'Tip: tap a nail to select it, then use the Size slider or drag to move it',
+        'Tip: tap a nail to select it. Tap empty space or Done to deselect.',
         style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
       ),
     );
