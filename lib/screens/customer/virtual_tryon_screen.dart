@@ -274,6 +274,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final List<String> _customDesigns = [];
   bool _busy = false;
 
+  // Design Studio: compose a look (design, colour, shape, finish) on an easy
+  // preview BEFORE the photo, then "put it on your hand". _seedFan places the
+  // composed design as a starter set on the next manually-chosen photo.
+  bool _studio = false;
+  bool _seedFan = false;
+
   final GlobalKey _captureKey = GlobalKey();
   Size _boxSize = Size.zero;
 
@@ -293,7 +299,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   final _picker = ImagePicker();
 
-  Future<void> _pickPhoto(ImageSource source) async {
+  Future<void> _pickPhoto(ImageSource source, {bool keepDesign = false}) async {
     final picked = await _picker.pickImage(
       source: source,
       maxWidth: 1600,
@@ -310,7 +316,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _nails.clear();
       _undoStack.clear();
       _selected = null;
-      _currentDesign = null;
+      // Coming from the Studio we keep the composed design so it can be laid
+      // onto the photo as a starter set; otherwise start with a clean slate.
+      if (!keepDesign) _currentDesign = null;
     });
     // Auto-enhance the photo (brighten/white-balance/sharpen) and measure its
     // light in the background; the photo swaps to the enhanced version and the
@@ -477,6 +485,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// First design tap auto-arranges five nails in a natural fan; later taps
   /// just re-skin whatever nails are already placed.
   void _applyDesign(String asset) {
+    // In the Studio (no photo yet) a design tap just updates the composed look
+    // shown in the preview; nails are placed later, once there's a photo.
+    if (_photo == null) {
+      setState(() => _currentDesign = asset);
+      return;
+    }
     _pushUndo();
     setState(() {
       _currentDesign = asset;
@@ -603,6 +617,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _shape = NailShape.oval;
       _finish = NailFinish.gloss;
       _lengthFactor = kNailDefaultLengthFactor;
+      _studio = false;
+      _seedFan = false;
       // Keep _ambient: the same photo (and its light) is still loaded.
     });
   }
@@ -782,8 +798,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Virtual Nail Try-On'),
+        leading: _studio && _photo == null
+            ? BackButton(onPressed: () => setState(() => _studio = false))
+            : null,
         actions: [
-          if (_photo != null)
+          if (_photo != null || _studio)
             IconButton(
               tooltip: 'Shape, finish & length',
               icon: const Icon(Icons.brush_outlined),
@@ -797,7 +816,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
         ],
       ),
-      body: _photo == null ? _buildChooser() : _buildEditor(),
+      body: _photo != null
+          ? _buildEditor()
+          : (_studio ? _buildStudio() : _buildChooser()),
     );
   }
 
@@ -824,6 +845,26 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
             const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: () => setState(() {
+                _studio = true;
+                _currentDesign ??= kDefaultDesign;
+              }),
+              icon: const Icon(Icons.brush),
+              label: const Text('Design My Nails First'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(240, 50),
+                backgroundColor: const Color(0xFF00897B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Pick your colours & design on a big preview, then put it '
+              'on your hand',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+            const SizedBox(height: 18),
             if (Platform.isAndroid) ...[
               FilledButton.icon(
                 onPressed: _openGuidedCapture,
@@ -865,6 +906,151 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  /// One nail rendered from the currently composed look, for the Studio
+  /// preview. Asset artwork is authored tip-down so it gets the half-turn;
+  /// procedurally-painted colours are already the right way up.
+  Widget _previewNail(double w, double h) {
+    final cd = _currentDesign ?? kDefaultDesign;
+    final color = colorDesignFor(cd);
+    final tintArgb = designTintArgb(cd);
+    return SizedBox(
+      width: w,
+      height: h,
+      child: Transform.rotate(
+        angle: color == null ? math.pi : 0,
+        child: NailOverlay(
+          image: color == null ? designProvider(cd) : null,
+          color: color,
+          tint: tintArgb == null ? null : Color(tintArgb),
+          shape: _shape,
+          finish: _finish,
+        ),
+      ),
+    );
+  }
+
+  /// The Design Studio: compose a look on a big, easy preview (no fiddling on
+  /// tiny nails over a hand photo), then "put it on your hand".
+  Widget _buildStudio() {
+    return Column(
+      children: [
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            color: const Color(0xFF1B1B1F),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final s in const [0.82, 0.93, 1.0, 0.92, 0.84])
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 5),
+                        child: _previewNail(50 * s, 72 * s),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    'Design your look here, then put it on your hand. '
+                    'Use the brush (top right) for shape & finish.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _buildCategoryChips(),
+        _buildDesignStrip(),
+        SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            color: Colors.white,
+            child: FilledButton.icon(
+              onPressed: _leaveStudioToCapture,
+              icon: const Icon(Icons.back_hand),
+              label: const Text('Put On My Hand'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                backgroundColor: const Color(0xFF00897B),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// After composing in the Studio, pick how to add the hand photo. The
+  /// composed design is carried over: Auto Try-On applies it to the detected
+  /// nails; a manual photo gets it as a starter fan to drag into place.
+  void _leaveStudioToCapture() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Add your hand photo',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            if (Platform.isAndroid)
+              ListTile(
+                leading: const Icon(Icons.auto_awesome, color: Color(0xFF7E57C2)),
+                title: const Text('Auto Try-On (Beta)'),
+                subtitle:
+                    const Text('Guided camera finds your nails automatically'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _studio = false);
+                  _openGuidedCapture();
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF00897B)),
+              title: const Text('Take a Photo'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _studio = false;
+                  _seedFan = true;
+                });
+                _pickPhoto(ImageSource.camera, keepDesign: true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined,
+                  color: Color(0xFF00897B)),
+              title: const Text('Upload from Gallery'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _studio = false;
+                  _seedFan = true;
+                });
+                _pickPhoto(ImageSource.gallery, keepDesign: true);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEditor() {
     return Column(
       children: [
@@ -878,6 +1064,17 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 if (_pendingLandmarks != null) {
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _autoPlaceNails());
+                } else if (_seedFan &&
+                    _nails.isEmpty &&
+                    _currentDesign != null) {
+                  // Came from the Studio with a manual photo: lay the composed
+                  // design down as a starter fan the customer can then drag onto
+                  // each finger.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!_seedFan || !mounted) return;
+                    _seedFan = false;
+                    _applyDesign(_currentDesign!);
+                  });
                 }
                 return RepaintBoundary(
                   key: _captureKey,
