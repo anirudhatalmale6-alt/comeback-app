@@ -16,6 +16,7 @@ import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/services/storage_service.dart';
 import 'package:comeback_app/screens/chat/chat_screen.dart';
 import 'package:comeback_app/widgets/nail_overlay.dart';
+import 'package:comeback_app/widgets/color_wheel_picker.dart';
 import 'package:comeback_app/screens/customer/guided_capture_screen.dart';
 import 'package:comeback_app/services/hand_geometry.dart';
 import 'package:comeback_app/services/photo_enhance.dart';
@@ -120,10 +121,10 @@ String _hex6(int argb) =>
 /// Builds the design id for a solid colour.
 String solidDesignId(int argb) => 'solid#${_hex6(argb)}';
 
-/// Builds the design id for a French tip in [tipArgb] over the standard nude
-/// base.
-String frenchDesignId(int tipArgb) =>
-    'french#${_hex6(tipArgb)}#${_hex6(kFrenchBaseColor)}';
+/// Builds the design id for a French tip in [tipArgb] over [baseArgb] (defaults
+/// to the standard nude base).
+String frenchDesignId(int tipArgb, [int baseArgb = kFrenchBaseColor]) =>
+    'french#${_hex6(tipArgb)}#${_hex6(baseArgb)}';
 
 /// Parses a procedural colour-design id (`solid#rrggbb` or
 /// `french#tttttt#bbbbbb`); returns null for bundled-asset or upload ids.
@@ -246,6 +247,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   double _lengthFactor = kNailDefaultLengthFactor;
   // Which category strip is showing, and the customer's own uploaded designs.
   String _category = kDesignCategories.first;
+  // The base (background) colour used behind French tips. Palette tip taps keep
+  // this base; the custom picker can change it.
+  int _frenchBase = kFrenchBaseColor;
   final List<String> _customDesigns = [];
   bool _busy = false;
 
@@ -997,15 +1001,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             width: w,
             height: h,
             child: Transform.rotate(
-              // +pi: the on-device render draws the sprite inverted relative to
-              // the authored tip-up convention (silhouette/finish/design all
-              // author the free-edge at the top). Solids on oval nails are
-              // symmetric under 180 deg so this stayed invisible until a
-              // directional design (French tip) was used - the coloured tip band
-              // was landing at the cuticle. This half-turn puts the free-edge
-              // (and its band) back at the fingertip for every nail, detected or
-              // manually added, keeping shape + finish + design consistent.
-              angle: n.rotation + math.pi,
+              // The bundled PNG artwork was authored "tip-down", so it needs a
+              // half-turn to land the free-edge (and any directional band) at the
+              // fingertip. Procedurally-painted colour designs are authored the
+              // right way up (tip at the top), so they must NOT get that extra
+              // half-turn - otherwise their French band flips down to the cuticle.
+              angle: n.rotation +
+                  (colorDesignFor(n.asset) == null ? math.pi : 0),
               alignment: Alignment.center,
               child: NailOverlay(
                   image: colorDesignFor(n.asset) == null
@@ -1251,8 +1253,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  /// A horizontal palette of colours. For Solids each swatch paints the whole
-  /// nail; for French each swatch sets the tip colour over a nude base.
+  /// A horizontal palette of colours led by a "Custom" wheel tile. For Solids
+  /// each swatch paints the whole nail; for French each swatch sets the tip
+  /// colour over the current base.
   Widget _buildColorPalette({required bool french}) {
     return Container(
       height: 92,
@@ -1260,14 +1263,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: kNailPalette.length,
+        itemCount: kNailPalette.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          final argb = kNailPalette[i] | 0xFF000000;
-          final id = french ? frenchDesignId(argb) : solidDesignId(argb);
+          if (i == 0) return _buildCustomColorTile(french: french);
+          final argb = kNailPalette[i - 1] | 0xFF000000;
+          final id =
+              french ? frenchDesignId(argb, _frenchBase) : solidDesignId(argb);
           final active = _currentDesign == id;
           final design = french
-              ? ColorDesign(const Color(kFrenchBaseColor), tip: Color(argb))
+              ? ColorDesign(Color(_frenchBase), tip: Color(argb))
               : ColorDesign(Color(argb));
           return Center(
             child: GestureDetector(
@@ -1292,6 +1297,141 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         },
       ),
     );
+  }
+
+  /// The leading palette tile: a rainbow wheel that opens the colour picker so
+  /// the customer can dial in any exact colour (and, for French, the base too).
+  Widget _buildCustomColorTile({required bool french}) {
+    return Center(
+      child: GestureDetector(
+        onTap: french ? _pickFrenchCustom : _pickSolidCustom,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+                gradient: const SweepGradient(colors: [
+                  Color(0xFFFF0000),
+                  Color(0xFFFFFF00),
+                  Color(0xFF00FF00),
+                  Color(0xFF00FFFF),
+                  Color(0xFF0000FF),
+                  Color(0xFFFF00FF),
+                  Color(0xFFFF0000),
+                ]),
+              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 24),
+            ),
+            const SizedBox(height: 2),
+            const Text('Custom', style: TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Solids: pick any exact colour with the wheel and paint the whole nail.
+  Future<void> _pickSolidCustom() async {
+    final cd = _currentDesign == null ? null : colorDesignFor(_currentDesign!);
+    final start = (cd != null && cd.tip == null) ? cd.base : const Color(0xFFE23B4E);
+    final picked =
+        await showColorWheelDialog(context, initial: start, title: 'Nail colour');
+    if (picked == null) return;
+    _applyDesign(solidDesignId(picked.toARGB32()));
+  }
+
+  /// French: choose both the tip colour and the base colour, each with the
+  /// wheel, and preview the result live before applying.
+  Future<void> _pickFrenchCustom() async {
+    final cd = _currentDesign == null ? null : colorDesignFor(_currentDesign!);
+    Color tip = (cd != null && cd.tip != null) ? cd.tip! : const Color(0xFFFFFFFF);
+    Color base = (cd != null && cd.tip != null) ? cd.base : Color(_frenchBase);
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            Widget swatchRow(String label, Color color, VoidCallback onTap) {
+              return InkWell(
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(label, style: const TextStyle(fontSize: 15)),
+                      const Spacer(),
+                      const Icon(Icons.edit, size: 18, color: Colors.black45),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Custom French',
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: SizedBox(
+                        width: 64,
+                        height: 90,
+                        child: NailColorSwatch(ColorDesign(base, tip: tip)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    swatchRow('Tip colour', tip, () async {
+                      final c = await showColorWheelDialog(ctx,
+                          initial: tip, title: 'Tip colour');
+                      if (c != null) setSheet(() => tip = c);
+                    }),
+                    const Divider(height: 1),
+                    swatchRow('Base colour', base, () async {
+                      final c = await showColorWheelDialog(ctx,
+                          initial: base, title: 'Base colour');
+                      if (c != null) setSheet(() => base = c);
+                    }),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(sheetCtx, true),
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48)),
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true) {
+      setState(() => _frenchBase = base.toARGB32());
+      _applyDesign(frenchDesignId(tip.toARGB32(), base.toARGB32()));
+    }
   }
 
   Widget _buildDesignTile(String id, String name) {
