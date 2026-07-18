@@ -69,9 +69,11 @@ const double kNailBacksetFactor = 0.16;
 const double kNailPinkyBacksetFactor = 0.10;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
-/// and its distal phalanx is stubby, so the tip landmark lands short). A small
-/// backset pushes the thumb nail forward along its axis to cap the tip.
-const double kNailThumbBacksetFactor = 0.04;
+/// and its distal phalanx is stubby, so the tip landmark lands well short of the
+/// real nail bed). A NEGATIVE backset pushes the thumb nail past the tip
+/// landmark, up onto the nail bed where it belongs (0.04 still read low across
+/// tester shots; -0.06 lifts it onto the bed).
+const double kNailThumbBacksetFactor = -0.06;
 
 /// Tip landmark indices (MediaPipe Hands).
 const int kThumbTipIndex = 4;

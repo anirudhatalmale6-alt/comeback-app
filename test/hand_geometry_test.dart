@@ -60,16 +60,17 @@ void main() {
       expect(pinkyCenter.dx, lessThan(lm[kPinkyTipIndex].dx));
     });
 
-    test('thumb uses its smaller backset (nail rides closer to the tip)', () {
+    test('thumb rides up onto the nail bed (past the tip landmark)', () {
       final lm = List<Offset>.filled(21, Offset.zero);
       lm[4] = const Offset(100, 100); // thumb tip
-      lm[3] = const Offset(100, 150); // thumb joint below
+      lm[3] = const Offset(100, 150); // thumb joint below (finger points up)
       final p = computeNailPoses(lm).first;
-      // With the thumb backset (0.04) the centre sits only slightly back from
-      // the tip — much less than the default backset would give.
-      final backDist = p.center.dy - 100;
+      final backDist = p.center.dy - 100; // +y is toward the joint (down)
       expect(backDist,
           closeTo(50 * kNailLengthFactor * kNailThumbBacksetFactor, 0.01));
+      // Negative backset lifts the thumb nail ABOVE the tip (toward the bed),
+      // well up from where the default backset would leave it.
+      expect(backDist, lessThan(0));
       expect(backDist, lessThan(50 * kNailLengthFactor * kNailBacksetFactor));
     });
   });

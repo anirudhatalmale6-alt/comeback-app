@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,6 +18,7 @@ import 'package:comeback_app/screens/chat/chat_screen.dart';
 import 'package:comeback_app/widgets/nail_overlay.dart';
 import 'package:comeback_app/screens/customer/guided_capture_screen.dart';
 import 'package:comeback_app/services/hand_geometry.dart';
+import 'package:comeback_app/services/photo_enhance.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 /// [asset] doubles as the design's identity.
@@ -174,8 +175,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       imageQuality: 90,
     );
     if (picked == null) return;
+    final original = File(picked.path);
     setState(() {
-      _photo = File(picked.path);
+      _photo = original;
       _photoImgSize = Size.zero;
       _pendingLandmarks = null;
       _ambient = AmbientLight.neutral;
@@ -183,14 +185,39 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _selected = null;
       _currentDesign = null;
     });
-    // Measure the photo light in the background; nails restyle once it lands.
+    // Auto-enhance the photo (brighten/white-balance/sharpen) and measure its
+    // light in the background; the photo swaps to the enhanced version and the
+    // nails restyle once it lands. Dimensions are preserved so nothing shifts.
     try {
-      final bytes = await picked.readAsBytes();
+      final enhanced = await _enhancedPhotoFile(original);
+      final bytes = await enhanced.readAsBytes();
       final decoded = await decodeImageFromList(bytes);
       final ambient = await _computeAmbient(decoded);
-      if (mounted) setState(() => _ambient = ambient);
+      if (mounted) {
+        setState(() {
+          _photo = enhanced;
+          _ambient = ambient;
+        });
+      }
     } catch (_) {
-      // Fall back to neutral light if the photo can't be sampled.
+      // Fall back to the original photo and neutral light on any failure.
+    }
+  }
+
+  /// Runs [enhanceJpgBytes] on a background isolate and writes the result to a
+  /// temp file. Returns the original file unchanged if enhancement fails, so
+  /// callers can use it blindly — a photo is never lost to a bad enhance.
+  Future<File> _enhancedPhotoFile(File src) async {
+    try {
+      final bytes = await src.readAsBytes();
+      final out = await compute(enhanceJpgBytes, bytes);
+      final path =
+          '${Directory.systemTemp.path}/tryon_enh_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      final file = File(path);
+      await file.writeAsBytes(out, flush: true);
+      return file;
+    } catch (_) {
+      return src;
     }
   }
 
@@ -257,13 +284,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       MaterialPageRoute(builder: (_) => const GuidedCaptureScreen()),
     );
     if (result == null || !mounted) return;
-    final bytes = await result.imageFile.readAsBytes();
+    // Auto-enhance the captured frame. Enhancement preserves dimensions, so the
+    // normalized landmarks still map onto it exactly.
+    final enhanced = await _enhancedPhotoFile(result.imageFile);
+    final bytes = await enhanced.readAsBytes();
     final decoded = await decodeImageFromList(bytes);
     if (!mounted) return;
     final ambient = await _computeAmbient(decoded);
     if (!mounted) return;
     setState(() {
-      _photo = result.imageFile;
+      _photo = enhanced;
       _photoImgSize =
           Size(decoded.width.toDouble(), decoded.height.toDouble());
       _pendingLandmarks = result.normalizedLandmarks;
