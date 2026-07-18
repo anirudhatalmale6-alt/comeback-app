@@ -128,6 +128,35 @@ class _Nail {
   })  : initCenter = center,
         initScale = scale,
         initRotation = rotation;
+
+  _Nail._raw({
+    required this.center,
+    required this.scale,
+    required this.rotation,
+    required this.asset,
+    required this.shape,
+    required this.finish,
+    required this.lengthFactor,
+    required this.initCenter,
+    required this.initScale,
+    required this.initRotation,
+  });
+
+  /// A deep copy that PRESERVES the original auto-placed pose (init*), so Undo
+  /// can restore a nail and Reset still snaps it back to where auto-layout put
+  /// it — not to wherever it happened to be when the snapshot was taken.
+  _Nail copy() => _Nail._raw(
+        center: center,
+        scale: scale,
+        rotation: rotation,
+        asset: asset,
+        shape: shape,
+        finish: finish,
+        lengthFactor: lengthFactor,
+        initCenter: initCenter,
+        initScale: initScale,
+        initRotation: initRotation,
+      );
 }
 
 class VirtualTryOnScreen extends StatefulWidget {
@@ -141,6 +170,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   File? _photo;
   final List<_Nail> _nails = [];
   int? _selected;
+  // Undo history: a stack of nail-list snapshots taken just BEFORE each edit
+  // (move, resize, add, remove, recolour, shape/length). Undo pops the last.
+  final List<List<_Nail>> _undoStack = [];
+  static const int _kMaxUndo = 40;
+  // True while a nail is being dragged, so we can show crosshair guides that
+  // stay visible even when the finger covers the nail.
+  bool _dragging = false;
   String? _currentDesign;
   // The shape/finish/length applied to new nails and to "all nails" edits. A
   // single selected nail can override these for that finger only.
@@ -186,6 +222,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _pendingLandmarks = null;
       _ambient = AmbientLight.neutral;
       _nails.clear();
+      _undoStack.clear();
       _selected = null;
       _currentDesign = null;
     });
@@ -304,6 +341,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _ambient = ambient;
       _selected = null;
       _nails.clear();
+      _undoStack.clear();
       _currentDesign ??= kDefaultDesign;
     });
   }
@@ -353,6 +391,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// First design tap auto-arranges five nails in a natural fan; later taps
   /// just re-skin whatever nails are already placed.
   void _applyDesign(String asset) {
+    _pushUndo();
     setState(() {
       _currentDesign = asset;
       if (_nails.isEmpty) {
@@ -408,11 +447,31 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     _applyDesign(picked.path);
   }
 
+  /// Snapshots the current nails so the next edit can be undone. Call BEFORE
+  /// mutating [_nails].
+  void _pushUndo() {
+    _undoStack.add(_nails.map((n) => n.copy()).toList());
+    if (_undoStack.length > _kMaxUndo) _undoStack.removeAt(0);
+  }
+
+  void _undo() {
+    if (_undoStack.isEmpty) return;
+    setState(() {
+      final prev = _undoStack.removeLast();
+      _nails
+        ..clear()
+        ..addAll(prev);
+      // Keep any still-valid selection; drop it if it now points past the end.
+      if (_selected != null && _selected! >= _nails.length) _selected = null;
+    });
+  }
+
   void _addNail() {
     if (_currentDesign == null) {
       _snack('Pick a design first');
       return;
     }
+    _pushUndo();
     setState(() {
       _nails.add(_Nail(
         center: Offset(_boxSize.width / 2, _boxSize.height / 2),
@@ -429,6 +488,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   void _removeSelected() {
     if (_selected == null) return;
+    _pushUndo();
     setState(() {
       _nails.removeAt(_selected!);
       _selected = null;
@@ -439,6 +499,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// leaving every other nail untouched.
   void _resetSelected() {
     if (_selected == null) return;
+    _pushUndo();
     setState(() {
       final n = _nails[_selected!];
       n.center = n.initCenter;
@@ -450,6 +511,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   void _reset() {
     setState(() {
       _nails.clear();
+      _undoStack.clear();
       _selected = null;
       _currentDesign = null;
       _shape = NailShape.oval;
@@ -462,6 +524,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Applies a shape to the selected nail only, or to every nail (and future
   /// nails) when nothing is selected.
   void _applyShape(NailShape shape) {
+    _pushUndo();
     setState(() {
       if (_selected != null) {
         _nails[_selected!].shape = shape;
@@ -477,6 +540,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Applies a finish to the selected nail only, or to every nail (and future
   /// nails) when nothing is selected — same behaviour as [_applyShape].
   void _applyFinish(NailFinish finish) {
+    _pushUndo();
     setState(() {
       if (_selected != null) {
         _nails[_selected!].finish = finish;
@@ -492,6 +556,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Applies a length multiplier (Short/Medium/Long) with the same
   /// selected-nail-vs-all behaviour as [_applyShape].
   void _applyLength(double factor) {
+    _pushUndo();
     setState(() {
       if (_selected != null) {
         _nails[_selected!].lengthFactor = factor;
@@ -752,6 +817,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       ),
                       for (int i = 0; i < _nails.length; i++)
                         _buildNail(i, _boxSize),
+                      // Crosshair guides while dragging so you can see exactly
+                      // where the nail lands even under your fingertip.
+                      if (_dragging &&
+                          _selected != null &&
+                          _selected! < _nails.length)
+                        _buildDragGuides(_nails[_selected!].center),
                       if (_currentDesign == null)
                         Positioned(
                           left: 0,
@@ -792,6 +863,46 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // wide, which is hard to tap; the hit box is padded out to at least this so
   // the nail is easy to select and drag even when the artwork is tiny.
   static const double _kMinTouch = 48;
+
+  /// Crosshair + centre ring shown while a nail is being dragged. The lines
+  /// span the whole photo so the exact target point stays visible even when the
+  /// fingertip covers the nail ("hard to see where you're putting them").
+  /// Non-interactive (IgnorePointer) so it never eats the drag.
+  Widget _buildDragGuides(Offset c) {
+    const line = Color(0xCC00E5FF); // cyan ~80% — reads over skin and nails
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: c.dy - 0.75,
+            height: 1.5,
+            child: Container(color: line),
+          ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            left: c.dx - 0.75,
+            width: 1.5,
+            child: Container(color: line),
+          ),
+          Positioned(
+            left: c.dx - 9,
+            top: c.dy - 9,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: line, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildNail(int i, Size box) {
     final n = _nails[i];
@@ -855,7 +966,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               onScaleStart: (_) {
                 _startScale = n.scale;
                 _startRot = n.rotation;
-                setState(() => _selected = i);
+                // One undo snapshot per drag/pinch gesture (not per frame).
+                _pushUndo();
+                setState(() {
+                  _selected = i;
+                  _dragging = true;
+                });
               },
               onScaleUpdate: (d) {
                 setState(() {
@@ -864,6 +980,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                   n.rotation = _startRot + d.rotation;
                 });
               },
+              onScaleEnd: (_) => setState(() => _dragging = false),
             ),
           ),
           if (selected)
@@ -905,6 +1022,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             icon: const Icon(Icons.image_outlined, size: 18),
             label: const Text('Change photo'),
           ),
+          TextButton.icon(
+            onPressed: _undoStack.isEmpty ? null : _undo,
+            icon: const Icon(Icons.undo, size: 18),
+            label: const Text('Undo'),
+          ),
           const Spacer(),
           if (_selected != null) ...[
             TextButton.icon(
@@ -945,6 +1067,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 value: n.scale.clamp(0.35, 4.0),
                 min: 0.35,
                 max: 4.0,
+                onChangeStart: (_) => _pushUndo(),
                 onChanged: (v) => setState(() => n.scale = v),
               ),
             ),
@@ -971,7 +1094,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       color: Colors.grey.shade50,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       child: Text(
-        'Tip: tap a nail to select it. Tap empty space or Done to deselect.',
+        'Tip: tap a nail, then drag to move it — guide lines show where it lands. '
+        'Undo reverses your last change; tap empty space or Done to deselect.',
         style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
       ),
     );
