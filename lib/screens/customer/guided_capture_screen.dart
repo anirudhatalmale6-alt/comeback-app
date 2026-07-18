@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
 
 import 'package:comeback_app/services/capture_conditions.dart';
 import 'package:comeback_app/services/hand_geometry.dart';
 import 'package:comeback_app/services/image_stats.dart';
+import 'package:comeback_app/services/yuv_to_image.dart';
 
 /// What the guided capture hands back: the photo it took plus the 21 hand
 /// landmarks in the upright photo's NORMALIZED space (0–1), ready to drive
@@ -46,6 +48,13 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
   DateTime? _steadySince;
   Offset? _steadyCentroid;
 
+  /// The most recent camera frame — the same stream of frames hand detection
+  /// runs on. We turn THIS into the photo so the landmarks line up with it,
+  /// instead of shooting a separate still that can have a different field of
+  /// view or catch the hand a few milliseconds later (which made placement
+  /// "sometimes completely off").
+  CameraImage? _lastImage;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +91,7 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
 
   void _onFrame(CameraImage image) {
     if (_capturing) return;
+    _lastImage = image;
     final p0 = image.planes.first;
     _luma = computeLumaStats(
         p0.bytes, image.width, image.height, p0.bytesPerRow);
@@ -134,16 +144,52 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
   Future<void> _autoCapture(List<Offset> landmarks) async {
     if (_capturing) return;
     _capturing = true;
+    final frame = _lastImage;
     setState(() {});
     try {
       await _cam!.stopImageStream();
-      final shot = await _cam!.takePicture();
+      // Preferred path: save the exact detection frame as the photo so the
+      // landmarks map onto it perfectly. Falls back to a normal still if the
+      // frame can't be converted, so capture can never be worse than before.
+      File? file = await _saveDetectionFrame(frame);
+      file ??= File((await _cam!.takePicture()).path);
       if (!mounted) return;
-      Navigator.pop(
-          context, GuidedCaptureResult(File(shot.path), landmarks));
+      Navigator.pop(context, GuidedCaptureResult(file, landmarks));
     } catch (e) {
       _capturing = false;
       if (mounted) setState(() => _error = '$e');
+    }
+  }
+
+  /// Converts [image] (the frame detection ran on) to an upright JPEG on a
+  /// background isolate and writes it to a temp file. Returns null if the frame
+  /// is missing or not in the expected YUV420 layout, so the caller can fall
+  /// back to a regular still.
+  Future<File?> _saveDetectionFrame(CameraImage? image) async {
+    if (image == null || image.planes.length < 3) return null;
+    try {
+      final y = image.planes[0];
+      final u = image.planes[1];
+      final v = image.planes[2];
+      final frame = YuvFrame(
+        y: Uint8List.fromList(y.bytes),
+        u: Uint8List.fromList(u.bytes),
+        v: Uint8List.fromList(v.bytes),
+        width: image.width,
+        height: image.height,
+        yRowStride: y.bytesPerRow,
+        uvRowStride: u.bytesPerRow,
+        uvPixelStride: u.bytesPerPixel ?? 1,
+        rotationTurns: _sensorOrientation ~/ 90,
+      );
+      final jpg = await compute(encodeYuvFrameToJpg, frame);
+      final path =
+          '${Directory.systemTemp.path}/tryon_${DateTime.now().microsecondsSinceEpoch}.jpg';
+      final file = File(path);
+      await file.writeAsBytes(jpg, flush: true);
+      return file;
+    } catch (_) {
+      return null;
     }
   }
 
