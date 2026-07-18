@@ -46,7 +46,9 @@ const List<List<int>> kFingerJoints = [
 /// fingertip — it sits on the plate, not running down the finger past the
 /// cuticle (which is what 0.58/0.68 did) and not overshooting into a long blob.
 /// Verified by rendering the geometry onto a hand skeleton (placement_render_test).
-const double kNailLengthFactor = 0.52;
+/// Bumped 0.52→0.58 on tester feedback that the nails read too small / didn't
+/// fill the real nail bed — this scales the whole auto-nail up ~11%.
+const double kNailLengthFactor = 0.58;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
@@ -57,23 +59,24 @@ const double kNailWidthFactor = 0.56;
 /// ~0.50 value leaves a gap above every nail. Pushing the free-edge forward
 /// closes that gap and lands the nail on top of the natural nail. If a future
 /// build fixes the landmark mapping this can climb back toward 0.35. (Higher
-/// values pull the nail short / down the finger.)
-const double kNailBacksetFactor = 0.16;
+/// values pull the nail short / down the finger.) Lowered 0.16→0.10 on tester
+/// feedback ("move all the nails up so you can't see the real nails").
+const double kNailBacksetFactor = 0.10;
 
 /// The pinky gets its own backset. Its tip→DIP segment is the shortest of the
 /// five, so MediaPipe landmark noise is a bigger FRACTION of it and the pinky
 /// tip maps shortest — the pinky nail reads low. A lower backset pushes it up.
 /// Was 0.06, which over-projected it forward along the pinky's diagonal axis and
-/// threw the nail sideways; 0.10 keeps the lift while the lateral term (below)
-/// handles the sideways drift directly.
-const double kNailPinkyBacksetFactor = 0.10;
+/// threw the nail sideways; the lateral term (below) handles the sideways drift
+/// directly. Lowered 0.10→0.04 with the global up-shift so the pinky rises too.
+const double kNailPinkyBacksetFactor = 0.04;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the
 /// real nail bed). A NEGATIVE backset pushes the thumb nail past the tip
 /// landmark, up onto the nail bed where it belongs (0.04 still read low across
-/// tester shots; -0.06 lifts it onto the bed).
-const double kNailThumbBacksetFactor = -0.06;
+/// tester shots; -0.06 lifted it onto the bed, -0.10 with the global up-shift).
+const double kNailThumbBacksetFactor = -0.10;
 
 /// Tip landmark indices (MediaPipe Hands).
 const int kThumbTipIndex = 4;

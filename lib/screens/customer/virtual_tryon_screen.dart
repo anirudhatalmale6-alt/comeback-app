@@ -91,6 +91,10 @@ const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
 const double kNailBaseWidthFactor = 0.125;
 const double kNailAspectRatio = 0.88;
 
+/// Default nail length multiplier (the "Medium" preset). Bumped 1.0→1.15 on
+/// tester feedback that the nails should be a bit longer to fill the nail bed.
+const double kNailDefaultLengthFactor = 1.15;
+
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'.
 ImageProvider designProvider(String id) {
@@ -142,7 +146,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // single selected nail can override these for that finger only.
   NailShape _shape = NailShape.oval;
   NailFinish _finish = NailFinish.gloss;
-  double _lengthFactor = 1.0;
+  double _lengthFactor = kNailDefaultLengthFactor;
   // Which category strip is showing, and the customer's own uploaded designs.
   String _category = kDesignCategories.first;
   final List<String> _customDesigns = [];
@@ -450,7 +454,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _currentDesign = null;
       _shape = NailShape.oval;
       _finish = NailFinish.gloss;
-      _lengthFactor = 1.0;
+      _lengthFactor = kNailDefaultLengthFactor;
       // Keep _ambient: the same photo (and its light) is still loaded.
     });
   }
@@ -1274,9 +1278,9 @@ class _ShapeLengthSheet extends StatefulWidget {
 
 class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
   static const _lengths = [
-    ('Short', 0.78),
-    ('Medium', 1.0),
-    ('Long', 1.28),
+    ('Short', 0.90),
+    ('Medium', kNailDefaultLengthFactor), // 1.15 — the new default
+    ('Long', 1.45),
   ];
 
   late NailShape _shape = widget.initialShape;
