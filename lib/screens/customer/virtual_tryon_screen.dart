@@ -157,11 +157,32 @@ const double kNailAspectRatio = 0.88;
 /// tester feedback that the nails should be a bit longer to fill the nail bed.
 const double kNailDefaultLengthFactor = 1.15;
 
+/// An asset or upload design may carry a recolour suffix, e.g.
+/// `assets/nail_designs/leopard.png#tint=2196f3`. These helpers split that off
+/// so the base artwork can be loaded and the recolour applied separately.
+String stripDesignSuffix(String id) {
+  final i = id.indexOf('#tint=');
+  return i < 0 ? id : id.substring(0, i);
+}
+
+/// The recolour applied to an asset design, or null if it is shown as-is.
+int? designTintArgb(String id) {
+  final i = id.indexOf('#tint=');
+  if (i < 0) return null;
+  return int.parse(id.substring(i + 6), radix: 16) | 0xFF000000;
+}
+
+/// Builds a design id that recolours [baseId] to [argb].
+String tintedDesignId(String baseId, int argb) =>
+    '${stripDesignSuffix(baseId)}#tint=${_hex6(argb)}';
+
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
-/// path; custom uploads are absolute file paths starting with '/'.
+/// path; custom uploads are absolute file paths starting with '/'. Any recolour
+/// suffix is stripped first so the base artwork loads.
 ImageProvider designProvider(String id) {
-  if (id.startsWith('/')) return FileImage(File(id));
-  return AssetImage(id);
+  final base = stripDesignSuffix(id);
+  if (base.startsWith('/')) return FileImage(File(base));
+  return AssetImage(base);
 }
 
 /// One design placed on a nail: where it sits, how big, and its angle.
@@ -1014,6 +1035,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       ? designProvider(n.asset)
                       : null,
                   color: colorDesignFor(n.asset),
+                  tint: designTintArgb(n.asset) == null
+                      ? null
+                      : Color(designTintArgb(n.asset)!),
                   shape: n.shape,
                   finish: n.finish,
                   ambient: _ambient),
@@ -1121,44 +1145,80 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   Widget _buildPerNailHint() {
-    // When a nail is selected, show a Size slider so it can be resized reliably.
-    // Pinch-to-zoom also works, but on a small nail the pinch target is tiny, so
-    // the slider is the dependable way to size it up or down. Drag still moves it.
+    // When a nail is selected, show Size and Angle sliders so it can be resized
+    // and rotated reliably. Pinch/twist gestures also work, but on a small nail
+    // the target is tiny, so the sliders are the dependable controls. Drag still
+    // moves it.
     if (_selected != null) {
       final n = _nails[_selected!];
       return Container(
         width: double.infinity,
         color: const Color(0xFFEDE7F6),
-        padding: const EdgeInsets.only(left: 12, right: 6),
-        child: Row(
+        padding: const EdgeInsets.only(left: 12, right: 6, top: 2, bottom: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.zoom_out_map,
-                size: 16, color: Color(0xFF5E35B1)),
-            const SizedBox(width: 4),
-            const Text('Size', style: TextStyle(fontSize: 12)),
-            Expanded(
-              child: Slider(
-                value: n.scale.clamp(0.35, 4.0),
-                min: 0.35,
-                max: 4.0,
-                onChangeStart: (_) => _pushUndo(),
-                onChanged: (v) => setState(() => n.scale = v),
-              ),
+            Row(
+              children: [
+                const Icon(Icons.zoom_out_map,
+                    size: 16, color: Color(0xFF5E35B1)),
+                const SizedBox(width: 4),
+                const SizedBox(
+                    width: 40,
+                    child: Text('Size', style: TextStyle(fontSize: 12))),
+                Expanded(
+                  child: Slider(
+                    value: n.scale.clamp(0.35, 4.0),
+                    min: 0.35,
+                    max: 4.0,
+                    onChangeStart: (_) => _pushUndo(),
+                    onChanged: (v) => setState(() => n.scale = v),
+                  ),
+                ),
+                // Explicit way to dismiss the selection (and its X badge)
+                // without deleting the nail. Tapping empty photo space too.
+                TextButton(
+                  onPressed: () => setState(() => _selected = null),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    foregroundColor: const Color(0xFF5E35B1),
+                  ),
+                  child: const Text('Done', style: TextStyle(fontSize: 13)),
+                ),
+                const SizedBox(width: 2),
+              ],
             ),
-            const Text('drag to move',
-                style: TextStyle(fontSize: 10, color: Colors.grey)),
-            // Explicit way to dismiss the selection (and its X badge) without
-            // deleting the nail. Tapping empty photo space does the same.
-            TextButton(
-              onPressed: () => setState(() => _selected = null),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(0, 32),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                foregroundColor: const Color(0xFF5E35B1),
-              ),
-              child: const Text('Done', style: TextStyle(fontSize: 13)),
+            Row(
+              children: [
+                const Icon(Icons.rotate_right,
+                    size: 16, color: Color(0xFF5E35B1)),
+                const SizedBox(width: 4),
+                const SizedBox(
+                    width: 40,
+                    child: Text('Angle', style: TextStyle(fontSize: 12))),
+                Expanded(
+                  child: Slider(
+                    value: n.rotation.clamp(-math.pi, math.pi),
+                    min: -math.pi,
+                    max: math.pi,
+                    onChangeStart: (_) => _pushUndo(),
+                    onChanged: (v) => setState(() => n.rotation = v),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      setState(() => n.rotation = n.initRotation),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    foregroundColor: const Color(0xFF5E35B1),
+                  ),
+                  child: const Text('Straighten', style: TextStyle(fontSize: 13)),
+                ),
+                const SizedBox(width: 2),
+              ],
             ),
-            const SizedBox(width: 2),
           ],
         ),
       );
@@ -1224,32 +1284,29 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final isUploads = _category == 'My Uploads';
     final designs =
         kBundledDesigns.where((d) => d.category == _category).toList();
-    // In My Uploads the first tile is the "add" button; then the user's images.
+    // Every artwork strip leads with a special tile: "Upload" for My Uploads,
+    // "Recolour" (the colour wheel) for the built-in categories so any design
+    // can be dialled to an exact colour. The rest are the design swatches.
     final itemCount =
-        isUploads ? _customDesigns.length + 1 : designs.length;
+        isUploads ? _customDesigns.length + 1 : designs.length + 1;
 
     return Container(
       height: 92,
       color: Colors.white,
-      child: itemCount == 0
-          ? Center(
-              child: Text('No designs in this category',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-            )
-          : ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              itemCount: itemCount,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, i) {
-                if (isUploads && i == 0) return _buildUploadTile();
-                final id = isUploads
-                    ? _customDesigns[i - 1]
-                    : designs[i].asset;
-                final name = isUploads ? 'My photo' : designs[i].name;
-                return _buildDesignTile(id, name);
-              },
-            ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: itemCount,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          if (i == 0) {
+            return isUploads ? _buildUploadTile() : _buildRecolorTile();
+          }
+          final id = isUploads ? _customDesigns[i - 1] : designs[i - 1].asset;
+          final name = isUploads ? 'My photo' : designs[i - 1].name;
+          return _buildDesignTile(id, name);
+        },
+      ),
     );
   }
 
@@ -1434,8 +1491,74 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     }
   }
 
+  /// Leading tile for the artwork categories: a colour-wheel button that
+  /// recolours the showing design (or the first in the category) to any exact
+  /// colour, keeping its texture. Highlighted while a recolour is active.
+  Widget _buildRecolorTile() {
+    final tinted =
+        _currentDesign != null && designTintArgb(_currentDesign!) != null;
+    return Center(
+      child: GestureDetector(
+        onTap: _pickRecolor,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      tinted ? const Color(0xFF00897B) : Colors.grey.shade300,
+                  width: tinted ? 2.5 : 1,
+                ),
+                gradient: const SweepGradient(colors: [
+                  Color(0xFFFF0000),
+                  Color(0xFFFFFF00),
+                  Color(0xFF00FF00),
+                  Color(0xFF00FFFF),
+                  Color(0xFF0000FF),
+                  Color(0xFFFF00FF),
+                  Color(0xFFFF0000),
+                ]),
+              ),
+              child: const Icon(Icons.brush, color: Colors.white, size: 22),
+            ),
+            const SizedBox(height: 2),
+            const Text('Recolour', style: TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Recolours the current design (a glitter, ombré or pattern) to any exact
+  /// colour via the wheel. Works on whichever artwork is showing; if none in
+  /// this category is picked yet, it recolours the first one.
+  Future<void> _pickRecolor() async {
+    final designs =
+        kBundledDesigns.where((d) => d.category == _category).toList();
+    if (designs.isEmpty) return;
+    final cur =
+        _currentDesign == null ? null : stripDesignSuffix(_currentDesign!);
+    final base = (cur != null && designs.any((d) => d.asset == cur))
+        ? cur
+        : designs.first.asset;
+    final curTint =
+        _currentDesign == null ? null : designTintArgb(_currentDesign!);
+    final start = Color(curTint ?? 0xFFEE5DA0);
+    final picked = await showColorWheelDialog(context,
+        initial: start, title: 'Recolour design');
+    if (picked == null) return;
+    _applyDesign(tintedDesignId(base, picked.toARGB32()));
+  }
+
   Widget _buildDesignTile(String id, String name) {
-    final active = _currentDesign == id;
+    // Compare on the base path so the underlying swatch still reads as selected
+    // even when a recolour suffix is applied to the live design.
+    final active = _currentDesign != null &&
+        stripDesignSuffix(_currentDesign!) == id;
     return GestureDetector(
       onTap: () => _applyDesign(id),
       child: Column(

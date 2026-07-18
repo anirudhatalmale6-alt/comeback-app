@@ -495,6 +495,11 @@ class NailOverlay extends StatelessWidget {
   /// precedence over [image] when set.
   final ColorDesign? color;
 
+  /// Recolours an [image] design to this colour while keeping its light/dark
+  /// structure (a gradient's fade, a glitter's sparkle, a pattern's contrast).
+  /// Null leaves the artwork in its original colours. Ignored for [color].
+  final Color? tint;
+
   final NailShape shape;
   final NailFinish finish;
 
@@ -506,6 +511,7 @@ class NailOverlay extends StatelessWidget {
     super.key,
     this.image,
     this.color,
+    this.tint,
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
@@ -521,9 +527,21 @@ class NailOverlay extends StatelessWidget {
     } else {
       // BoxFit.cover so the artwork fills the whole nail silhouette; it is
       // scaled, never stretched out of proportion.
+      Widget art = Image(image: image!, fit: BoxFit.cover);
+      if (tint != null) {
+        // Recolour the design to the chosen colour: BlendMode.color takes the
+        // hue+saturation from the tint but keeps the artwork's own luminosity,
+        // so a gradient still fades, glitter still sparkles and a pattern keeps
+        // its contrast — just in a new colour. Done inside the clip so only the
+        // nail is affected.
+        art = ColorFiltered(
+          colorFilter: ColorFilter.mode(tint!, BlendMode.color),
+          child: art,
+        );
+      }
       design = ClipPath(
         clipper: _NailClipper(shape),
-        child: Image(image: image!, fit: BoxFit.cover),
+        child: art,
       );
     }
     if (!ambient.isNeutral) {
