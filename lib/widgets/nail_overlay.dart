@@ -27,6 +27,20 @@ class AmbientLight {
       ]);
 }
 
+/// A procedurally-painted design: a solid [base] colour, optionally with a
+/// French [tip] crescent in a second colour. This lets the customer pick ANY
+/// base colour or tip colour instead of being limited to the handful of baked-in
+/// PNG swatches — the nail is drawn from these colours at render time.
+class ColorDesign {
+  final Color base;
+
+  /// When non-null, a French tip crescent of this colour is painted over the
+  /// free-edge on top of the [base]. Null means a plain solid colour.
+  final Color? tip;
+
+  const ColorDesign(this.base, {this.tip});
+}
+
 /// The nail-tip styles a customer can pick, matching what a technician offers.
 /// Nine salon shapes, ordered natural → dramatic.
 enum NailShape {
@@ -473,27 +487,45 @@ class _NailFinishPainter extends CustomPainter {
 /// The widget fills its parent box; the caller sizes/positions/rotates it and
 /// picks the [shape] and [finish].
 class NailOverlay extends StatelessWidget {
-  final ImageProvider image;
+  /// The design artwork (bundled asset or the customer's own upload). Null when
+  /// the nail is painted from a [color] instead.
+  final ImageProvider? image;
+
+  /// A procedurally-painted colour design (solid, or a French tip). Takes
+  /// precedence over [image] when set.
+  final ColorDesign? color;
+
   final NailShape shape;
   final NailFinish finish;
 
-  /// The measured photo light. The design artwork is tinted by this so it sits
-  /// in the same light as the hand. Defaults to no adjustment.
+  /// The measured photo light. The design is tinted by this so it sits in the
+  /// same light as the hand. Defaults to no adjustment.
   final AmbientLight ambient;
 
   const NailOverlay({
     super.key,
-    required this.image,
+    this.image,
+    this.color,
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
-  });
+  }) : assert(image != null || color != null,
+            'NailOverlay needs an image or a colour to paint');
 
   @override
   Widget build(BuildContext context) {
-    // BoxFit.cover so the design fills the whole nail silhouette; the artwork is
-    // scaled, never stretched out of proportion.
-    Widget design = Image(image: image, fit: BoxFit.cover);
+    Widget design;
+    if (color != null) {
+      // Painted from colours; the painter clips itself to the nail silhouette.
+      design = CustomPaint(painter: _ColorDesignPainter(shape, color!));
+    } else {
+      // BoxFit.cover so the artwork fills the whole nail silhouette; it is
+      // scaled, never stretched out of proportion.
+      design = ClipPath(
+        clipper: _NailClipper(shape),
+        child: Image(image: image!, fit: BoxFit.cover),
+      );
+    }
     if (!ambient.isNeutral) {
       design = ColorFiltered(colorFilter: ambient.filter, child: design);
     }
@@ -501,17 +533,78 @@ class NailOverlay extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         CustomPaint(painter: _ContactShadowPainter(shape)),
-        Opacity(
-          opacity: finish.opacity,
-          child: ClipPath(
-            clipper: _NailClipper(shape),
-            child: design,
-          ),
-        ),
+        Opacity(opacity: finish.opacity, child: design),
         CustomPaint(painter: _NailFinishPainter(shape, finish)),
       ],
     );
   }
+}
+
+/// Paints a [ColorDesign] inside the nail silhouette: a solid base, plus a
+/// French tip crescent (separated by a natural "smile line" that dips lowest in
+/// the centre) when a tip colour is set. The free-edge is at the TOP of the box,
+/// matching the silhouette and finish painters.
+class _ColorDesignPainter extends CustomPainter {
+  final NailShape shape;
+  final ColorDesign design;
+  const _ColorDesignPainter(this.shape, this.design);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = nailSilhouette(size, shape);
+    canvas.save();
+    canvas.clipPath(path);
+    canvas.drawRect(Offset.zero & size, Paint()..color = design.base);
+    final tip = design.tip;
+    if (tip != null) {
+      final w = size.width, h = size.height;
+      final band = Path()
+        ..moveTo(0, h * 0.24)
+        ..quadraticBezierTo(w * 0.5, h * 0.42, w, h * 0.24)
+        ..lineTo(w, 0)
+        ..lineTo(0, 0)
+        ..close();
+      canvas.drawPath(band, Paint()..color = tip);
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ColorDesignPainter old) =>
+      old.shape != shape ||
+      old.design.base != design.base ||
+      old.design.tip != design.tip;
+}
+
+/// A small glossy preview of a [ColorDesign] on a nail silhouette, used for the
+/// colour-palette swatches so a solid shows a full-colour nail and a French tip
+/// shows a nude nail with the chosen tip colour.
+class NailColorSwatch extends StatelessWidget {
+  final ColorDesign design;
+  final NailShape shape;
+  const NailColorSwatch(this.design, {super.key, this.shape = NailShape.oval});
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _ColorSwatchPainter(shape, design));
+}
+
+class _ColorSwatchPainter extends CustomPainter {
+  final NailShape shape;
+  final ColorDesign design;
+  const _ColorSwatchPainter(this.shape, this.design);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _ColorDesignPainter(shape, design).paint(canvas, size);
+    _NailFinishPainter(shape, NailFinish.gloss).paint(canvas, size);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ColorSwatchPainter old) =>
+      old.shape != shape ||
+      old.design.base != design.base ||
+      old.design.tip != design.tip;
 }
 
 /// A small solid-colour preview of a nail [shape] with a given [finish], used in

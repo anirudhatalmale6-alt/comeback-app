@@ -76,8 +76,69 @@ const List<BundledDesign> kBundledDesigns = [
   BundledDesign('Hearts', 'assets/nail_designs/hearts.png', 'Patterns'),
 ];
 
-/// The design shown before the customer picks anything.
-const String kDefaultDesign = 'assets/nail_designs/classic_red.png';
+/// The natural nail-bed colour painted behind a French tip.
+const int kFrenchBaseColor = 0xFFF2DED6;
+
+/// A palette of nail-appropriate colours. Used as the base colour for Solids and
+/// as the tip colour for French, so the customer can paint any colour instead of
+/// being limited to a few baked-in swatches. Ordered reds → pinks → nudes →
+/// purples → blues → greens → warms → neutrals.
+const List<int> kNailPalette = [
+  0xFFE23B4E, // classic red
+  0xFFB01B33, // burgundy
+  0xFFD81B60, // raspberry
+  0xFFFF6F61, // coral
+  0xFFF7A8B8, // ballet pink
+  0xFFEE5DA0, // hot pink
+  0xFFF2DED6, // nude
+  0xFFC98A5E, // caramel
+  0xFF7D4B2A, // chocolate
+  0xFFB57EDC, // lilac
+  0xFF7C4DFF, // purple
+  0xFF3F51B5, // indigo
+  0xFF2196F3, // ocean blue
+  0xFF00BCD4, // teal
+  0xFF26A69A, // jade
+  0xFF66BB6A, // green
+  0xFFCDDC39, // lime
+  0xFFFFEB3B, // yellow
+  0xFFFFC107, // gold
+  0xFFFF9800, // orange
+  0xFFFFFFFF, // white (classic French tip)
+  0xFFBFC7CE, // silver
+  0xFF9E9E9E, // grey
+  0xFF212121, // black
+];
+
+/// The design shown before the customer picks anything (classic red solid).
+const String kDefaultDesign = 'solid#e23b4e';
+
+/// The 6-hex form of a colour, e.g. 0xFFE23B4E → "e23b4e".
+String _hex6(int argb) =>
+    (argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
+
+/// Builds the design id for a solid colour.
+String solidDesignId(int argb) => 'solid#${_hex6(argb)}';
+
+/// Builds the design id for a French tip in [tipArgb] over the standard nude
+/// base.
+String frenchDesignId(int tipArgb) =>
+    'french#${_hex6(tipArgb)}#${_hex6(kFrenchBaseColor)}';
+
+/// Parses a procedural colour-design id (`solid#rrggbb` or
+/// `french#tttttt#bbbbbb`); returns null for bundled-asset or upload ids.
+ColorDesign? colorDesignFor(String id) {
+  Color parse(String h) => Color(int.parse(h, radix: 16) | 0xFF000000);
+  if (id.startsWith('solid#')) {
+    return ColorDesign(parse(id.substring(6)));
+  }
+  if (id.startsWith('french#')) {
+    final parts = id.substring(7).split('#');
+    final base = parts.length > 1 ? parse(parts[1]) : const Color(kFrenchBaseColor);
+    return ColorDesign(base, tip: parse(parts[0]));
+  }
+  return null;
+}
 
 /// A nail's base width as a fraction of the editor box, and its height-to-width
 /// ratio. Kept as shared constants so auto-placement and rendering stay in sync
@@ -947,7 +1008,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               angle: n.rotation + math.pi,
               alignment: Alignment.center,
               child: NailOverlay(
-                  image: designProvider(n.asset),
+                  image: colorDesignFor(n.asset) == null
+                      ? designProvider(n.asset)
+                      : null,
+                  color: colorDesignFor(n.asset),
                   shape: n.shape,
                   finish: n.finish,
                   ambient: _ambient),
@@ -1150,6 +1214,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   Widget _buildDesignStrip() {
+    // Solids and French are painted from the colour palette so any colour is
+    // available (base colour for Solids, tip colour for French).
+    if (_category == 'Solids' || _category == 'French') {
+      return _buildColorPalette(french: _category == 'French');
+    }
     final isUploads = _category == 'My Uploads';
     final designs =
         kBundledDesigns.where((d) => d.category == _category).toList();
@@ -1179,6 +1248,49 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 return _buildDesignTile(id, name);
               },
             ),
+    );
+  }
+
+  /// A horizontal palette of colours. For Solids each swatch paints the whole
+  /// nail; for French each swatch sets the tip colour over a nude base.
+  Widget _buildColorPalette({required bool french}) {
+    return Container(
+      height: 92,
+      color: Colors.white,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        itemCount: kNailPalette.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final argb = kNailPalette[i] | 0xFF000000;
+          final id = french ? frenchDesignId(argb) : solidDesignId(argb);
+          final active = _currentDesign == id;
+          final design = french
+              ? ColorDesign(const Color(kFrenchBaseColor), tip: Color(argb))
+              : ColorDesign(Color(argb));
+          return Center(
+            child: GestureDetector(
+              onTap: () => _applyDesign(id),
+              child: Container(
+                width: 54,
+                height: 54,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        active ? const Color(0xFF00897B) : Colors.grey.shade300,
+                    width: active ? 2.5 : 1,
+                  ),
+                ),
+                child: NailColorSwatch(design),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
