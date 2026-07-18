@@ -936,7 +936,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             width: w,
             height: h,
             child: Transform.rotate(
-              angle: n.rotation,
+              // +pi: the on-device render draws the sprite inverted relative to
+              // the authored tip-up convention (silhouette/finish/design all
+              // author the free-edge at the top). Solids on oval nails are
+              // symmetric under 180 deg so this stayed invisible until a
+              // directional design (French tip) was used - the coloured tip band
+              // was landing at the cuticle. This half-turn puts the free-edge
+              // (and its band) back at the fingertip for every nail, detected or
+              // manually added, keeping shape + finish + design consistent.
+              angle: n.rotation + math.pi,
               alignment: Alignment.center,
               child: NailOverlay(
                   image: designProvider(n.asset),
