@@ -530,6 +530,11 @@ class NailOverlay extends StatelessWidget {
   /// Null leaves the artwork in its original colours. Ignored for [color].
   final Color? tint;
 
+  /// When set, a French tip crescent of this colour is painted OVER an [image]
+  /// design, so a glitter, ombré, pattern or the customer's own photo can wear a
+  /// French tip on top. Ignored for a [color] design — those carry their own tip.
+  final Color? frenchTip;
+
   final NailShape shape;
   final NailFinish finish;
 
@@ -542,6 +547,7 @@ class NailOverlay extends StatelessWidget {
     this.image,
     this.color,
     this.tint,
+    this.frenchTip,
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
@@ -573,6 +579,18 @@ class NailOverlay extends StatelessWidget {
         clipper: _NailClipper(shape),
         child: art,
       );
+      if (frenchTip != null) {
+        // Stack a French tip crescent on top of the artwork (drawn under the
+        // finish so the gloss/shading still plays over it, and inside the
+        // ambient filter below so it shares the photo's light).
+        design = Stack(
+          fit: StackFit.expand,
+          children: [
+            design,
+            CustomPaint(painter: _FrenchOverlayPainter(shape, frenchTip!)),
+          ],
+        );
+      }
     }
     if (!ambient.isNeutral) {
       design = ColorFiltered(colorFilter: ambient.filter, child: design);
@@ -586,6 +604,45 @@ class NailOverlay extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The French "smile line" tip band inside a [size] nail box: the crescent from
+/// the free-edge (top) down to the smile line, which arcs UP in the middle (an
+/// "n"/dome) so the tip is deepest at the sidewalls and rises toward the centre
+/// — the way a French tip reads on a real nail. (The control point sits ABOVE
+/// the side anchors, pulling the curve toward the free-edge in the middle.)
+///
+/// Shared by the procedural French [ColorDesign] and the French-tip OVERLAY that
+/// stacks on artwork, so both read identically.
+Path frenchTipBand(Size size) {
+  final w = size.width, h = size.height;
+  return Path()
+    ..moveTo(0, h * 0.34)
+    ..quadraticBezierTo(w * 0.5, h * 0.14, w, h * 0.34)
+    ..lineTo(w, 0)
+    ..lineTo(0, 0)
+    ..close();
+}
+
+/// Paints a French tip crescent of [tip] colour ON TOP of an existing artwork
+/// design (glitter, ombré, pattern or the customer's upload), clipped to the
+/// nail silhouette so it stacks cleanly over the base.
+class _FrenchOverlayPainter extends CustomPainter {
+  final NailShape shape;
+  final Color tip;
+  const _FrenchOverlayPainter(this.shape, this.tip);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipPath(nailSilhouette(size, shape));
+    canvas.drawPath(frenchTipBand(size), Paint()..color = tip);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _FrenchOverlayPainter old) =>
+      old.shape != shape || old.tip != tip;
 }
 
 /// Paints a [ColorDesign] inside the nail silhouette: a solid base, plus a
@@ -605,18 +662,7 @@ class _ColorDesignPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, Paint()..color = design.base);
     final tip = design.tip;
     if (tip != null) {
-      final w = size.width, h = size.height;
-      // The French smile line arcs UP in the middle (an "n"/dome), so the tip
-      // colour is deepest at the sidewalls and rises toward the centre — the
-      // way a French tip reads on the nail. (Control point ABOVE the side
-      // anchors pulls the curve toward the free-edge in the middle.)
-      final band = Path()
-        ..moveTo(0, h * 0.34)
-        ..quadraticBezierTo(w * 0.5, h * 0.14, w, h * 0.34)
-        ..lineTo(w, 0)
-        ..lineTo(0, 0)
-        ..close();
-      canvas.drawPath(band, Paint()..color = tip);
+      canvas.drawPath(frenchTipBand(size), Paint()..color = tip);
     }
     canvas.restore();
   }

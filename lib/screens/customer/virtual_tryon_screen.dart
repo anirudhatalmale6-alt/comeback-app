@@ -172,24 +172,53 @@ const double kNailAspectRatio = 0.88;
 /// tester feedback that the nails should be a bit longer to fill the nail bed.
 const double kNailDefaultLengthFactor = 1.15;
 
-/// An asset or upload design may carry a recolour suffix, e.g.
-/// `assets/nail_designs/leopard.png#tint=2196f3`. These helpers split that off
-/// so the base artwork can be loaded and the recolour applied separately.
+/// An asset or upload design may carry suffixes: a recolour and/or a stacked
+/// French tip, e.g. `assets/nail_designs/leopard.png#tint=2196f3#ftip=ffffff`.
+/// These helpers split the suffixes off so the base artwork can be loaded and
+/// each layer applied separately. (Order is always `#tint=` then `#ftip=`.)
 String stripDesignSuffix(String id) {
-  final i = id.indexOf('#tint=');
-  return i < 0 ? id : id.substring(0, i);
+  int cut = id.length;
+  final t = id.indexOf('#tint=');
+  if (t >= 0 && t < cut) cut = t;
+  final f = id.indexOf('#ftip=');
+  if (f >= 0 && f < cut) cut = f;
+  return id.substring(0, cut);
 }
 
 /// The recolour applied to an asset design, or null if it is shown as-is.
 int? designTintArgb(String id) {
   final i = id.indexOf('#tint=');
   if (i < 0) return null;
-  return int.parse(id.substring(i + 6), radix: 16) | 0xFF000000;
+  return int.parse(id.substring(i + 6, i + 12), radix: 16) | 0xFF000000;
 }
 
-/// Builds a design id that recolours [baseId] to [argb].
-String tintedDesignId(String baseId, int argb) =>
-    '${stripDesignSuffix(baseId)}#tint=${_hex6(argb)}';
+/// Builds a design id that recolours [baseId] to [argb] (preserving any stacked
+/// French tip).
+String tintedDesignId(String baseId, int argb) {
+  final ftip = frenchOverlayArgb(baseId);
+  final base = '${stripDesignSuffix(baseId)}#tint=${_hex6(argb)}';
+  return ftip == null ? base : '$base#ftip=${_hex6(ftip)}';
+}
+
+/// The colour of a French tip stacked on an artwork design, or null when the
+/// design has no French tip on top.
+int? frenchOverlayArgb(String id) {
+  final i = id.indexOf('#ftip=');
+  if (i < 0) return null;
+  return int.parse(id.substring(i + 6, i + 12), radix: 16) | 0xFF000000;
+}
+
+/// Removes any stacked French tip from [id], leaving the bare artwork design
+/// (with its recolour, if any, intact).
+String stripFrenchOverlay(String id) {
+  final i = id.indexOf('#ftip=');
+  return i < 0 ? id : id.substring(0, i);
+}
+
+/// Builds a design id that stacks a French tip of [argb] on [baseId]. The tip
+/// always sits last, after any recolour suffix.
+String withFrenchOverlay(String baseId, int argb) =>
+    '${stripFrenchOverlay(baseId)}#ftip=${_hex6(argb)}';
 
 /// Resolves a design id to an image: bundled assets keep their `assets/...`
 /// path; custom uploads are absolute file paths starting with '/'. Any recolour
@@ -1060,6 +1089,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final cd = design ?? _currentDesign ?? kDefaultDesign;
     final color = colorDesignFor(cd);
     final tintArgb = designTintArgb(cd);
+    final ftipArgb = color == null ? frenchOverlayArgb(cd) : null;
     return SizedBox(
       width: w,
       height: h,
@@ -1067,6 +1097,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         image: color == null ? designProvider(cd) : null,
         color: color,
         tint: tintArgb == null ? null : Color(tintArgb),
+        frenchTip: ftipArgb == null ? null : Color(ftipArgb),
         shape: _shape,
         finish: _finish,
       ),
@@ -1587,6 +1618,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                   tint: designTintArgb(n.asset) == null
                       ? null
                       : Color(designTintArgb(n.asset)!),
+                  frenchTip: colorDesignFor(n.asset) != null ||
+                          frenchOverlayArgb(n.asset) == null
+                      ? null
+                      : Color(frenchOverlayArgb(n.asset)!),
                   shape: n.shape,
                   finish: n.finish,
                   ambient: _ambient),
@@ -1843,11 +1878,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final isUploads = _category == 'My Uploads';
     final designs =
         kBundledDesigns.where((d) => d.category == _category).toList();
-    // Every artwork strip leads with a special tile: "Upload" for My Uploads,
-    // "Recolour" (the colour wheel) for the built-in categories so any design
-    // can be dialled to an exact colour. The rest are the design swatches.
-    final itemCount =
-        isUploads ? _customDesigns.length + 1 : designs.length + 1;
+    // Every artwork strip leads with special tiles: "Upload" for My Uploads or
+    // "Recolour" (the colour wheel) for the built-in categories, then a "French
+    // tip" tile that stacks a French tip on top of the chosen artwork. The rest
+    // are the design swatches.
+    final leading = <Widget>[
+      isUploads ? _buildUploadTile() : _buildRecolorTile(),
+      _buildFrenchOverlayTile(),
+    ];
+    final dataCount = isUploads ? _customDesigns.length : designs.length;
 
     return Container(
       height: 92,
@@ -1855,14 +1894,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: itemCount,
+        itemCount: leading.length + dataCount,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          if (i == 0) {
-            return isUploads ? _buildUploadTile() : _buildRecolorTile();
-          }
-          final id = isUploads ? _customDesigns[i - 1] : designs[i - 1].asset;
-          final name = isUploads ? 'My photo' : designs[i - 1].name;
+          if (i < leading.length) return leading[i];
+          final j = i - leading.length;
+          final id = isUploads ? _customDesigns[j] : designs[j].asset;
+          final name = isUploads ? 'My photo' : designs[j].name;
           return _buildDesignTile(id, name);
         },
       ),
@@ -2112,6 +2150,156 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         initial: start, title: 'Recolour design');
     if (picked == null) return;
     _applyDesign(tintedDesignId(base, picked.toARGB32()));
+  }
+
+  /// Leading tile for the artwork categories that stacks a French tip on top of
+  /// the showing design. Highlighted while a French tip is on. Its emblem is a
+  /// nude nail wearing a French tip in the current (or default white) colour.
+  Widget _buildFrenchOverlayTile() {
+    final activeId = _activeDesignId();
+    final ftip = activeId == null ? null : frenchOverlayArgb(activeId);
+    final on = ftip != null;
+    return Center(
+      child: GestureDetector(
+        onTap: _pickFrenchOverlay,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: on ? const Color(0xFF00897B) : Colors.grey.shade300,
+                  width: on ? 2.5 : 1,
+                ),
+              ),
+              child: NailColorSwatch(
+                ColorDesign(const Color(kFrenchBaseColor),
+                    tip: Color(ftip ?? 0xFFFFFFFF)),
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text('French tip', style: TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Stacks (or removes) a French tip on top of the current artwork design.
+  /// Opens a sheet with a live preview so the customer can pick the tip colour
+  /// and see it over the glitter/pattern/ombré/upload before applying.
+  Future<void> _pickFrenchOverlay() async {
+    final activeId = _activeDesignId() ?? _currentDesign;
+    if (activeId == null) {
+      _snack('Pick a design first');
+      return;
+    }
+    if (colorDesignFor(activeId) != null) {
+      // Solids/French are painted, not artwork — the French tab already does
+      // tips for those. This overlay is only for glitter/pattern/ombré/uploads.
+      _snack('Pick a glitter, ombré, pattern or your own upload to add a tip');
+      return;
+    }
+    final baseImg = designProvider(activeId);
+    final tintArgb = designTintArgb(activeId);
+    Color tip = Color(frenchOverlayArgb(activeId) ?? 0xFFFFFFFF);
+    final hadTip = frenchOverlayArgb(activeId) != null;
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('French tip on top',
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Adds a French tip over your chosen design.',
+                      style: TextStyle(fontSize: 12.5, color: Colors.black54),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: SizedBox(
+                        width: 64,
+                        height: 96,
+                        child: NailOverlay(
+                          image: baseImg,
+                          tint: tintArgb == null ? null : Color(tintArgb),
+                          frenchTip: tip,
+                          shape: _shape,
+                          finish: _finish,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final c = await showColorWheelDialog(ctx,
+                            initial: tip, title: 'Tip colour');
+                        if (c != null) setSheet(() => tip = c);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: tip,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade400),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            const Text('Tip colour',
+                                style: TextStyle(fontSize: 15)),
+                            const Spacer(),
+                            const Icon(Icons.edit,
+                                size: 18, color: Colors.black45),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(sheetCtx, 'apply'),
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48)),
+                      child: Text(hadTip ? 'Update French tip' : 'Add French tip'),
+                    ),
+                    if (hadTip)
+                      TextButton(
+                        onPressed: () => Navigator.pop(sheetCtx, 'remove'),
+                        child: const Text('Remove French tip'),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (result == 'apply') {
+      _applyDesign(withFrenchOverlay(activeId, tip.toARGB32()));
+    } else if (result == 'remove') {
+      _applyDesign(stripFrenchOverlay(activeId));
+    }
   }
 
   Widget _buildDesignTile(String id, String name) {
