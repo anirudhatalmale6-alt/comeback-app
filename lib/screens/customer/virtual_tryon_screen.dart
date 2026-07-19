@@ -296,6 +296,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   bool _seedFan = false;
   // The plain colour shown behind the Studio preview (customer-changeable).
   int _studioBg = kStudioBackgrounds.first;
+  // A design per finger for the Studio (index 0 = leftmost/thumb .. 4 = pinky).
+  // null means that finger just uses the shared [_currentDesign]. Lets the
+  // customer design each nail separately before putting the set on the hand.
+  final List<String?> _studioDesigns = List<String?>.filled(5, null);
+  // Which Studio nail is being designed on its own (zoomed in); null = editing
+  // the whole set together.
+  int? _studioFocus;
 
   final GlobalKey _captureKey = GlobalKey();
   Size _boxSize = Size.zero;
@@ -335,7 +342,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _selected = null;
       // Coming from the Studio we keep the composed design so it can be laid
       // onto the photo as a starter set; otherwise start with a clean slate.
-      if (!keepDesign) _currentDesign = null;
+      if (!keepDesign) {
+        _currentDesign = null;
+        for (int i = 0; i < _studioDesigns.length; i++) {
+          _studioDesigns[i] = null;
+        }
+      }
     });
     // Auto-enhance the photo (brighten/white-balance/sharpen) and measure its
     // light in the background; the photo swaps to the enhanced version and the
@@ -430,12 +442,19 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Opens the guided camera; on return, loads the standardized photo and
   /// queues its detected landmarks so nails are auto-placed once the editor
   /// has laid out.
-  Future<void> _openGuidedCapture() async {
+  Future<void> _openGuidedCapture({bool keepStudioDesigns = false}) async {
     final result = await Navigator.push<GuidedCaptureResult>(
       context,
       MaterialPageRoute(builder: (_) => const GuidedCaptureScreen()),
     );
     if (result == null || !mounted) return;
+    // A guided capture that didn't come from the Studio starts with a clean
+    // per-finger design slate.
+    if (!keepStudioDesigns) {
+      for (int i = 0; i < _studioDesigns.length; i++) {
+        _studioDesigns[i] = null;
+      }
+    }
     // Auto-enhance the captured frame. Enhancement preserves dimensions, so the
     // normalized landmarks still map onto it exactly.
     final enhanced = await _enhancedPhotoFile(result.imageFile);
@@ -474,23 +493,37 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final poses = computeNailPoses(lmImg);
     final baseW = _boxSize.width * kNailBaseWidthFactor;
     final baseH = baseW * kNailAspectRatio;
-    final asset = _currentDesign ?? kDefaultDesign;
+    final shared = _currentDesign ?? kDefaultDesign;
+    // If the customer designed each finger separately in the Studio, match those
+    // per-finger designs to the detected nails left→right (index 0 of the Studio
+    // fan is the leftmost nail). Falls back to the shared design otherwise.
+    final perNail = _studioDesigns.any((d) => d != null) &&
+        poses.length == _studioDesigns.length;
+    final designByPose = List<String>.filled(poses.length, shared);
+    if (perNail) {
+      final order = List<int>.generate(poses.length, (i) => i)
+        ..sort((a, b) => poses[a].center.dx.compareTo(poses[b].center.dx));
+      for (int rank = 0; rank < order.length; rank++) {
+        designByPose[order[rank]] = _studioDesigns[rank] ?? shared;
+      }
+    }
     setState(() {
       _nails.clear();
-      for (final pose in poses) {
+      for (int i = 0; i < poses.length; i++) {
+        final pose = poses[i];
         final centerBox = fit.imageToBox(pose.center);
         final lenBox = pose.length * fit.scale;
         _nails.add(_Nail(
           center: centerBox,
           scale: (lenBox / baseH).clamp(0.2, 5.0),
           rotation: pose.rotation,
-          asset: asset,
+          asset: designByPose[i],
           shape: _shape,
           finish: _finish,
           lengthFactor: _lengthFactor,
         ));
       }
-      _currentDesign = asset;
+      _currentDesign = shared;
     });
   }
 
@@ -503,9 +536,20 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// just re-skin whatever nails are already placed.
   void _applyDesign(String asset) {
     // In the Studio (no photo yet) a design tap just updates the composed look
-    // shown in the preview; nails are placed later, once there's a photo.
+    // shown in the preview; nails are placed later, once there's a photo. If a
+    // single nail is focused, only that finger changes; otherwise the whole set
+    // takes the new design.
     if (_photo == null) {
-      setState(() => _currentDesign = asset);
+      setState(() {
+        if (_studioFocus != null) {
+          _studioDesigns[_studioFocus!] = asset;
+        } else {
+          _currentDesign = asset;
+          for (int i = 0; i < _studioDesigns.length; i++) {
+            _studioDesigns[i] = null;
+          }
+        }
+      });
       return;
     }
     _pushUndo();
@@ -544,6 +588,50 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         }
       }
     });
+  }
+
+  /// Lays the Studio's composed set onto a freshly-picked manual photo as a
+  /// starter fan the customer drags onto each finger. Each finger keeps the
+  /// design it was given in the Studio (per-nail), falling back to the shared
+  /// look. The fan is placed left→right to match the Studio's finger order.
+  void _seedStudioFan() {
+    if (_boxSize == Size.zero) return;
+    final shared = _currentDesign ?? kDefaultDesign;
+    setState(() {
+      _nails.clear();
+      _undoStack.clear();
+      _selected = null;
+      const spots = [
+        [0.30, 0.47, -0.50, 0.72],
+        [0.42, 0.34, -0.22, 0.92],
+        [0.52, 0.29, 0.00, 1.05],
+        [0.63, 0.34, 0.22, 0.90],
+        [0.74, 0.47, 0.50, 0.80],
+      ];
+      for (int i = 0; i < spots.length; i++) {
+        final s = spots[i];
+        _nails.add(_Nail(
+          center: Offset(_boxSize.width * s[0], _boxSize.height * s[1]),
+          scale: s[3].toDouble(),
+          rotation: s[2].toDouble(),
+          asset: _studioDesigns[i] ?? shared,
+          shape: _shape,
+          finish: _finish,
+          lengthFactor: _lengthFactor,
+        ));
+      }
+      _currentDesign = shared;
+    });
+  }
+
+  /// The design id the strip below is currently editing: the focused finger's
+  /// design in the Studio, otherwise the shared/current design. Drives which
+  /// swatch shows as selected and what the custom pickers open on.
+  String? _activeDesignId() {
+    if (_photo == null && _studioFocus != null) {
+      return _studioDesigns[_studioFocus!] ?? _currentDesign;
+    }
+    return _currentDesign;
   }
 
   /// Lets the customer bring their own inspiration image (a design they saw
@@ -636,6 +724,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _lengthFactor = kNailDefaultLengthFactor;
       _studio = false;
       _seedFan = false;
+      _studioFocus = null;
+      for (int i = 0; i < _studioDesigns.length; i++) {
+        _studioDesigns[i] = null;
+      }
       // Keep _ambient: the same photo (and its light) is still loaded.
     });
   }
@@ -816,7 +908,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       appBar: AppBar(
         title: const Text('Virtual Nail Try-On'),
         leading: _studio && _photo == null
-            ? BackButton(onPressed: () => setState(() => _studio = false))
+            ? BackButton(onPressed: () => setState(() {
+                // Step out of a focused nail back to the whole set first; a
+                // second back leaves the Studio.
+                if (_studioFocus != null) {
+                  _studioFocus = null;
+                } else {
+                  _studio = false;
+                }
+              }))
             : null,
         actions: [
           if (_photo != null || _studio)
@@ -865,6 +965,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             FilledButton.icon(
               onPressed: () => setState(() {
                 _studio = true;
+                _studioFocus = null;
+                for (int i = 0; i < _studioDesigns.length; i++) {
+                  _studioDesigns[i] = null;
+                }
                 _currentDesign ??= kDefaultDesign;
               }),
               icon: const Icon(Icons.brush),
@@ -925,9 +1029,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   /// One nail rendered from the currently composed look, for the Studio
   /// preview. Everything is authored tip-up, so it renders straight — the same
-  /// way it lands on the hand.
-  Widget _previewNail(double w, double h) {
-    final cd = _currentDesign ?? kDefaultDesign;
+  /// way it lands on the hand. [design] overrides the shared look for a single
+  /// finger (per-nail Studio design).
+  Widget _previewNail(double w, double h, {String? design}) {
+    final cd = design ?? _currentDesign ?? kDefaultDesign;
     final color = colorDesignFor(cd);
     final tintArgb = designTintArgb(cd);
     return SizedBox(
@@ -958,54 +1063,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           child: Container(
             width: double.infinity,
             color: Color(_studioBg),
-            child: Column(
-              children: [
-                // Big, width-filling fan of nails so the design is easy to see
-                // and work with. Sized from the available width (as large as
-                // fits) rather than a fixed small size.
-                Expanded(
-                  child: Center(
-                    child: LayoutBuilder(
-                      builder: (context, c) {
-                        const scales = [0.82, 0.93, 1.0, 0.92, 0.84];
-                        const gap = 8.0;
-                        final totalScale =
-                            scales.fold<double>(0, (a, b) => a + b);
-                        final avail =
-                            c.maxWidth - 28 - gap * (scales.length - 1);
-                        final unit = (avail / totalScale).clamp(40.0, 104.0);
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            for (int i = 0; i < scales.length; i++)
-                              Padding(
-                                padding: EdgeInsets.only(
-                                    right:
-                                        i == scales.length - 1 ? 0 : gap),
-                                child: _previewNail(
-                                    unit * scales[i], unit * scales[i] * 1.5),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    'Design your look here, then put it on your hand. '
-                    'Use the brush (top right) for shape & finish.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: onBg, fontSize: 13),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildStudioBgStrip(),
-                const SizedBox(height: 10),
-              ],
-            ),
+            child: _studioFocus == null
+                ? _buildStudioOverview(onBg)
+                : _buildStudioFocus(onBg),
           ),
         ),
         _buildCategoryChips(),
@@ -1026,6 +1086,107 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  /// The whole-set view: a big, width-filling fan of the five nails. Tapping a
+  /// nail zooms in to design just that finger.
+  Widget _buildStudioOverview(Color onBg) {
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                const scales = [0.82, 0.93, 1.0, 0.92, 0.84];
+                const gap = 8.0;
+                final totalScale = scales.fold<double>(0, (a, b) => a + b);
+                final avail = c.maxWidth - 28 - gap * (scales.length - 1);
+                final unit = (avail / totalScale).clamp(40.0, 104.0);
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (int i = 0; i < scales.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(
+                            right: i == scales.length - 1 ? 0 : gap),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _studioFocus = i),
+                          child: _previewNail(
+                              unit * scales[i], unit * scales[i] * 1.5,
+                              design: _studioDesigns[i]),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            'Design the whole set, or tap one nail to design it on its own. '
+            'Use the brush (top right) for shape & finish.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: onBg, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildStudioBgStrip(),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+
+  /// Zoomed-in view of a single finger, so it can be designed on its own. A
+  /// colour/design tap or recolour applies only to this nail.
+  Widget _buildStudioFocus(Color onBg) {
+    final i = _studioFocus!;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 12, 0),
+          child: Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => setState(() => _studioFocus = null),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: const Text('All nails'),
+                style: TextButton.styleFrom(foregroundColor: onBg),
+              ),
+              const Spacer(),
+              Text('Nail ${i + 1} of 5',
+                  style: TextStyle(
+                      color: onBg, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 12),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final w = (c.maxWidth * 0.42).clamp(90.0, 170.0);
+                return _previewNail(w, w * 1.5, design: _studioDesigns[i]);
+              },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            'Pick a colour or design for this nail only. Tap "All nails" to go '
+            'back to the full set.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: onBg, fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildStudioBgStrip(),
+        const SizedBox(height: 10),
       ],
     );
   }
@@ -1120,8 +1281,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     const Text('Guided camera finds your nails automatically'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  setState(() => _studio = false);
-                  _openGuidedCapture();
+                  setState(() {
+                    _studio = false;
+                    _studioFocus = null;
+                  });
+                  _openGuidedCapture(keepStudioDesigns: true);
                 },
               ),
             ListTile(
@@ -1131,6 +1295,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 Navigator.pop(ctx);
                 setState(() {
                   _studio = false;
+                  _studioFocus = null;
                   _seedFan = true;
                 });
                 _pickPhoto(ImageSource.camera, keepDesign: true);
@@ -1144,6 +1309,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 Navigator.pop(ctx);
                 setState(() {
                   _studio = false;
+                  _studioFocus = null;
                   _seedFan = true;
                 });
                 _pickPhoto(ImageSource.gallery, keepDesign: true);
@@ -1178,7 +1344,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!_seedFan || !mounted) return;
                     _seedFan = false;
-                    _applyDesign(_currentDesign!);
+                    _seedStudioFan();
                   });
                 }
                 return RepaintBoundary(
@@ -1239,7 +1405,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
         ),
         _buildToolbar(),
-        if (_nails.isNotEmpty) _buildPerNailHint(),
+        // Always rendered at a constant height so selecting/deselecting a nail
+        // never resizes the photo above it (which would rescale the photo and
+        // pull the nails off the fingers).
+        _buildPerNailHint(),
         _buildCategoryChips(),
         _buildDesignStrip(),
         _buildActions(),
@@ -1446,19 +1615,26 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  // Constant height of the per-nail control bar. Fixed so the photo area above
+  // it never changes size when a nail is selected/deselected — otherwise the
+  // photo rescales and the placed nails no longer line up with the fingers.
+  static const double _kHintHeight = 104;
+
   Widget _buildPerNailHint() {
     // When a nail is selected, show Size and Angle sliders so it can be resized
     // and rotated reliably. Pinch/twist gestures also work, but on a small nail
     // the target is tiny, so the sliders are the dependable controls. Drag still
     // moves it.
-    if (_selected != null) {
+    if (_selected != null && _selected! < _nails.length) {
       final n = _nails[_selected!];
       return Container(
         width: double.infinity,
+        height: _kHintHeight,
         color: const Color(0xFFEDE7F6),
-        padding: const EdgeInsets.only(left: 12, right: 6, top: 2, bottom: 2),
+        padding: const EdgeInsets.only(left: 12, right: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Row(
               children: [
@@ -1527,12 +1703,19 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     }
     return Container(
       width: double.infinity,
+      height: _kHintHeight,
+      alignment: Alignment.center,
       color: Colors.grey.shade50,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Text(
-        'Tip: tap a nail, then drag to move it — guide lines show where it lands. '
-        'Undo reverses your last change; tap empty space or Done to deselect.',
-        style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+        _nails.isEmpty
+            ? 'Pick a design below to place your nails, then tap a nail to '
+                'move, resize or angle it.'
+            : 'Tip: tap a nail, then drag to move it — guide lines show where '
+                'it lands. Undo reverses your last change; tap empty space or '
+                'Done to deselect.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
       ),
     );
   }
@@ -1629,7 +1812,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           final argb = kNailPalette[i - 1] | 0xFF000000;
           final id =
               french ? frenchDesignId(argb, _frenchBase) : solidDesignId(argb);
-          final active = _currentDesign == id;
+          final active = _activeDesignId() == id;
           final design = french
               ? ColorDesign(Color(_frenchBase), tip: Color(argb))
               : ColorDesign(Color(argb));
@@ -1695,7 +1878,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   /// Solids: pick any exact colour with the wheel and paint the whole nail.
   Future<void> _pickSolidCustom() async {
-    final cd = _currentDesign == null ? null : colorDesignFor(_currentDesign!);
+    final activeId = _activeDesignId();
+    final cd = activeId == null ? null : colorDesignFor(activeId);
     final start = (cd != null && cd.tip == null) ? cd.base : const Color(0xFFE23B4E);
     final picked =
         await showColorWheelDialog(context, initial: start, title: 'Nail colour');
@@ -1706,7 +1890,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// French: choose both the tip colour and the base colour, each with the
   /// wheel, and preview the result live before applying.
   Future<void> _pickFrenchCustom() async {
-    final cd = _currentDesign == null ? null : colorDesignFor(_currentDesign!);
+    final activeId = _activeDesignId();
+    final cd = activeId == null ? null : colorDesignFor(activeId);
     Color tip = (cd != null && cd.tip != null) ? cd.tip! : const Color(0xFFFFFFFF);
     Color base = (cd != null && cd.tip != null) ? cd.base : Color(_frenchBase);
 
@@ -1797,8 +1982,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// recolours the showing design (or the first in the category) to any exact
   /// colour, keeping its texture. Highlighted while a recolour is active.
   Widget _buildRecolorTile() {
-    final tinted =
-        _currentDesign != null && designTintArgb(_currentDesign!) != null;
+    final activeId = _activeDesignId();
+    final tinted = activeId != null && designTintArgb(activeId) != null;
     return Center(
       child: GestureDetector(
         onTap: _pickRecolor,
@@ -1842,13 +2027,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final designs =
         kBundledDesigns.where((d) => d.category == _category).toList();
     if (designs.isEmpty) return;
-    final cur =
-        _currentDesign == null ? null : stripDesignSuffix(_currentDesign!);
+    final activeId = _activeDesignId();
+    final cur = activeId == null ? null : stripDesignSuffix(activeId);
     final base = (cur != null && designs.any((d) => d.asset == cur))
         ? cur
         : designs.first.asset;
-    final curTint =
-        _currentDesign == null ? null : designTintArgb(_currentDesign!);
+    final curTint = activeId == null ? null : designTintArgb(activeId);
     final start = Color(curTint ?? 0xFFEE5DA0);
     final picked = await showColorWheelDialog(context,
         initial: start, title: 'Recolour design');
@@ -1859,8 +2043,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   Widget _buildDesignTile(String id, String name) {
     // Compare on the base path so the underlying swatch still reads as selected
     // even when a recolour suffix is applied to the live design.
-    final active = _currentDesign != null &&
-        stripDesignSuffix(_currentDesign!) == id;
+    final activeId = _activeDesignId();
+    final active = activeId != null && stripDesignSuffix(activeId) == id;
     return GestureDetector(
       onTap: () => _applyDesign(id),
       child: Column(
