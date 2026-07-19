@@ -70,6 +70,14 @@ const List<BundledDesign> kBundledDesigns = [
   BundledDesign('Red', 'assets/nail_designs/red_glitter.png', 'Glitter'),
   BundledDesign('Champagne', 'assets/nail_designs/champagne_glitter.png', 'Glitter'),
   BundledDesign('Black', 'assets/nail_designs/black_glitter.png', 'Glitter'),
+  BundledDesign('Rose Gold', 'assets/nail_designs/rosegold_glitter.png', 'Glitter'),
+  BundledDesign('Mint', 'assets/nail_designs/mint_glitter.png', 'Glitter'),
+  BundledDesign('Coral', 'assets/nail_designs/coral_glitter.png', 'Glitter'),
+  BundledDesign('Lavender', 'assets/nail_designs/lavender_glitter.png', 'Glitter'),
+  BundledDesign('Bronze', 'assets/nail_designs/bronze_glitter.png', 'Glitter'),
+  BundledDesign('Turquoise', 'assets/nail_designs/turquoise_glitter.png', 'Glitter'),
+  BundledDesign('Pink', 'assets/nail_designs/pink_glitter.png', 'Glitter'),
+  BundledDesign('Peach', 'assets/nail_designs/peach_glitter.png', 'Glitter'),
   // Ombré
   BundledDesign('Sunset', 'assets/nail_designs/sunset_ombre.png', 'Ombré'),
   BundledDesign('Pink', 'assets/nail_designs/pink_ombre.png', 'Ombré'),
@@ -81,6 +89,14 @@ const List<BundledDesign> kBundledDesigns = [
   BundledDesign('Peach', 'assets/nail_designs/peach_ombre.png', 'Ombré'),
   BundledDesign('Grey', 'assets/nail_designs/grey_ombre.png', 'Ombré'),
   BundledDesign('Rainbow', 'assets/nail_designs/rainbow_ombre.png', 'Ombré'),
+  BundledDesign('Lavender', 'assets/nail_designs/lavender_ombre.png', 'Ombré'),
+  BundledDesign('Coral', 'assets/nail_designs/coral_ombre.png', 'Ombré'),
+  BundledDesign('Mint', 'assets/nail_designs/mint_ombre.png', 'Ombré'),
+  BundledDesign('Orange', 'assets/nail_designs/orange_ombre.png', 'Ombré'),
+  BundledDesign('Berry', 'assets/nail_designs/berry_ombre.png', 'Ombré'),
+  BundledDesign('Aqua', 'assets/nail_designs/aqua_ombre.png', 'Ombré'),
+  BundledDesign('Cocoa', 'assets/nail_designs/cocoa_ombre.png', 'Ombré'),
+  BundledDesign('Galaxy', 'assets/nail_designs/galaxy_ombre.png', 'Ombré'),
   // Patterns
   BundledDesign('Polka Dots', 'assets/nail_designs/polka_dots.png', 'Patterns'),
   BundledDesign('Stripes', 'assets/nail_designs/stripes.png', 'Patterns'),
@@ -93,22 +109,51 @@ const List<BundledDesign> kBundledDesigns = [
   BundledDesign('Cow', 'assets/nail_designs/cow_print.png', 'Patterns'),
   BundledDesign('Gingham', 'assets/nail_designs/gingham.png', 'Patterns'),
   BundledDesign('Swirls', 'assets/nail_designs/swirls.png', 'Patterns'),
+  BundledDesign('Plaid', 'assets/nail_designs/plaid.png', 'Patterns'),
+  BundledDesign('Tartan', 'assets/nail_designs/tartan_green.png', 'Patterns'),
+  BundledDesign('Checker', 'assets/nail_designs/checker.png', 'Patterns'),
+  BundledDesign('Houndstooth', 'assets/nail_designs/houndstooth.png', 'Patterns'),
+  BundledDesign('Zebra', 'assets/nail_designs/zebra.png', 'Patterns'),
+  BundledDesign('Confetti', 'assets/nail_designs/confetti.png', 'Patterns'),
+  BundledDesign('Tie-Dye', 'assets/nail_designs/tiedye.png', 'Patterns'),
+  BundledDesign('Argyle', 'assets/nail_designs/argyle.png', 'Patterns'),
 ];
 
 /// Premade decal stickers the customer can place on a nail in the Design Studio
 /// (ordered as they appear in the picker). Each is transparent artwork sized to
 /// sit on top of any design.
 const List<String> kDecals = [
+  // Hearts
   'assets/nail_designs/decals/heart.png',
+  'assets/nail_designs/decals/heart_outline.png',
+  'assets/nail_designs/decals/heart_silver.png',
+  'assets/nail_designs/decals/heart_gem.png',
+  // Stars & sparkle
   'assets/nail_designs/decals/star.png',
-  'assets/nail_designs/decals/daisy.png',
+  'assets/nail_designs/decals/star_outline.png',
+  'assets/nail_designs/decals/star_silver.png',
+  'assets/nail_designs/decals/star_gem.png',
+  'assets/nail_designs/decals/sparkle.png',
+  // Gems
   'assets/nail_designs/decals/gem.png',
-  'assets/nail_designs/decals/bow.png',
+  'assets/nail_designs/decals/diamond.png',
+  // Flowers
+  'assets/nail_designs/decals/daisy.png',
+  'assets/nail_designs/decals/rose.png',
+  'assets/nail_designs/decals/blossom.png',
+  'assets/nail_designs/decals/flower.png',
+  // Butterflies
   'assets/nail_designs/decals/butterfly.png',
+  'assets/nail_designs/decals/butterfly_blue.png',
+  // Swoopy designs
+  'assets/nail_designs/decals/swoosh.png',
+  'assets/nail_designs/decals/swirl.png',
+  // Fun extras
+  'assets/nail_designs/decals/bow.png',
+  'assets/nail_designs/decals/crown.png',
   'assets/nail_designs/decals/moon.png',
   'assets/nail_designs/decals/bolt.png',
   'assets/nail_designs/decals/cherry.png',
-  'assets/nail_designs/decals/crown.png',
   'assets/nail_designs/decals/snowflake.png',
   'assets/nail_designs/decals/clover.png',
 ];
