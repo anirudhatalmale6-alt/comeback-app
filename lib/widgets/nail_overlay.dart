@@ -576,9 +576,13 @@ class _ColorDesignPainter extends CustomPainter {
     final tip = design.tip;
     if (tip != null) {
       final w = size.width, h = size.height;
+      // The French smile line arcs UP in the middle (an "n"/dome), so the tip
+      // colour is deepest at the sidewalls and rises toward the centre — the
+      // way a French tip reads on the nail. (Control point ABOVE the side
+      // anchors pulls the curve toward the free-edge in the middle.)
       final band = Path()
-        ..moveTo(0, h * 0.24)
-        ..quadraticBezierTo(w * 0.5, h * 0.42, w, h * 0.24)
+        ..moveTo(0, h * 0.34)
+        ..quadraticBezierTo(w * 0.5, h * 0.14, w, h * 0.34)
         ..lineTo(w, 0)
         ..lineTo(0, 0)
         ..close();

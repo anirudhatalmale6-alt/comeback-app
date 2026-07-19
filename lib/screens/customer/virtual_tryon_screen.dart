@@ -1355,10 +1355,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       Center(
                         child: Image.file(_photo!, fit: BoxFit.contain),
                       ),
-                      // Tapping empty photo space deselects the current nail
-                      // (hides its X badge and outline) without deleting it.
-                      // Sits UNDER the nails, so tapping a nail still selects it;
-                      // only taps that miss every nail reach this layer.
+                      // Full-photo gesture layer, UNDER the nails. A tap on empty
+                      // space deselects; a DRAG on empty space moves the selected
+                      // nail — so you can drag from the side of the screen and
+                      // watch it land via the guide lines, without your finger
+                      // covering the nail. (Touching a nail still selects/moves
+                      // that nail, since its own handler sits above this layer.)
                       Positioned.fill(
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
@@ -1366,6 +1368,23 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                             if (_selected != null) {
                               setState(() => _selected = null);
                             }
+                          },
+                          onScaleStart: (_) {
+                            if (_selected == null) return;
+                            _pushUndo();
+                            setState(() => _dragging = true);
+                          },
+                          onScaleUpdate: (d) {
+                            if (_selected == null ||
+                                _selected! >= _nails.length) {
+                              return;
+                            }
+                            setState(() =>
+                                _nails[_selected!].center += d.focalPointDelta);
+                          },
+                          onScaleEnd: (_) {
+                            if (_selected == null) return;
+                            setState(() => _dragging = false);
                           },
                         ),
                       ),
@@ -1711,9 +1730,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         _nails.isEmpty
             ? 'Pick a design below to place your nails, then tap a nail to '
                 'move, resize or angle it.'
-            : 'Tip: tap a nail, then drag to move it — guide lines show where '
-                'it lands. Undo reverses your last change; tap empty space or '
-                'Done to deselect.',
+            : 'Tip: tap a nail to select it, then drag anywhere (even the side '
+                'of the screen) to move it — guide lines show where it lands. '
+                'Tap empty space or Done to deselect.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
       ),
