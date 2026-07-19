@@ -127,6 +127,7 @@ const List<String> kDecals = [
   'assets/nail_designs/decals/heart.png',
   'assets/nail_designs/decals/heart_outline.png',
   'assets/nail_designs/decals/heart_silver.png',
+  'assets/nail_designs/decals/heart_gold.png',
   'assets/nail_designs/decals/heart_gem.png',
   // Stars & sparkle
   'assets/nail_designs/decals/star.png',
@@ -140,11 +141,19 @@ const List<String> kDecals = [
   // Flowers
   'assets/nail_designs/decals/daisy.png',
   'assets/nail_designs/decals/rose.png',
+  'assets/nail_designs/decals/rose_gold.png',
+  'assets/nail_designs/decals/rose_silver.png',
   'assets/nail_designs/decals/blossom.png',
   'assets/nail_designs/decals/flower.png',
+  'assets/nail_designs/decals/flower_gold.png',
+  'assets/nail_designs/decals/flower_silver.png',
+  'assets/nail_designs/decals/lily_gold.png',
+  'assets/nail_designs/decals/lily_silver.png',
   // Butterflies
   'assets/nail_designs/decals/butterfly.png',
   'assets/nail_designs/decals/butterfly_blue.png',
+  'assets/nail_designs/decals/butterfly_gold.png',
+  'assets/nail_designs/decals/butterfly_silver.png',
   // Swoopy designs
   'assets/nail_designs/decals/swoosh.png',
   'assets/nail_designs/decals/swirl.png',
@@ -1336,6 +1345,25 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  /// Copies the design and decals of the focused nail onto every other nail,
+  /// so the customer can build one look and apply it across the whole set in a
+  /// single tap. Decals are deep-copied so each nail can still be tweaked after.
+  void _copyNailToAll(int i) {
+    setState(() {
+      for (int j = 0; j < _studioDesigns.length; j++) {
+        if (j == i) continue;
+        _studioDesigns[j] = _studioDesigns[i];
+        _studioDecals[j] = _studioDecals[i].map((d) => d.copy()).toList();
+      }
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(
+        content: Text('Design copied to all nails'),
+        duration: Duration(seconds: 2),
+      ));
+  }
+
   /// Zoomed-in view of a single finger, so it can be designed on its own. A
   /// colour/design tap or recolour applies only to this nail. Decals can be
   /// added from the strip and dragged/sized/rotated on the nail.
@@ -1361,10 +1389,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 style: TextButton.styleFrom(foregroundColor: onBg),
               ),
               const Spacer(),
-              Text('Nail ${i + 1} of 5',
-                  style: TextStyle(
-                      color: onBg, fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(width: 12),
+              Flexible(
+                child: TextButton.icon(
+                  onPressed: () => _copyNailToAll(i),
+                  icon: const Icon(Icons.copy_all, size: 18),
+                  label: const Text('Copy to all nails',
+                      overflow: TextOverflow.ellipsis),
+                  style: TextButton.styleFrom(foregroundColor: onBg),
+                ),
+              ),
+              const SizedBox(width: 4),
             ],
           ),
         ),
