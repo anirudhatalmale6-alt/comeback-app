@@ -53,6 +53,9 @@ enum NailShape {
   ballerina,
   stiletto,
   lipstick,
+  flare,
+  edge,
+  arrowhead,
 }
 
 extension NailShapeLabel on NailShape {
@@ -76,6 +79,12 @@ extension NailShapeLabel on NailShape {
         return 'Stiletto';
       case NailShape.lipstick:
         return 'Lipstick';
+      case NailShape.flare:
+        return 'Flare';
+      case NailShape.edge:
+        return 'Edge';
+      case NailShape.arrowhead:
+        return 'Arrowhead';
     }
   }
 }
@@ -195,6 +204,27 @@ Path nailSilhouette(Size s, [NailShape shape = NailShape.oval]) {
       p.lineTo(w * 0.86, h * 0.08);
       p.lineTo(w * 0.16, h * 0.34);
       p.cubicTo(w * 0.10, h * 0.56, w * 0.10, h * 0.72, w * 0.18, h * 0.88);
+      break;
+    case NailShape.flare:
+      // "Duck"/flare: sides splay OUTWARD toward a wide, softly-rounded free
+      // edge — wider at the tip than at the cuticle.
+      p.cubicTo(w * 0.90, h * 0.62, w * 0.97, h * 0.34, w * 0.98, h * 0.12);
+      p.quadraticBezierTo(w * 0.50, h * 0.0, w * 0.02, h * 0.12);
+      p.cubicTo(w * 0.03, h * 0.34, w * 0.10, h * 0.62, w * 0.18, h * 0.88);
+      break;
+    case NailShape.edge:
+      // Straight angular sides rising to a single central ridge/peak at the
+      // tip, like a faceted "edge" nail.
+      p.cubicTo(w * 0.90, h * 0.64, w * 0.78, h * 0.34, w * 0.60, h * 0.12);
+      p.lineTo(w * 0.50, h * 0.0);
+      p.lineTo(w * 0.40, h * 0.12);
+      p.cubicTo(w * 0.22, h * 0.34, w * 0.10, h * 0.64, w * 0.18, h * 0.88);
+      break;
+    case NailShape.arrowhead:
+      // Bellies out wide at the sides then tapers to a sharp point — a broader,
+      // more dramatic point than the stiletto.
+      p.cubicTo(w * 1.0, h * 0.70, w * 0.84, h * 0.42, w * 0.50, h * 0.0);
+      p.cubicTo(w * 0.16, h * 0.42, w * 0.0, h * 0.70, w * 0.18, h * 0.88);
       break;
   }
   p.close();

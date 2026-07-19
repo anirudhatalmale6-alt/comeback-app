@@ -317,11 +317,33 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // filled in once the photo is decoded and averaged.
   AmbientLight _ambient = AmbientLight.neutral;
 
-  // Baselines captured at gesture start so pinch/rotate feel natural.
-  double _startScale = 1;
-  double _startRot = 0;
-
   final _picker = ImagePicker();
+
+  // Pinch-to-zoom of the editor canvas, so small nails are easy to design.
+  // Zoom/pan applies to the on-screen view only; the saved image is captured
+  // from the un-zoomed RepaintBoundary.
+  final TransformationController _zoomCtrl = TransformationController();
+  bool _zoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _zoomCtrl.addListener(_onZoomChanged);
+  }
+
+  @override
+  void dispose() {
+    _zoomCtrl.removeListener(_onZoomChanged);
+    _zoomCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onZoomChanged() {
+    final zoomed = _zoomCtrl.value.getMaxScaleOnAxis() > 1.01;
+    if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
+  }
+
+  void _resetZoom() => _zoomCtrl.value = Matrix4.identity();
 
   Future<void> _pickPhoto(ImageSource source, {bool keepDesign = false}) async {
     final picked = await _picker.pickImage(
@@ -331,6 +353,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       imageQuality: 90,
     );
     if (picked == null) return;
+    _resetZoom();
     final original = File(picked.path);
     setState(() {
       _photo = original;
@@ -448,6 +471,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       MaterialPageRoute(builder: (_) => const GuidedCaptureScreen()),
     );
     if (result == null || !mounted) return;
+    _resetZoom();
     // A guided capture that didn't come from the Studio starts with a clean
     // per-finger design slate.
     if (!keepStudioDesigns) {
@@ -714,6 +738,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   void _reset() {
+    _resetZoom();
     setState(() {
       _nails.clear();
       _undoStack.clear();
@@ -1329,9 +1354,22 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           child: Container(
             color: const Color(0xFF1B1B1F),
             width: double.infinity,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                _boxSize = Size(constraints.maxWidth, constraints.maxHeight);
+            child: Stack(
+              children: [
+                // Pinch to zoom in (and pan) so small nails are easy to design.
+                // Two fingers zoom/pan; one finger pans when nothing is selected,
+                // or moves the selected nail. The saved image is captured from
+                // the RepaintBoundary below, so it's always the un-zoomed view.
+                InteractiveViewer(
+                  transformationController: _zoomCtrl,
+                  panEnabled: _selected == null,
+                  minScale: 1.0,
+                  maxScale: 5.0,
+                  clipBehavior: Clip.hardEdge,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _boxSize =
+                          Size(constraints.maxWidth, constraints.maxHeight);
                 if (_pendingLandmarks != null) {
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _autoPlaceNails());
@@ -1369,23 +1407,25 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                               setState(() => _selected = null);
                             }
                           },
-                          onScaleStart: (_) {
-                            if (_selected == null) return;
-                            _pushUndo();
-                            setState(() => _dragging = true);
-                          },
-                          onScaleUpdate: (d) {
-                            if (_selected == null ||
-                                _selected! >= _nails.length) {
-                              return;
-                            }
-                            setState(() =>
-                                _nails[_selected!].center += d.focalPointDelta);
-                          },
-                          onScaleEnd: (_) {
-                            if (_selected == null) return;
-                            setState(() => _dragging = false);
-                          },
+                          // Only claim one-finger drags when a nail is selected
+                          // (to move it). When nothing is selected these are null
+                          // so the drag falls through to the zoom viewer's pan.
+                          onPanStart: _selected == null
+                              ? null
+                              : (_) {
+                                  _pushUndo();
+                                  setState(() => _dragging = true);
+                                },
+                          onPanUpdate: _selected == null
+                              ? null
+                              : (d) {
+                                  if (_selected! >= _nails.length) return;
+                                  setState(() =>
+                                      _nails[_selected!].center += d.delta);
+                                },
+                          onPanEnd: _selected == null
+                              ? null
+                              : (_) => setState(() => _dragging = false),
                         ),
                       ),
                       for (int i = 0; i < _nails.length; i++)
@@ -1420,6 +1460,25 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                   ),
                 );
               },
+                  ),
+                ),
+                if (_zoomed)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Material(
+                      color: Colors.black54,
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: IconButton(
+                        tooltip: 'Reset zoom',
+                        icon: const Icon(Icons.zoom_out_map,
+                            color: Colors.white),
+                        onPressed: _resetZoom,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -1546,29 +1605,25 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 ),
               ),
             ),
-          // Full hit box: the enlarged, easy-to-hit tap/drag target.
+          // Full hit box: the enlarged, easy-to-hit tap/drag target. One-finger
+          // pan moves the nail; two-finger gestures are left to the zoom viewer.
+          // Size and angle are set with the sliders below.
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => setState(() => _selected = i),
-              onScaleStart: (_) {
-                _startScale = n.scale;
-                _startRot = n.rotation;
-                // One undo snapshot per drag/pinch gesture (not per frame).
+              onPanStart: (_) {
+                // One undo snapshot per drag gesture (not per frame).
                 _pushUndo();
                 setState(() {
                   _selected = i;
                   _dragging = true;
                 });
               },
-              onScaleUpdate: (d) {
-                setState(() {
-                  n.center += d.focalPointDelta;
-                  n.scale = (_startScale * d.scale).clamp(0.35, 4.0);
-                  n.rotation = _startRot + d.rotation;
-                });
+              onPanUpdate: (d) {
+                setState(() => n.center += d.delta);
               },
-              onScaleEnd: (_) => setState(() => _dragging = false),
+              onPanEnd: (_) => setState(() => _dragging = false),
             ),
           ),
           if (selected)
@@ -1730,9 +1785,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         _nails.isEmpty
             ? 'Pick a design below to place your nails, then tap a nail to '
                 'move, resize or angle it.'
-            : 'Tip: tap a nail to select it, then drag anywhere (even the side '
-                'of the screen) to move it — guide lines show where it lands. '
-                'Tap empty space or Done to deselect.',
+            : 'Tip: pinch to zoom in for detail. Tap a nail to select it, then '
+                'drag anywhere (even the side of the screen) to move it. Tap '
+                'empty space or Done to deselect.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
       ),
@@ -2317,7 +2372,8 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
   static const _lengths = [
     ('Short', 0.90),
     ('Medium', kNailDefaultLengthFactor), // 1.15 — the new default
-    ('Long', 1.45),
+    ('Long', 1.65), // lengthened on tester feedback
+    ('X-Long', 2.15), // new extra-long option
   ];
 
   late NailShape _shape = widget.initialShape;
@@ -2485,19 +2541,23 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
                                 _length == l.$2 ? _teal : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(22),
                           ),
-                          child: Text(
-                            l.$1,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: _length == l.$2
-                                  ? Colors.white
-                                  : Colors.black87,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              l.$1,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: _length == l.$2
+                                    ? Colors.white
+                                    : Colors.black87,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                    if (l != _lengths.last) const SizedBox(width: 10),
+                    if (l != _lengths.last) const SizedBox(width: 8),
                   ],
                 ],
               ),

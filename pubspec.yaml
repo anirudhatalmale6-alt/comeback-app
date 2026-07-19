@@ -1,7 +1,7 @@
 name: comeback_app
 description: Come Back - Nail Salon Management App
 publish_to: 'none'
-version: 1.6.33+86
+version: 1.6.34+87
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
