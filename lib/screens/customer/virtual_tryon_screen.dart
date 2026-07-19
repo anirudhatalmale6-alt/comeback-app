@@ -114,6 +114,21 @@ const List<int> kNailPalette = [
 /// The design shown before the customer picks anything (classic red solid).
 const String kDefaultDesign = 'solid#e23b4e';
 
+/// Plain background colours offered behind the Design Studio preview, so the
+/// customer can pick whatever reads best against the design they're building.
+/// Light neutrals first, then a couple of darks. A colour wheel tile lets them
+/// dial in any other colour too. Default is the soft grey.
+const List<int> kStudioBackgrounds = [
+  0xFFECEFF1, // soft grey (default)
+  0xFFFFFFFF, // white
+  0xFFEDE7F6, // lavender
+  0xFFFCE4EC, // blush pink
+  0xFFE0F2F1, // mint
+  0xFFFFF8E1, // cream
+  0xFF37474F, // slate
+  0xFF1B1B1F, // near-black
+];
+
 /// The 6-hex form of a colour, e.g. 0xFFE23B4E → "e23b4e".
 String _hex6(int argb) =>
     (argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0');
@@ -279,6 +294,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // composed design as a starter set on the next manually-chosen photo.
   bool _studio = false;
   bool _seedFan = false;
+  // The plain colour shown behind the Studio preview (customer-changeable).
+  int _studioBg = kStudioBackgrounds.first;
 
   final GlobalKey _captureKey = GlobalKey();
   Size _boxSize = Size.zero;
@@ -907,8 +924,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   /// One nail rendered from the currently composed look, for the Studio
-  /// preview. Asset artwork is authored tip-down so it gets the half-turn;
-  /// procedurally-painted colours are already the right way up.
+  /// preview. Everything is authored tip-up, so it renders straight — the same
+  /// way it lands on the hand.
   Widget _previewNail(double w, double h) {
     final cd = _currentDesign ?? kDefaultDesign;
     final color = colorDesignFor(cd);
@@ -916,15 +933,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     return SizedBox(
       width: w,
       height: h,
-      child: Transform.rotate(
-        angle: color == null ? math.pi : 0,
-        child: NailOverlay(
-          image: color == null ? designProvider(cd) : null,
-          color: color,
-          tint: tintArgb == null ? null : Color(tintArgb),
-          shape: _shape,
-          finish: _finish,
-        ),
+      child: NailOverlay(
+        image: color == null ? designProvider(cd) : null,
+        color: color,
+        tint: tintArgb == null ? null : Color(tintArgb),
+        shape: _shape,
+        finish: _finish,
       ),
     );
   }
@@ -932,36 +946,64 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// The Design Studio: compose a look on a big, easy preview (no fiddling on
   /// tiny nails over a hand photo), then "put it on your hand".
   Widget _buildStudio() {
+    // Text/handles read differently on a light vs dark background, so pick a
+    // legible foreground for whichever plain colour the customer chose.
+    final onBg = ThemeData.estimateBrightnessForColor(Color(_studioBg)) ==
+            Brightness.dark
+        ? Colors.white70
+        : Colors.black54;
     return Column(
       children: [
         Expanded(
           child: Container(
             width: double.infinity,
-            color: const Color(0xFF1B1B1F),
+            color: Color(_studioBg),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    for (final s in const [0.82, 0.93, 1.0, 0.92, 0.84])
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
-                        child: _previewNail(50 * s, 72 * s),
-                      ),
-                  ],
+                // Big, width-filling fan of nails so the design is easy to see
+                // and work with. Sized from the available width (as large as
+                // fits) rather than a fixed small size.
+                Expanded(
+                  child: Center(
+                    child: LayoutBuilder(
+                      builder: (context, c) {
+                        const scales = [0.82, 0.93, 1.0, 0.92, 0.84];
+                        const gap = 8.0;
+                        final totalScale =
+                            scales.fold<double>(0, (a, b) => a + b);
+                        final avail =
+                            c.maxWidth - 28 - gap * (scales.length - 1);
+                        final unit = (avail / totalScale).clamp(40.0, 104.0);
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            for (int i = 0; i < scales.length; i++)
+                              Padding(
+                                padding: EdgeInsets.only(
+                                    right:
+                                        i == scales.length - 1 ? 0 : gap),
+                                child: _previewNail(
+                                    unit * scales[i], unit * scales[i] * 1.5),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 22),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
                     'Design your look here, then put it on your hand. '
                     'Use the brush (top right) for shape & finish.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                    style: TextStyle(color: onBg, fontSize: 13),
                   ),
                 ),
+                const SizedBox(height: 12),
+                _buildStudioBgStrip(),
+                const SizedBox(height: 10),
               ],
             ),
           ),
@@ -985,6 +1027,69 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// A horizontal strip of plain background colours (led by a colour-wheel tile
+  /// for any custom colour) so the customer can change the Studio backdrop to
+  /// whatever reads best behind the design they're building.
+  Widget _buildStudioBgStrip() {
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          _studioBgDot(custom: true),
+          for (final c in kStudioBackgrounds) _studioBgDot(color: c),
+        ],
+      ),
+    );
+  }
+
+  Widget _studioBgDot({int? color, bool custom = false}) {
+    final selected = color != null && _studioBg == color;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: GestureDetector(
+        onTap: () async {
+          if (custom) {
+            final picked = await showColorWheelDialog(context,
+                initial: Color(_studioBg), title: 'Background colour');
+            if (picked != null) {
+              setState(() => _studioBg = picked.toARGB32());
+            }
+          } else {
+            setState(() => _studioBg = color!);
+          }
+        },
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: custom ? null : Color(color!),
+            gradient: custom
+                ? const SweepGradient(colors: [
+                    Color(0xFFFF0000),
+                    Color(0xFFFFFF00),
+                    Color(0xFF00FF00),
+                    Color(0xFF00FFFF),
+                    Color(0xFF0000FF),
+                    Color(0xFFFF00FF),
+                    Color(0xFFFF0000),
+                  ])
+                : null,
+            border: Border.all(
+              color: selected ? const Color(0xFF00897B) : Colors.black26,
+              width: selected ? 3 : 1,
+            ),
+          ),
+          child: custom
+              ? const Icon(Icons.colorize, size: 15, color: Colors.white)
+              : null,
+        ),
+      ),
     );
   }
 
@@ -1219,13 +1324,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             width: w,
             height: h,
             child: Transform.rotate(
-              // The bundled PNG artwork was authored "tip-down", so it needs a
-              // half-turn to land the free-edge (and any directional band) at the
-              // fingertip. Procedurally-painted colour designs are authored the
-              // right way up (tip at the top), so they must NOT get that extra
-              // half-turn - otherwise their French band flips down to the cuticle.
-              angle: n.rotation +
-                  (colorDesignFor(n.asset) == null ? math.pi : 0),
+              // Both the bundled PNG artwork and the procedurally-painted colour
+              // designs are authored tip-UP (free-edge at the top), matching the
+              // nail silhouette. So a nail just takes its own rotation with no
+              // extra half-turn. (An earlier half-turn for artwork flipped the
+              // design upside down and swung auto-placed nails toward the
+              // knuckle instead of the fingertip.)
+              angle: n.rotation,
               alignment: Alignment.center,
               child: NailOverlay(
                   image: colorDesignFor(n.asset) == null
