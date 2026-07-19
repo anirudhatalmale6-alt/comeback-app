@@ -535,6 +535,12 @@ class NailOverlay extends StatelessWidget {
   /// French tip on top. Ignored for a [color] design — those carry their own tip.
   final Color? frenchTip;
 
+  /// Premade decal stickers (hearts, stars, gems…) placed on top of the design,
+  /// clipped to the nail so they never bleed onto the skin. Positioned/sized
+  /// relative to the nail box, so the same list reads identically on the big
+  /// Studio preview and the small nail over the hand photo.
+  final List<DecalSpec> decals;
+
   final NailShape shape;
   final NailFinish finish;
 
@@ -548,6 +554,7 @@ class NailOverlay extends StatelessWidget {
     this.color,
     this.tint,
     this.frenchTip,
+    this.decals = const [],
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
@@ -592,6 +599,21 @@ class NailOverlay extends StatelessWidget {
         );
       }
     }
+    if (decals.isNotEmpty) {
+      // Decals sit on top of the design (and any French tip), clipped to the
+      // nail so an off-centre sticker trims at the edge instead of spilling
+      // onto the skin — matching what lands on the hand.
+      design = Stack(
+        fit: StackFit.expand,
+        children: [
+          design,
+          ClipPath(
+            clipper: _NailClipper(shape),
+            child: _DecalLayer(decals),
+          ),
+        ],
+      );
+    }
     if (!ambient.isNeutral) {
       design = ColorFiltered(colorFilter: ambient.filter, child: design);
     }
@@ -602,6 +624,57 @@ class NailOverlay extends StatelessWidget {
         Opacity(opacity: finish.opacity, child: design),
         CustomPaint(painter: _NailFinishPainter(shape, finish)),
       ],
+    );
+  }
+}
+
+/// One premade decal placed on a nail: its artwork and where it sits, sized and
+/// rotated relative to the nail box. [pos] is normalised (0..1) within the box
+/// and [size] is the decal's width as a fraction of the box width, so a decal
+/// keeps its relative place/size whether the nail is drawn big in the Studio or
+/// small over the hand.
+class DecalSpec {
+  final ImageProvider image;
+  final Offset pos;
+  final double size;
+  final double rotation;
+  const DecalSpec({
+    required this.image,
+    required this.pos,
+    required this.size,
+    required this.rotation,
+  });
+}
+
+/// Lays a list of [DecalSpec]s over a nail box, each centred on its [pos],
+/// sized to a square of [size]×box-width and rotated. Used inside [NailOverlay]
+/// (clipped to the nail) so it renders identically everywhere the nail appears.
+class _DecalLayer extends StatelessWidget {
+  final List<DecalSpec> decals;
+  const _DecalLayer(this.decals);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth, h = c.maxHeight;
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (final s in decals)
+              Positioned(
+                left: s.pos.dx * w - s.size * w / 2,
+                top: s.pos.dy * h - s.size * w / 2,
+                width: s.size * w,
+                height: s.size * w,
+                child: Transform.rotate(
+                  angle: s.rotation,
+                  child: Image(image: s.image, fit: BoxFit.contain),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

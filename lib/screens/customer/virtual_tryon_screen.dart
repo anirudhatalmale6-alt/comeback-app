@@ -95,6 +95,24 @@ const List<BundledDesign> kBundledDesigns = [
   BundledDesign('Swirls', 'assets/nail_designs/swirls.png', 'Patterns'),
 ];
 
+/// Premade decal stickers the customer can place on a nail in the Design Studio
+/// (ordered as they appear in the picker). Each is transparent artwork sized to
+/// sit on top of any design.
+const List<String> kDecals = [
+  'assets/nail_designs/decals/heart.png',
+  'assets/nail_designs/decals/star.png',
+  'assets/nail_designs/decals/daisy.png',
+  'assets/nail_designs/decals/gem.png',
+  'assets/nail_designs/decals/bow.png',
+  'assets/nail_designs/decals/butterfly.png',
+  'assets/nail_designs/decals/moon.png',
+  'assets/nail_designs/decals/bolt.png',
+  'assets/nail_designs/decals/cherry.png',
+  'assets/nail_designs/decals/crown.png',
+  'assets/nail_designs/decals/snowflake.png',
+  'assets/nail_designs/decals/clover.png',
+];
+
 /// The natural nail-bed colour painted behind a French tip.
 const int kFrenchBaseColor = 0xFFF2DED6;
 
@@ -247,6 +265,26 @@ ImageProvider designProvider(String id) {
   return AssetImage(base);
 }
 
+/// A premade decal sticker placed on a nail. [pos] is normalised (0..1) within
+/// the nail box and [size] is its width as a fraction of the box width, so the
+/// same placement reads identically on the big Studio preview and the small nail
+/// over the hand. [asset] is one of [kDecals].
+class _Decal {
+  String asset;
+  Offset pos;
+  double size;
+  double rotation;
+  _Decal({
+    required this.asset,
+    required this.pos,
+    required this.size,
+    required this.rotation,
+  });
+
+  _Decal copy() =>
+      _Decal(asset: asset, pos: pos, size: size, rotation: rotation);
+}
+
 /// One design placed on a nail: where it sits, how big, and its angle.
 ///
 /// The `init*` fields remember the pose the nail was first placed at (from the
@@ -259,6 +297,8 @@ class _Nail {
   NailShape shape;
   NailFinish finish;
   double lengthFactor;
+  /// Decals stacked on this nail (placed in the Studio, carried onto the hand).
+  List<_Decal> decals;
   final Offset initCenter;
   final double initScale;
   final double initRotation;
@@ -270,7 +310,9 @@ class _Nail {
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.lengthFactor = 1.0,
-  })  : initCenter = center,
+    List<_Decal>? decals,
+  })  : decals = decals ?? [],
+        initCenter = center,
         initScale = scale,
         initRotation = rotation;
 
@@ -282,6 +324,7 @@ class _Nail {
     required this.shape,
     required this.finish,
     required this.lengthFactor,
+    required this.decals,
     required this.initCenter,
     required this.initScale,
     required this.initRotation,
@@ -298,6 +341,7 @@ class _Nail {
         shape: shape,
         finish: finish,
         lengthFactor: lengthFactor,
+        decals: decals.map((d) => d.copy()).toList(),
         initCenter: initCenter,
         initScale: initScale,
         initRotation: initRotation,
@@ -350,6 +394,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // Which Studio nail is being designed on its own (zoomed in); null = editing
   // the whole set together.
   int? _studioFocus;
+  // Decals placed per Studio nail (index matches _studioDesigns / the fan order,
+  // 0 = leftmost). Placed and edited only in the Studio, then carried onto the
+  // hand when the set is put on.
+  final List<List<_Decal>> _studioDecals =
+      List.generate(5, (_) => <_Decal>[]);
+  // The placed decal currently selected (for move/resize/rotate/delete) while a
+  // single Studio nail is focused; null = none selected.
+  int? _selectedDecal;
 
   final GlobalKey _captureKey = GlobalKey();
   Size _boxSize = Size.zero;
@@ -565,17 +617,21 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final baseW = _boxSize.width * kNailBaseWidthFactor;
     final baseH = baseW * kNailAspectRatio;
     final shared = _currentDesign ?? kDefaultDesign;
-    // If the customer designed each finger separately in the Studio, match those
-    // per-finger designs to the detected nails left→right (index 0 of the Studio
-    // fan is the leftmost nail). Falls back to the shared design otherwise.
-    final perNail = _studioDesigns.any((d) => d != null) &&
+    // If the customer designed each finger separately in the Studio (a per-nail
+    // base design OR placed decals), match those to the detected nails left→right
+    // (index 0 of the Studio fan is the leftmost nail). Falls back to the shared
+    // design and no decals otherwise.
+    final perNail = (_studioDesigns.any((d) => d != null) ||
+            _studioDecals.any((l) => l.isNotEmpty)) &&
         poses.length == _studioDesigns.length;
     final designByPose = List<String>.filled(poses.length, shared);
+    final decalsByPose = List<List<_Decal>>.generate(poses.length, (_) => []);
     if (perNail) {
       final order = List<int>.generate(poses.length, (i) => i)
         ..sort((a, b) => poses[a].center.dx.compareTo(poses[b].center.dx));
       for (int rank = 0; rank < order.length; rank++) {
         designByPose[order[rank]] = _studioDesigns[rank] ?? shared;
+        decalsByPose[order[rank]] = _studioDecals[rank];
       }
     }
     setState(() {
@@ -592,6 +648,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           shape: _shape,
           finish: _finish,
           lengthFactor: _lengthFactor,
+          decals: decalsByPose[i].map((d) => d.copy()).toList(),
         ));
       }
       _currentDesign = shared;
@@ -689,6 +746,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           shape: _shape,
           finish: _finish,
           lengthFactor: _lengthFactor,
+          decals: _studioDecals[i].map((d) => d.copy()).toList(),
         ));
       }
       _currentDesign = shared;
@@ -797,8 +855,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _studio = false;
       _seedFan = false;
       _studioFocus = null;
+      _selectedDecal = null;
       for (int i = 0; i < _studioDesigns.length; i++) {
         _studioDesigns[i] = null;
+        _studioDecals[i].clear();
       }
       // Keep _ambient: the same photo (and its light) is still loaded.
     });
@@ -1103,7 +1163,18 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// preview. Everything is authored tip-up, so it renders straight — the same
   /// way it lands on the hand. [design] overrides the shared look for a single
   /// finger (per-nail Studio design).
-  Widget _previewNail(double w, double h, {String? design}) {
+  /// Turns the stored per-nail decals into render specs for [NailOverlay].
+  List<DecalSpec> _decalSpecs(List<_Decal>? decals) => (decals ?? const [])
+      .map((d) => DecalSpec(
+            image: AssetImage(d.asset),
+            pos: d.pos,
+            size: d.size,
+            rotation: d.rotation,
+          ))
+      .toList();
+
+  Widget _previewNail(double w, double h,
+      {String? design, List<_Decal>? decals}) {
     final cd = design ?? _currentDesign ?? kDefaultDesign;
     final color = colorDesignFor(cd);
     final tintArgb = designTintArgb(cd);
@@ -1116,6 +1187,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         color: color,
         tint: tintArgb == null ? null : Color(tintArgb),
         frenchTip: ftipArgb == null ? null : Color(ftipArgb),
+        decals: _decalSpecs(decals),
         shape: _shape,
         finish: _finish,
       ),
@@ -1187,10 +1259,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                         padding: EdgeInsets.only(
                             right: i == scales.length - 1 ? 0 : gap),
                         child: GestureDetector(
-                          onTap: () => setState(() => _studioFocus = i),
+                          onTap: () => setState(() {
+                            _studioFocus = i;
+                            _selectedDecal = null;
+                          }),
                           child: _previewNail(
                               unit * scales[i], unit * scales[i] * 1.5,
-                              design: _studioDesigns[i]),
+                              design: _studioDesigns[i],
+                              decals: _studioDecals[i]),
                         ),
                       ),
                   ],
@@ -1216,9 +1292,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   /// Zoomed-in view of a single finger, so it can be designed on its own. A
-  /// colour/design tap or recolour applies only to this nail.
+  /// colour/design tap or recolour applies only to this nail. Decals can be
+  /// added from the strip and dragged/sized/rotated on the nail.
   Widget _buildStudioFocus(Color onBg) {
     final i = _studioFocus!;
+    final decals = _studioDecals[i];
+    final sel = (_selectedDecal != null && _selectedDecal! < decals.length)
+        ? _selectedDecal!
+        : null;
     return Column(
       children: [
         Padding(
@@ -1226,7 +1307,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           child: Row(
             children: [
               TextButton.icon(
-                onPressed: () => setState(() => _studioFocus = null),
+                onPressed: () => setState(() {
+                  _studioFocus = null;
+                  _selectedDecal = null;
+                }),
                 icon: const Icon(Icons.arrow_back, size: 18),
                 label: const Text('All nails'),
                 style: TextButton.styleFrom(foregroundColor: onBg),
@@ -1243,26 +1327,213 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           child: Center(
             child: LayoutBuilder(
               builder: (context, c) {
-                final w = (c.maxWidth * 0.42).clamp(90.0, 170.0);
-                return _previewNail(w, w * 1.5, design: _studioDesigns[i]);
+                // Size to fit BOTH the available width and height so the nail
+                // never overflows the (now shorter) focus area on small screens.
+                final w = math
+                    .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
+                    .clamp(80.0, 160.0);
+                return _buildDecalEditableNail(i, w, w * 1.5);
               },
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Text(
-            'Pick a colour or design for this nail only. Tap "All nails" to go '
-            'back to the full set.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: onBg, fontSize: 13),
+        // A selected decal shows a compact size/rotate/delete bar; otherwise a
+        // short hint. Fixed height either way so the layout doesn't jump.
+        if (sel != null)
+          _buildDecalToolbar(i, sel, onBg)
+        else
+          SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Center(
+                child: Text(
+                  decals.isEmpty
+                      ? 'Tap a decal below to place it, then drag it on the nail.'
+                      : 'Tap a decal to select it, drag to move. Pick a colour or design below.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: onBg, fontSize: 13),
+                ),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
+        _buildDecalStrip(i),
+        const SizedBox(height: 8),
         _buildStudioBgStrip(),
         const SizedBox(height: 10),
       ],
     );
+  }
+
+  /// The focused Studio nail as an editable surface: the base design + decals,
+  /// with a transparent tap layer (tap empty space to deselect) and a draggable
+  /// handle per decal (tap to select, drag to move; selected shows a ring).
+  Widget _buildDecalEditableNail(int i, double w, double h) {
+    final decals = _studioDecals[i];
+    return SizedBox(
+      width: w,
+      height: h,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          _previewNail(w, h, design: _studioDesigns[i], decals: decals),
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => setState(() => _selectedDecal = null),
+            ),
+          ),
+          for (int k = 0; k < decals.length; k++)
+            _buildDecalHandle(i, k, w, h),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDecalHandle(int i, int k, double w, double h) {
+    final d = _studioDecals[i][k];
+    final side = d.size * w;
+    final cx = d.pos.dx * w, cy = d.pos.dy * h;
+    final hit = math.max(side, 44.0);
+    final selected = _selectedDecal == k;
+    return Positioned(
+      left: cx - hit / 2,
+      top: cy - hit / 2,
+      width: hit,
+      height: hit,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => setState(() => _selectedDecal = k),
+        onPanStart: (_) => setState(() => _selectedDecal = k),
+        onPanUpdate: (e) => setState(() {
+          d.pos = Offset(
+            (d.pos.dx + e.delta.dx / w).clamp(0.0, 1.0),
+            (d.pos.dy + e.delta.dy / h).clamp(0.0, 1.0),
+          );
+        }),
+        child: selected
+            ? Center(
+                child: Container(
+                  width: side + 6,
+                  height: side + 6,
+                  decoration: BoxDecoration(
+                    border:
+                        Border.all(color: const Color(0xFF00897B), width: 2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              )
+            : const SizedBox.expand(),
+      ),
+    );
+  }
+
+  /// The horizontal picker of premade decals; tapping one drops it on the
+  /// focused nail (centred, selected) ready to drag.
+  Widget _buildDecalStrip(int i) {
+    return Container(
+      height: 60,
+      color: Colors.white,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        itemCount: kDecals.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, k) {
+          return GestureDetector(
+            onTap: () => _addDecal(i, kDecals[k]),
+            child: Container(
+              width: 48,
+              height: 48,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Image.asset(kDecals[k], fit: BoxFit.contain),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Compact controls for the selected decal: size, rotation and delete.
+  Widget _buildDecalToolbar(int i, int k, Color onBg) {
+    final d = _studioDecals[i][k];
+    Widget sliderRow(IconData icon, double value, double min, double max,
+        ValueChanged<double> onChanged) {
+      return Row(
+        children: [
+          Icon(icon, size: 18, color: onBg),
+          Expanded(
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              activeColor: const Color(0xFF00897B),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return SizedBox(
+      height: 96,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 34,
+              child: sliderRow(Icons.photo_size_select_large, d.size, 0.15, 0.9,
+                  (v) => setState(() => d.size = v)),
+            ),
+            SizedBox(
+              height: 34,
+              child: sliderRow(Icons.rotate_right, d.rotation, -math.pi,
+                  math.pi, (v) => setState(() => d.rotation = v)),
+            ),
+            SizedBox(
+              height: 24,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    _studioDecals[i].removeAt(k);
+                    _selectedDecal = null;
+                  }),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Remove'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red.shade400,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Drops a new decal on the focused nail, centred and ready to drag.
+  void _addDecal(int i, String asset) {
+    setState(() {
+      _studioDecals[i].add(_Decal(
+        asset: asset,
+        pos: const Offset(0.5, 0.42),
+        size: 0.42,
+        rotation: 0,
+      ));
+      _selectedDecal = _studioDecals[i].length - 1;
+    });
   }
 
   /// A horizontal strip of plain background colours (led by a colour-wheel tile
@@ -1640,6 +1911,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                           frenchOverlayArgb(n.asset) == null
                       ? null
                       : Color(frenchOverlayArgb(n.asset)!),
+                  decals: _decalSpecs(n.decals),
                   shape: n.shape,
                   finish: n.finish,
                   ambient: _ambient),
