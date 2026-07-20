@@ -385,10 +385,19 @@ class _Stroke {
   final int color; // ARGB
   final double width;
   final List<Offset> points;
-  _Stroke({required this.color, required this.width, required this.points});
+  final bool erase; // an eraser stroke rubs out earlier paint on the nail
+  _Stroke({
+    required this.color,
+    required this.width,
+    required this.points,
+    this.erase = false,
+  });
 
-  _Stroke copy() =>
-      _Stroke(color: color, width: width, points: List<Offset>.from(points));
+  _Stroke copy() => _Stroke(
+      color: color,
+      width: width,
+      points: List<Offset>.from(points),
+      erase: erase);
 }
 
 /// One design placed on a nail: where it sits, how big, and its angle.
@@ -521,6 +530,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final List<List<_Stroke>> _studioStrokes =
       List.generate(5, (_) => <_Stroke>[]);
   bool _drawMode = false;
+  bool _erasing = false;
   int _drawColor = 0xFFE23B4E; // classic red to start
   double _drawWidth = 0.06; // fraction of the nail-box width
 
@@ -1307,6 +1317,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             color: Color(s.color),
             width: s.width,
             points: s.points,
+            erase: s.erase,
           ))
       .toList();
 
@@ -1497,7 +1508,17 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 final w = math
                     .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
                     .clamp(80.0, 160.0);
-                return _buildDecalEditableNail(i, w, w * 1.5);
+                // Pinch (two fingers) to zoom in for fine detail; one finger
+                // still draws/moves. Keyed by nail so zoom resets per finger.
+                return InteractiveViewer(
+                  key: ValueKey('studio_zoom_$i'),
+                  constrained: false,
+                  panEnabled: false,
+                  scaleEnabled: true,
+                  minScale: 1,
+                  maxScale: 4,
+                  child: _buildDecalEditableNail(i, w, w * 1.5),
+                );
               },
             ),
           ),
@@ -1566,6 +1587,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     color: _drawColor,
                     width: _drawWidth,
                     points: [norm(e.localPosition)],
+                    erase: _erasing,
                   ));
                 }),
                 onPanUpdate: (e) => setState(() {
@@ -1640,7 +1662,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  /// The Draw-tool toolbar: colour swatches, brush size, undo and clear.
+  /// The Draw-tool toolbar: a colour-wheel button + colour swatches, brush size,
+  /// an eraser toggle, undo and clear.
   Widget _buildDrawToolbar(int i, Color onBg) {
     final strokes = _studioStrokes[i];
     return Column(
@@ -1652,12 +1675,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             children: [
+              _drawWheelButton(),
               for (final c in kNailPalette) _drawColorDot(c),
             ],
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
             children: [
               Icon(Icons.brush, size: 16, color: onBg),
@@ -1668,6 +1692,18 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                   max: 0.16,
                   onChanged: (v) => setState(() => _drawWidth = v),
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.auto_fix_off),
+                tooltip: 'Eraser',
+                isSelected: _erasing,
+                color: onBg,
+                style: IconButton.styleFrom(
+                  backgroundColor:
+                      _erasing ? const Color(0xFF00897B) : Colors.transparent,
+                  foregroundColor: _erasing ? Colors.white : onBg,
+                ),
+                onPressed: () => setState(() => _erasing = !_erasing),
               ),
               IconButton(
                 icon: const Icon(Icons.undo),
@@ -1692,10 +1728,48 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  Widget _drawColorDot(int c) {
-    final selected = _drawColor == c;
+  /// A rainbow "colour wheel" button that opens the full colour picker so any
+  /// colour can be chosen for the brush.
+  Widget _drawWheelButton() {
     return GestureDetector(
-      onTap: () => setState(() => _drawColor = c),
+      onTap: () async {
+        final c = await showColorWheelDialog(context,
+            initial: Color(_drawColor), title: 'Brush colour');
+        if (c != null) {
+          setState(() {
+            _drawColor = c.toARGB32();
+            _erasing = false;
+          });
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        width: 30,
+        height: 30,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: SweepGradient(colors: [
+            Color(0xFFFF0000),
+            Color(0xFFFFFF00),
+            Color(0xFF00FF00),
+            Color(0xFF00FFFF),
+            Color(0xFF0000FF),
+            Color(0xFFFF00FF),
+            Color(0xFFFF0000),
+          ]),
+        ),
+        child: const Icon(Icons.add, size: 16, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _drawColorDot(int c) {
+    final selected = !_erasing && _drawColor == c;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _drawColor = c;
+        _erasing = false;
+      }),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         width: 30,

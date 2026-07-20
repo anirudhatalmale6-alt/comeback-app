@@ -707,8 +707,12 @@ class StrokeSpec {
   final Color color;
   final double width;
   final List<Offset> points;
+  final bool erase;
   const StrokeSpec(
-      {required this.color, required this.width, required this.points});
+      {required this.color,
+      required this.width,
+      required this.points,
+      this.erase = false});
 }
 
 /// Paints freehand [StrokeSpec]s inside the nail box (already clipped to the
@@ -721,19 +725,27 @@ class _StrokePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
+    // Draw all strokes into one layer so eraser strokes (BlendMode.clear) can
+    // rub out earlier paint on the nail without touching the design beneath.
+    canvas.saveLayer(Offset.zero & size, Paint());
     for (final s in strokes) {
       if (s.points.isEmpty) continue;
       final paint = Paint()
-        ..color = s.color
+        ..color = s.erase ? const Color(0xFFFFFFFF) : s.color
         ..style = PaintingStyle.stroke
         ..strokeWidth = (s.width * w).clamp(1.0, w)
         ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
+        ..strokeJoin = StrokeJoin.round
+        ..blendMode = s.erase ? BlendMode.clear : BlendMode.srcOver;
       if (s.points.length == 1) {
         // A tap becomes a dot.
         final p = Offset(s.points.first.dx * w, s.points.first.dy * h);
-        canvas.drawCircle(p, paint.strokeWidth / 2,
-            Paint()..color = s.color);
+        canvas.drawCircle(
+            p,
+            paint.strokeWidth / 2,
+            Paint()
+              ..color = s.erase ? const Color(0xFFFFFFFF) : s.color
+              ..blendMode = s.erase ? BlendMode.clear : BlendMode.srcOver);
         continue;
       }
       final path = Path()
@@ -743,6 +755,7 @@ class _StrokePainter extends CustomPainter {
       }
       canvas.drawPath(path, paint);
     }
+    canvas.restore();
   }
 
   @override
