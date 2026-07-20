@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -495,84 +494,88 @@ class _RoundIconButton extends StatelessWidget {
 
 /// Draws a clean, natural hand-shaped outline for the user to line their hand
 /// up with, and dims everything outside it so the guide reads clearly against
-/// the live camera feed. The silhouette is built by unioning tapered
-/// finger/thumb "capsules" onto a rounded palm into one smooth outline, so it
-/// looks like a real hand instead of a set of blocks.
+/// the live camera feed. The silhouette is a single smooth closed curve traced
+/// around a real hand shape (Catmull-Rom through anatomical control points), so
+/// the finger valleys, tips, thumb and palm all curve naturally instead of
+/// looking blocky.
 class _HandGuidePainter extends CustomPainter {
   final bool ready;
   final int progress;
   _HandGuidePainter({required this.ready, required this.progress});
 
-  /// A tapered capsule (rounded at both ends) from [a] radius [ra] to [b]
-  /// radius [rb] — one finger, one thumb, or a knuckle joint.
-  Path _capsule(Offset a, double ra, Offset b, double rb) {
-    final p = Path();
-    final d = b - a;
-    final len = d.distance;
-    if (len < 1e-3) {
-      p.addOval(Rect.fromCircle(center: a, radius: math.max(ra, rb)));
-      return p;
+  /// A smooth closed path passing through [p] using a Catmull-Rom spline
+  /// converted to cubic Béziers (tension 1/6). Gives organic curves with no
+  /// straight edges between the control points.
+  Path _smoothClosed(List<Offset> p) {
+    final path = Path();
+    final n = p.length;
+    if (n < 3) {
+      path.addPolygon(p, true);
+      return path;
     }
-    final dir = d / len;
-    final perp = Offset(-dir.dy, dir.dx);
-    final a1 = a + perp * ra, a2 = a - perp * ra;
-    final b1 = b + perp * rb, b2 = b - perp * rb;
-    p.moveTo(a1.dx, a1.dy);
-    p.lineTo(b1.dx, b1.dy);
-    p.lineTo(b2.dx, b2.dy);
-    p.lineTo(a2.dx, a2.dy);
-    p.close();
-    p.addOval(Rect.fromCircle(center: a, radius: ra));
-    p.addOval(Rect.fromCircle(center: b, radius: rb));
-    return p;
+    path.moveTo(p[0].dx, p[0].dy);
+    for (int i = 0; i < n; i++) {
+      final p0 = p[(i - 1 + n) % n];
+      final p1 = p[i];
+      final p2 = p[(i + 1) % n];
+      final p3 = p[(i + 2) % n];
+      final c1 = Offset(p1.dx + (p2.dx - p0.dx) / 6, p1.dy + (p2.dy - p0.dy) / 6);
+      final c2 = Offset(p2.dx - (p3.dx - p1.dx) / 6, p2.dy - (p3.dy - p1.dy) / 6);
+      path.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, p2.dx, p2.dy);
+    }
+    path.close();
+    return path;
   }
 
   Path _buildHand(Size size) {
     final w = size.width, h = size.height;
     final cx = w / 2;
-    // Vertical band the hand occupies; leaves room for the top pill and the
-    // bottom dots so nothing is clipped.
-    final palmTop = h * 0.50, palmBottom = h * 0.80;
-    final palmHalf = w * 0.24;
-    final palmH = palmBottom - palmTop;
+    final palmHalf = w * 0.22;
+    final knuckleY = h * 0.44; // where the finger bases meet the palm
+    final wristY = h * 0.80;
+    final wristHalf = w * 0.155;
+    final valleyY = h * 0.455; // bottom of the curved webbing between fingers
 
-    // Palm — a generous rounded rectangle; finger bases sink into its top and
-    // the wrist rounds off at the bottom.
-    Path hand = Path()
-      ..addRRect(RRect.fromRectAndCorners(
-        Rect.fromLTRB(cx - palmHalf, palmTop - palmH * 0.10, cx + palmHalf,
-            palmBottom),
-        topLeft: Radius.circular(palmHalf * 0.5),
-        topRight: Radius.circular(palmHalf * 0.5),
-        bottomLeft: Radius.circular(palmHalf * 0.7),
-        bottomRight: Radius.circular(palmHalf * 0.7),
-      ));
-
-    Path union(Path a, Path b) => Path.combine(PathOperation.union, a, b);
-
-    // Four fingers: [baseX frac of palmHalf, length frac, tip X fan (frac of w),
-    // base radius frac of palmHalf]. Index → pinky, middle longest.
-    final fingerMax = h * 0.30;
+    // Each finger: centre x, half-width, tip y. Index → pinky, middle longest.
     final fingers = <List<double>>[
-      [-0.62, 0.86, -0.09, 0.30], // index
-      [-0.21, 1.00, -0.03, 0.32], // middle
-      [0.21, 0.92, 0.04, 0.30], // ring
-      [0.62, 0.74, 0.12, 0.26], // pinky
+      [cx - w * 0.175, w * 0.058, h * 0.20], // index
+      [cx - w * 0.050, w * 0.060, h * 0.155], // middle (longest)
+      [cx + w * 0.075, w * 0.056, h * 0.185], // ring
+      [cx + w * 0.185, w * 0.048, h * 0.265], // pinky (shortest)
     ];
-    for (final f in fingers) {
-      final base = Offset(cx + palmHalf * f[0], palmTop);
-      final tip = Offset(base.dx + w * f[2], palmTop - fingerMax * f[1]);
-      final rb = palmHalf * f[3];
-      hand = union(hand, _capsule(base, rb, tip, rb * 0.72));
+
+    // Trace the outline clockwise from the left wrist, up the thumb side, over
+    // the four fingers, then down the right side back across the wrist.
+    final pts = <Offset>[
+      Offset(cx - wristHalf, wristY), // wrist, left
+      Offset(cx - palmHalf * 1.02, h * 0.70), // thenar bulge
+      Offset(cx - w * 0.24, h * 0.63),
+      Offset(cx - w * 0.335, h * 0.545), // thumb outer side
+      Offset(cx - w * 0.365, h * 0.455), // thumb tip shoulder
+      Offset(cx - w * 0.345, h * 0.415), // thumb tip
+      Offset(cx - w * 0.295, h * 0.455), // thumb inner shoulder
+      Offset(cx - w * 0.245, h * 0.55), // thumb–index web (deep valley)
+    ];
+    for (int i = 0; i < fingers.length; i++) {
+      final fx = fingers[i][0], hw = fingers[i][1], ty = fingers[i][2];
+      pts.add(Offset(fx - hw, knuckleY)); // left base
+      pts.add(Offset(fx - hw * 0.72, ty + hw * 1.35)); // tip shoulder, left
+      pts.add(Offset(fx, ty)); // tip
+      pts.add(Offset(fx + hw * 0.72, ty + hw * 1.35)); // tip shoulder, right
+      pts.add(Offset(fx + hw, knuckleY)); // right base
+      if (i < fingers.length - 1) {
+        final nx = fingers[i + 1][0] - fingers[i + 1][1];
+        pts.add(Offset((fx + hw + nx) / 2, valleyY)); // curved valley
+      }
     }
+    pts.addAll([
+      Offset(cx + palmHalf * 1.02, h * 0.60), // upper palm, right
+      Offset(cx + palmHalf, h * 0.72),
+      Offset(cx + wristHalf, wristY), // wrist, right
+      Offset(cx, wristY + h * 0.02), // rounded wrist base
+    ]);
 
-    // Thumb — thicker, angled out and down to the lower-left of the palm.
-    final thumbBase = Offset(cx - palmHalf * 0.80, palmTop + palmH * 0.42);
-    final thumbTip = Offset(cx - palmHalf * 1.55, palmTop - fingerMax * 0.22);
-    hand = union(hand, _capsule(thumbBase, palmHalf * 0.34, thumbTip,
-        palmHalf * 0.22));
-
-    return hand;
+    return _smoothClosed(pts);
   }
 
   @override
