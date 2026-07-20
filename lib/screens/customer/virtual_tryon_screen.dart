@@ -1500,26 +1500,29 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
         ),
         Expanded(
-          child: Center(
-            child: LayoutBuilder(
-              builder: (context, c) {
-                // Size to fit BOTH the available width and height so the nail
-                // never overflows the (now shorter) focus area on small screens.
-                final w = math
-                    .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
-                    .clamp(80.0, 160.0);
-                // Pinch (two fingers) to zoom in for fine detail; one finger
-                // still draws/moves. Keyed by nail so zoom resets per finger.
-                return InteractiveViewer(
-                  key: ValueKey('studio_zoom_$i'),
-                  constrained: false,
-                  panEnabled: false,
-                  scaleEnabled: true,
-                  minScale: 1,
-                  maxScale: 4,
-                  child: _buildDecalEditableNail(i, w, w * 1.5),
-                );
-              },
+          // The nail sits centred and fitted; pinch (two fingers) to zoom in and
+          // pan around for fine detail, while one finger still draws/moves.
+          // Keyed by nail so the zoom resets when a different finger is opened.
+          child: ClipRect(
+            child: InteractiveViewer(
+              key: ValueKey('studio_zoom_$i'),
+              panEnabled: false,
+              scaleEnabled: true,
+              minScale: 1,
+              maxScale: 5,
+              boundaryMargin: const EdgeInsets.all(double.infinity),
+              child: Center(
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    // Size to fit BOTH the available width and height so the
+                    // nail never overflows the focus area on small screens.
+                    final w = math
+                        .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
+                        .clamp(80.0, 160.0);
+                    return _buildDecalEditableNail(i, w, w * 1.5);
+                  },
+                ),
+              ),
             ),
           ),
         ),

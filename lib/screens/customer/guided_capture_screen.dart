@@ -590,21 +590,21 @@ class _HandGuidePainter extends CustomPainter {
     final w = size.width, h = size.height;
     final cx = w / 2;
     final palmHalf = w * 0.22;
-    final knuckleY = h * 0.44; // where the finger bases meet the palm
-    final wristY = h * 0.80;
-    final wristHalf = w * 0.155;
-    final valleyY = h * 0.455; // bottom of the curved webbing between fingers
+    final wristY = h * 0.815;
+    final wristHalf = w * 0.15;
 
-    // Each finger: centre x, half-width, tip y. Index → pinky, middle longest.
+    // Each finger: centre x, base half-width, tip half-width (tapered), tip y,
+    // base y (staggered so the knuckle line arcs). Index → pinky, middle
+    // longest, pinky shortest & slimmest.
     final fingers = <List<double>>[
-      [cx - w * 0.175, w * 0.058, h * 0.20], // index
-      [cx - w * 0.050, w * 0.060, h * 0.155], // middle (longest)
-      [cx + w * 0.075, w * 0.056, h * 0.185], // ring
-      [cx + w * 0.185, w * 0.048, h * 0.265], // pinky (shortest)
+      [cx - w * 0.150, w * 0.060, w * 0.043, h * 0.225, h * 0.455], // index
+      [cx - w * 0.028, w * 0.063, w * 0.046, h * 0.170, h * 0.448], // middle
+      [cx + w * 0.095, w * 0.059, w * 0.043, h * 0.205, h * 0.452], // ring
+      [cx + w * 0.203, w * 0.049, w * 0.037, h * 0.300, h * 0.472], // pinky
     ];
 
     // Trace the outline clockwise from the left wrist, up the thumb side, over
-    // the four fingers, then down the right side back across the wrist.
+    // the four tapered fingers, then down the right side back across the wrist.
     final pts = <Offset>[
       Offset(cx - wristHalf, wristY), // wrist, left
       Offset(cx - palmHalf * 1.14, h * 0.665), // thenar bulge (palm widest here)
@@ -617,20 +617,28 @@ class _HandGuidePainter extends CustomPainter {
       Offset(cx - w * 0.235, h * 0.585), // thumb–index web (deep valley)
     ];
     for (int i = 0; i < fingers.length; i++) {
-      final fx = fingers[i][0], hw = fingers[i][1], ty = fingers[i][2];
-      pts.add(Offset(fx - hw, knuckleY)); // left base
-      pts.add(Offset(fx - hw * 0.72, ty + hw * 1.35)); // tip shoulder, left
+      final fx = fingers[i][0];
+      final bhw = fingers[i][1], thw = fingers[i][2];
+      final ty = fingers[i][3], by = fingers[i][4];
+      final midY = (by + ty) * 0.5, midHW = (bhw + thw) * 0.52;
+      pts.add(Offset(fx - bhw, by)); // left base (widest)
+      pts.add(Offset(fx - midHW, midY)); // left mid (taper)
+      pts.add(Offset(fx - thw, ty + thw * 1.25)); // tip shoulder, left
       pts.add(Offset(fx, ty)); // tip
-      pts.add(Offset(fx + hw * 0.72, ty + hw * 1.35)); // tip shoulder, right
-      pts.add(Offset(fx + hw, knuckleY)); // right base
+      pts.add(Offset(fx + thw, ty + thw * 1.25)); // tip shoulder, right
+      pts.add(Offset(fx + midHW, midY)); // right mid
+      pts.add(Offset(fx + bhw, by)); // right base
       if (i < fingers.length - 1) {
         final nx = fingers[i + 1][0] - fingers[i + 1][1];
-        pts.add(Offset((fx + hw + nx) / 2, valleyY)); // curved valley
+        final ny = fingers[i + 1][4];
+        pts.add(Offset(
+            (fx + bhw + nx) / 2, (by > ny ? by : ny) + h * 0.012)); // web valley
       }
     }
     pts.addAll([
-      Offset(cx + palmHalf * 1.02, h * 0.60), // upper palm, right
-      Offset(cx + palmHalf, h * 0.72),
+      Offset(cx + w * 0.248, h * 0.55), // pinky-side knuckle (widest)
+      Offset(cx + w * 0.222, h * 0.66),
+      Offset(cx + w * 0.185, h * 0.745),
       Offset(cx + wristHalf, wristY), // wrist, right
       Offset(cx, wristY + h * 0.02), // rounded wrist base
     ]);
