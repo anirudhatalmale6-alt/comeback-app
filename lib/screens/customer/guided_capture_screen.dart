@@ -594,7 +594,6 @@ class _HandGuidePainter extends CustomPainter {
   Path _buildHand(Size size) {
     final w = size.width, h = size.height;
     final cx = w / 2;
-    final palmHalf = w * 0.22;
     final wristY = h * 0.815;
     final wristHalf = w * 0.15;
 
@@ -612,16 +611,20 @@ class _HandGuidePainter extends CustomPainter {
     // the four tapered fingers, then down the right side back across the wrist.
     final pts = <Offset>[
       Offset(cx - wristHalf, wristY), // wrist, left
-      Offset(cx - palmHalf * 1.08, h * 0.700), // thenar base (rounded, lower)
-      Offset(cx - w * 0.335, h * 0.618), // outer thumb base
-      Offset(cx - w * 0.408, h * 0.548), // outer knuckle bulge (thumb widest)
-      Offset(cx - w * 0.436, h * 0.487), // outer shaft, approaching tip
-      Offset(cx - w * 0.422, h * 0.443), // tip outer corner (narrowing)
-      Offset(cx - w * 0.392, h * 0.427), // tip apex (narrow, rounded)
-      Offset(cx - w * 0.358, h * 0.447), // tip inner corner
-      Offset(cx - w * 0.350, h * 0.508), // inner shaft (concave neck)
-      Offset(cx - w * 0.312, h * 0.565), // inner base
-      Offset(cx - w * 0.235, h * 0.600), // thumb–index web (deep valley)
+      // Thumb: a broad wedge flaring from the thenar (ball of the thumb) and
+      // tapering to a rounded tip — base much wider than tip so it never reads
+      // as a uniform noodle — with a shallow, wide web into the index.
+      Offset(cx - w * 0.205, h * 0.745), // thenar start (broad, low on palm)
+      Offset(cx - w * 0.268, h * 0.668), // thenar bulge (ball of thumb, wide)
+      Offset(cx - w * 0.330, h * 0.602), // outer thumb base
+      Offset(cx - w * 0.388, h * 0.540), // outer knuckle
+      Offset(cx - w * 0.410, h * 0.487), // outer, just below tip
+      Offset(cx - w * 0.398, h * 0.450), // tip outer corner
+      Offset(cx - w * 0.366, h * 0.435), // tip apex (rounded)
+      Offset(cx - w * 0.336, h * 0.451), // tip inner corner
+      Offset(cx - w * 0.330, h * 0.505), // inner shaft (upper)
+      Offset(cx - w * 0.278, h * 0.558), // inner, bulging back toward palm
+      Offset(cx - w * 0.205, h * 0.608), // thumb–index web (shallow, wide)
     ];
     for (int i = 0; i < fingers.length; i++) {
       final fx = fingers[i][0];
