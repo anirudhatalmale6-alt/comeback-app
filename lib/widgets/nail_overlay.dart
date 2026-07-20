@@ -541,6 +541,11 @@ class NailOverlay extends StatelessWidget {
   /// Studio preview and the small nail over the hand photo.
   final List<DecalSpec> decals;
 
+  /// Freehand strokes the customer painted on the nail in the Draw tool, clipped
+  /// to the nail silhouette. Points and width are normalised to the nail box so
+  /// the drawing reads the same in the Studio and over the hand.
+  final List<StrokeSpec> strokes;
+
   final NailShape shape;
   final NailFinish finish;
 
@@ -555,6 +560,7 @@ class NailOverlay extends StatelessWidget {
     this.tint,
     this.frenchTip,
     this.decals = const [],
+    this.strokes = const [],
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
@@ -598,6 +604,20 @@ class NailOverlay extends StatelessWidget {
           ],
         );
       }
+    }
+    if (strokes.isNotEmpty) {
+      // Freehand drawing sits on top of the base design (and French tip), under
+      // the decals, clipped to the nail so paint never bleeds onto the skin.
+      design = Stack(
+        fit: StackFit.expand,
+        children: [
+          design,
+          ClipPath(
+            clipper: _NailClipper(shape),
+            child: CustomPaint(painter: _StrokePainter(strokes)),
+          ),
+        ],
+      );
     }
     if (decals.isNotEmpty) {
       // Decals sit on top of the design (and any French tip), clipped to the
@@ -677,6 +697,56 @@ class _DecalLayer extends StatelessWidget {
       },
     );
   }
+}
+
+/// One freehand stroke painted on a nail: its [color], its [width] as a fraction
+/// of the nail-box width, and its [points] normalised (0..1) within the box, so
+/// the same stroke reads identically whether the nail is drawn big in the Studio
+/// or small over the hand.
+class StrokeSpec {
+  final Color color;
+  final double width;
+  final List<Offset> points;
+  const StrokeSpec(
+      {required this.color, required this.width, required this.points});
+}
+
+/// Paints freehand [StrokeSpec]s inside the nail box (already clipped to the
+/// silhouette by the caller), scaling the normalised points and width to the
+/// actual box size so drawings render identically everywhere.
+class _StrokePainter extends CustomPainter {
+  final List<StrokeSpec> strokes;
+  const _StrokePainter(this.strokes);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    for (final s in strokes) {
+      if (s.points.isEmpty) continue;
+      final paint = Paint()
+        ..color = s.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = (s.width * w).clamp(1.0, w)
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      if (s.points.length == 1) {
+        // A tap becomes a dot.
+        final p = Offset(s.points.first.dx * w, s.points.first.dy * h);
+        canvas.drawCircle(p, paint.strokeWidth / 2,
+            Paint()..color = s.color);
+        continue;
+      }
+      final path = Path()
+        ..moveTo(s.points.first.dx * w, s.points.first.dy * h);
+      for (int i = 1; i < s.points.length; i++) {
+        path.lineTo(s.points[i].dx * w, s.points[i].dy * h);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StrokePainter old) => old.strokes != strokes;
 }
 
 /// The French "smile line" tip band inside a [size] nail box: the crescent from

@@ -377,6 +377,20 @@ class _Decal {
       _Decal(asset: asset, pos: pos, size: size, rotation: rotation);
 }
 
+/// A freehand stroke painted on a nail in the Draw tool. [points] are normalised
+/// (0..1) within the nail box and [width] is a fraction of the box width, so a
+/// drawing keeps its place and thickness whether the nail is shown big in the
+/// Studio or small over the hand.
+class _Stroke {
+  final int color; // ARGB
+  final double width;
+  final List<Offset> points;
+  _Stroke({required this.color, required this.width, required this.points});
+
+  _Stroke copy() =>
+      _Stroke(color: color, width: width, points: List<Offset>.from(points));
+}
+
 /// One design placed on a nail: where it sits, how big, and its angle.
 ///
 /// The `init*` fields remember the pose the nail was first placed at (from the
@@ -391,6 +405,8 @@ class _Nail {
   double lengthFactor;
   /// Decals stacked on this nail (placed in the Studio, carried onto the hand).
   List<_Decal> decals;
+  /// Freehand strokes painted on this nail in the Draw tool.
+  List<_Stroke> strokes;
   final Offset initCenter;
   final double initScale;
   final double initRotation;
@@ -403,7 +419,9 @@ class _Nail {
     this.finish = NailFinish.gloss,
     this.lengthFactor = 1.0,
     List<_Decal>? decals,
+    List<_Stroke>? strokes,
   })  : decals = decals ?? [],
+        strokes = strokes ?? [],
         initCenter = center,
         initScale = scale,
         initRotation = rotation;
@@ -417,6 +435,7 @@ class _Nail {
     required this.finish,
     required this.lengthFactor,
     required this.decals,
+    required this.strokes,
     required this.initCenter,
     required this.initScale,
     required this.initRotation,
@@ -434,6 +453,7 @@ class _Nail {
         finish: finish,
         lengthFactor: lengthFactor,
         decals: decals.map((d) => d.copy()).toList(),
+        strokes: strokes.map((s) => s.copy()).toList(),
         initCenter: initCenter,
         initScale: initScale,
         initRotation: initRotation,
@@ -494,6 +514,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // The placed decal currently selected (for move/resize/rotate/delete) while a
   // single Studio nail is focused; null = none selected.
   int? _selectedDecal;
+
+  // Freehand strokes painted per Studio nail (index matches the fan order), and
+  // the current Draw-tool state. When _drawMode is on, dragging on the focused
+  // nail paints instead of moving decals.
+  final List<List<_Stroke>> _studioStrokes =
+      List.generate(5, (_) => <_Stroke>[]);
+  bool _drawMode = false;
+  int _drawColor = 0xFFE23B4E; // classic red to start
+  double _drawWidth = 0.06; // fraction of the nail-box width
 
   final GlobalKey _captureKey = GlobalKey();
   Size _boxSize = Size.zero;
@@ -714,16 +743,19 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     // (index 0 of the Studio fan is the leftmost nail). Falls back to the shared
     // design and no decals otherwise.
     final perNail = (_studioDesigns.any((d) => d != null) ||
-            _studioDecals.any((l) => l.isNotEmpty)) &&
+            _studioDecals.any((l) => l.isNotEmpty) ||
+            _studioStrokes.any((l) => l.isNotEmpty)) &&
         poses.length == _studioDesigns.length;
     final designByPose = List<String>.filled(poses.length, shared);
     final decalsByPose = List<List<_Decal>>.generate(poses.length, (_) => []);
+    final strokesByPose = List<List<_Stroke>>.generate(poses.length, (_) => []);
     if (perNail) {
       final order = List<int>.generate(poses.length, (i) => i)
         ..sort((a, b) => poses[a].center.dx.compareTo(poses[b].center.dx));
       for (int rank = 0; rank < order.length; rank++) {
         designByPose[order[rank]] = _studioDesigns[rank] ?? shared;
         decalsByPose[order[rank]] = _studioDecals[rank];
+        strokesByPose[order[rank]] = _studioStrokes[rank];
       }
     }
     setState(() {
@@ -741,6 +773,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           finish: _finish,
           lengthFactor: _lengthFactor,
           decals: decalsByPose[i].map((d) => d.copy()).toList(),
+          strokes: strokesByPose[i].map((s) => s.copy()).toList(),
         ));
       }
       _currentDesign = shared;
@@ -839,6 +872,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           finish: _finish,
           lengthFactor: _lengthFactor,
           decals: _studioDecals[i].map((d) => d.copy()).toList(),
+          strokes: _studioStrokes[i].map((s) => s.copy()).toList(),
         ));
       }
       _currentDesign = shared;
@@ -948,9 +982,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _seedFan = false;
       _studioFocus = null;
       _selectedDecal = null;
+      _drawMode = false;
       for (int i = 0; i < _studioDesigns.length; i++) {
         _studioDesigns[i] = null;
         _studioDecals[i].clear();
+        _studioStrokes[i].clear();
       }
       // Keep _ambient: the same photo (and its light) is still loaded.
     });
@@ -1265,8 +1301,17 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ))
       .toList();
 
+  /// Turns the stored per-nail strokes into render specs for [NailOverlay].
+  List<StrokeSpec> _strokeSpecs(List<_Stroke>? strokes) => (strokes ?? const [])
+      .map((s) => StrokeSpec(
+            color: Color(s.color),
+            width: s.width,
+            points: s.points,
+          ))
+      .toList();
+
   Widget _previewNail(double w, double h,
-      {String? design, List<_Decal>? decals}) {
+      {String? design, List<_Decal>? decals, List<_Stroke>? strokes}) {
     final cd = design ?? _currentDesign ?? kDefaultDesign;
     final color = colorDesignFor(cd);
     final tintArgb = designTintArgb(cd);
@@ -1280,6 +1325,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         tint: tintArgb == null ? null : Color(tintArgb),
         frenchTip: ftipArgb == null ? null : Color(ftipArgb),
         decals: _decalSpecs(decals),
+        strokes: _strokeSpecs(strokes),
         shape: _shape,
         finish: _finish,
       ),
@@ -1358,7 +1404,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                           child: _previewNail(
                               unit * scales[i], unit * scales[i] * 1.5,
                               design: _studioDesigns[i],
-                              decals: _studioDecals[i]),
+                              decals: _studioDecals[i],
+                              strokes: _studioStrokes[i]),
                         ),
                       ),
                   ],
@@ -1383,15 +1430,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  /// Copies the design and decals of the focused nail onto every other nail,
-  /// so the customer can build one look and apply it across the whole set in a
-  /// single tap. Decals are deep-copied so each nail can still be tweaked after.
+  /// Copies the design, decals and drawing of the focused nail onto every other
+  /// nail, so the customer can build one look and apply it across the whole set
+  /// in a single tap. Everything is deep-copied so each nail stays tweakable.
   void _copyNailToAll(int i) {
     setState(() {
       for (int j = 0; j < _studioDesigns.length; j++) {
         if (j == i) continue;
         _studioDesigns[j] = _studioDesigns[i];
         _studioDecals[j] = _studioDecals[i].map((d) => d.copy()).toList();
+        _studioStrokes[j] = _studioStrokes[i].map((s) => s.copy()).toList();
       }
     });
     ScaffoldMessenger.of(context)
@@ -1454,28 +1502,34 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
           ),
         ),
-        // A selected decal shows a compact size/rotate/delete bar; otherwise a
-        // short hint. Fixed height either way so the layout doesn't jump.
-        if (sel != null)
-          _buildDecalToolbar(i, sel, onBg)
-        else
-          SizedBox(
-            height: 44,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Center(
-                child: Text(
-                  decals.isEmpty
-                      ? 'Tap a decal below to place it, then drag it on the nail.'
-                      : 'Tap a decal to select it, drag to move. Pick a colour or design below.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: onBg, fontSize: 13),
+        _buildModeToggle(onBg),
+        const SizedBox(height: 6),
+        if (_drawMode)
+          _buildDrawToolbar(i, onBg)
+        else ...[
+          // A selected decal shows a compact size/rotate/delete bar; otherwise a
+          // short hint. Fixed height either way so the layout doesn't jump.
+          if (sel != null)
+            _buildDecalToolbar(i, sel, onBg)
+          else
+            SizedBox(
+              height: 44,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Center(
+                  child: Text(
+                    decals.isEmpty
+                        ? 'Tap a decal below to place it, then drag it on the nail.'
+                        : 'Tap a decal to select it, drag to move. Pick a colour or design below.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: onBg, fontSize: 13),
+                  ),
                 ),
               ),
             ),
-          ),
-        const SizedBox(height: 6),
-        _buildDecalStrip(i),
+          const SizedBox(height: 6),
+          _buildDecalStrip(i),
+        ],
         const SizedBox(height: 8),
         _buildStudioBgStrip(),
         const SizedBox(height: 10),
@@ -1488,22 +1542,172 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// handle per decal (tap to select, drag to move; selected shows a ring).
   Widget _buildDecalEditableNail(int i, double w, double h) {
     final decals = _studioDecals[i];
+    Offset norm(Offset p) => Offset(
+        (p.dx / w).clamp(0.0, 1.0), (p.dy / h).clamp(0.0, 1.0));
     return SizedBox(
       width: w,
       height: h,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          _previewNail(w, h, design: _studioDesigns[i], decals: decals),
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => setState(() => _selectedDecal = null),
+          _previewNail(w, h,
+              design: _studioDesigns[i],
+              decals: decals,
+              strokes: _studioStrokes[i]),
+          if (_drawMode)
+            // In Draw mode, dragging on the nail paints a stroke (clipped to the
+            // nail by the overlay). Decal handles are hidden so they don't fight
+            // the brush.
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: (e) => setState(() {
+                  _studioStrokes[i].add(_Stroke(
+                    color: _drawColor,
+                    width: _drawWidth,
+                    points: [norm(e.localPosition)],
+                  ));
+                }),
+                onPanUpdate: (e) => setState(() {
+                  final s = _studioStrokes[i];
+                  if (s.isNotEmpty) s.last.points.add(norm(e.localPosition));
+                }),
+              ),
+            )
+          else ...[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => setState(() => _selectedDecal = null),
+              ),
             ),
-          ),
-          for (int k = 0; k < decals.length; k++)
-            _buildDecalHandle(i, k, w, h),
+            for (int k = 0; k < decals.length; k++)
+              _buildDecalHandle(i, k, w, h),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// The Decals / Draw mode switch shown above the focused nail's toolbar.
+  Widget _buildModeToggle(Color onBg) {
+    Widget seg(String label, IconData icon, bool draw) {
+      final selected = _drawMode == draw;
+      return GestureDetector(
+        onTap: () => setState(() {
+          _drawMode = draw;
+          _selectedDecal = null;
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF00897B) : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 16, color: selected ? Colors.white : onBg),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      color: selected ? Colors.white : onBg,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: onBg.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            seg('Decals', Icons.auto_awesome, false),
+            seg('Draw', Icons.brush, true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The Draw-tool toolbar: colour swatches, brush size, undo and clear.
+  Widget _buildDrawToolbar(int i, Color onBg) {
+    final strokes = _studioStrokes[i];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            children: [
+              for (final c in kNailPalette) _drawColorDot(c),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: [
+              Icon(Icons.brush, size: 16, color: onBg),
+              Expanded(
+                child: Slider(
+                  value: _drawWidth,
+                  min: 0.02,
+                  max: 0.16,
+                  onChanged: (v) => setState(() => _drawWidth = v),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.undo),
+                color: onBg,
+                tooltip: 'Undo stroke',
+                onPressed: strokes.isEmpty
+                    ? null
+                    : () => setState(() => strokes.removeLast()),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                color: onBg,
+                tooltip: 'Clear drawing',
+                onPressed: strokes.isEmpty
+                    ? null
+                    : () => setState(() => strokes.clear()),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _drawColorDot(int c) {
+    final selected = _drawColor == c;
+    return GestureDetector(
+      onTap: () => setState(() => _drawColor = c),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Color(c),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? const Color(0xFF00897B) : Colors.black26,
+            width: selected ? 3 : 1,
+          ),
+        ),
       ),
     );
   }
@@ -2029,6 +2233,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       ? null
                       : Color(frenchOverlayArgb(n.asset)!),
                   decals: _decalSpecs(n.decals),
+                  strokes: _strokeSpecs(n.strokes),
                   shape: n.shape,
                   finish: n.finish,
                   ambient: _ambient),
