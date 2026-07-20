@@ -555,6 +555,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final TransformationController _zoomCtrl = TransformationController();
   bool _zoomed = false;
 
+  // Zoom for the single-nail studio focus view. Driven by both pinch and the
+  // on-screen +/- / reset buttons so zooming is easy without gestures.
+  final TransformationController _studioZoomCtrl = TransformationController();
+
   @override
   void initState() {
     super.initState();
@@ -565,6 +569,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   void dispose() {
     _zoomCtrl.removeListener(_onZoomChanged);
     _zoomCtrl.dispose();
+    _studioZoomCtrl.dispose();
     super.dispose();
   }
 
@@ -574,6 +579,21 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   void _resetZoom() => _zoomCtrl.value = Matrix4.identity();
+
+  // Step the studio-focus zoom in/out about the viewport centre so the nail
+  // stays put while scaling. Clamped to the InteractiveViewer's 1x–5x range.
+  void _studioZoomBy(double factor, Offset centre) {
+    final current = _studioZoomCtrl.value.clone();
+    final scaleNow = current.getMaxScaleOnAxis();
+    final target = (scaleNow * factor).clamp(1.0, 5.0);
+    final applied = target / scaleNow;
+    if ((applied - 1).abs() < 0.001) return;
+    final zoom = Matrix4.identity()
+      ..translateByDouble(centre.dx, centre.dy, 0, 1)
+      ..scaleByDouble(applied, applied, 1, 1)
+      ..translateByDouble(-centre.dx, -centre.dy, 0, 1);
+    _studioZoomCtrl.value = zoom * current;
+  }
 
   Future<void> _pickPhoto(ImageSource source, {bool keepDesign = false}) async {
     final picked = await _picker.pickImage(
@@ -1411,6 +1431,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                           onTap: () => setState(() {
                             _studioFocus = i;
                             _selectedDecal = null;
+                            _studioZoomCtrl.value = Matrix4.identity();
                           }),
                           child: _previewNail(
                               unit * scales[i], unit * scales[i] * 1.5,
@@ -1500,30 +1521,46 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
         ),
         Expanded(
-          // The nail sits centred and fitted; pinch (two fingers) to zoom in and
-          // pan around for fine detail, while one finger still draws/moves.
-          // Keyed by nail so the zoom resets when a different finger is opened.
-          child: ClipRect(
-            child: InteractiveViewer(
-              key: ValueKey('studio_zoom_$i'),
-              panEnabled: false,
-              scaleEnabled: true,
-              minScale: 1,
-              maxScale: 5,
-              boundaryMargin: const EdgeInsets.all(double.infinity),
-              child: Center(
-                child: LayoutBuilder(
-                  builder: (context, c) {
-                    // Size to fit BOTH the available width and height so the
-                    // nail never overflows the focus area on small screens.
-                    final w = math
-                        .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
-                        .clamp(80.0, 160.0);
-                    return _buildDecalEditableNail(i, w, w * 1.5);
-                  },
-                ),
-              ),
-            ),
+          // The nail sits centred and fitted. Zoom either by pinching (two
+          // fingers) OR with the on-screen +/- buttons; one finger still
+          // draws/moves. Zoom resets when a different finger is opened.
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final centre = Offset(box.maxWidth / 2, box.maxHeight / 2);
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRect(
+                      child: InteractiveViewer(
+                        transformationController: _studioZoomCtrl,
+                        panEnabled: false,
+                        scaleEnabled: true,
+                        minScale: 1,
+                        maxScale: 5,
+                        boundaryMargin: const EdgeInsets.all(double.infinity),
+                        child: Center(
+                          child: LayoutBuilder(
+                            builder: (context, c) {
+                              // Fit BOTH width and height so the nail never
+                              // overflows on small screens.
+                              final w = math
+                                  .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
+                                  .clamp(80.0, 160.0);
+                              return _buildDecalEditableNail(i, w, w * 1.5);
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: _buildZoomButtons(centre, onBg),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         _buildModeToggle(onBg),
@@ -1557,6 +1594,39 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         const SizedBox(height: 8),
         _buildStudioBgStrip(),
         const SizedBox(height: 10),
+      ],
+    );
+  }
+
+  /// A small vertical zoom pad (+ / reset / -) floated over the focus area so
+  /// the user can zoom without needing to pinch. Scales about [centre] (the
+  /// viewport centre) so the nail stays put while zooming.
+  Widget _buildZoomButtons(Offset centre, Color onBg) {
+    Widget btn(IconData icon, VoidCallback onTap, {String? tip}) {
+      return Material(
+        color: Colors.black.withValues(alpha: 0.55),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        btn(Icons.add, () => _studioZoomBy(1.4, centre)),
+        const SizedBox(height: 8),
+        btn(Icons.center_focus_strong,
+            () => _studioZoomCtrl.value = Matrix4.identity()),
+        const SizedBox(height: 8),
+        btn(Icons.remove, () => _studioZoomBy(1 / 1.4, centre)),
       ],
     );
   }

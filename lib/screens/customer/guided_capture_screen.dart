@@ -607,14 +607,16 @@ class _HandGuidePainter extends CustomPainter {
     // the four tapered fingers, then down the right side back across the wrist.
     final pts = <Offset>[
       Offset(cx - wristHalf, wristY), // wrist, left
-      Offset(cx - palmHalf * 1.14, h * 0.665), // thenar bulge (palm widest here)
-      Offset(cx - w * 0.30, h * 0.585), // thumb base, outer
-      Offset(cx - w * 0.385, h * 0.525), // thumb outer side
-      Offset(cx - w * 0.415, h * 0.475), // thumb tip, outer corner
-      Offset(cx - w * 0.385, h * 0.435), // thumb tip (broad, rounded)
-      Offset(cx - w * 0.335, h * 0.46), // thumb tip, inner corner
-      Offset(cx - w * 0.305, h * 0.52), // thumb inner side
-      Offset(cx - w * 0.235, h * 0.585), // thumb–index web (deep valley)
+      Offset(cx - palmHalf * 1.08, h * 0.700), // thenar base (rounded, lower)
+      Offset(cx - w * 0.335, h * 0.618), // outer thumb base
+      Offset(cx - w * 0.408, h * 0.548), // outer knuckle bulge (thumb widest)
+      Offset(cx - w * 0.436, h * 0.487), // outer shaft, approaching tip
+      Offset(cx - w * 0.422, h * 0.443), // tip outer corner (narrowing)
+      Offset(cx - w * 0.392, h * 0.427), // tip apex (narrow, rounded)
+      Offset(cx - w * 0.358, h * 0.447), // tip inner corner
+      Offset(cx - w * 0.350, h * 0.508), // inner shaft (concave neck)
+      Offset(cx - w * 0.312, h * 0.565), // inner base
+      Offset(cx - w * 0.235, h * 0.600), // thumb–index web (deep valley)
     ];
     for (int i = 0; i < fingers.length; i++) {
       final fx = fingers[i][0];
