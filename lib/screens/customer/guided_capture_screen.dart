@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -47,6 +48,13 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
 
   DateTime? _steadySince;
   Offset? _steadyCentroid;
+
+  // Visible 3-2-1 auto-capture countdown. 0 = not counting. Starts once the
+  // hand has been aligned and held still, and cancels the moment alignment is
+  // lost, so the shot is only taken from a good, stable position.
+  Timer? _countdownTimer;
+  int _countdown = 0;
+  List<Offset>? _lastLandmarks;
 
   /// The most recent camera frame — the same stream of frames hand detection
   /// runs on. We turn THIS into the photo so the landmarks line up with it,
@@ -118,18 +126,71 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
     if (status.isReady && upright != null) {
       final c = _centroid(upright);
       if (_steadyCentroid == null ||
-          (c - _steadyCentroid!).distance > 0.03) {
+          (c - _steadyCentroid!).distance > 0.05) {
+        // Hand moved — reset the steadiness clock and abort any countdown.
         _steadyCentroid = c;
         _steadySince = DateTime.now();
-      } else if (_steadySince != null &&
-          DateTime.now().difference(_steadySince!).inMilliseconds > 900) {
-        _autoCapture(upright);
+        _cancelCountdown();
+      } else {
+        _lastLandmarks = upright;
+        // Aligned and holding still: after a brief settle, start the 3-2-1.
+        if (_countdownTimer == null &&
+            _steadySince != null &&
+            DateTime.now().difference(_steadySince!).inMilliseconds > 300) {
+          _startCountdown();
+        }
       }
     } else {
       _steadySince = null;
       _steadyCentroid = null;
+      _cancelCountdown();
     }
     setState(() => _status = status);
+  }
+
+  /// Starts the visible 3-2-1 countdown; captures when it reaches zero.
+  void _startCountdown() {
+    setState(() => _countdown = 3);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _capturing) {
+        t.cancel();
+        return;
+      }
+      if (_countdown <= 1) {
+        t.cancel();
+        _countdownTimer = null;
+        final lm = _lastLandmarks;
+        if (lm != null) _autoCapture(lm);
+      } else {
+        setState(() => _countdown--);
+      }
+    });
+  }
+
+  void _cancelCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    if (_countdown != 0) _countdown = 0;
+  }
+
+  /// How many of the alignment checks have passed (0–5), used to fill the row
+  /// of progress dots so the user can see how close they are to a good shot.
+  int get _progress {
+    switch (_status) {
+      case CaptureCheck.noHand:
+      case CaptureCheck.tooDark:
+      case CaptureCheck.tooBright:
+        return 0;
+      case CaptureCheck.tooFar:
+      case CaptureCheck.tooClose:
+        return 2;
+      case CaptureCheck.offCenter:
+        return 3;
+      case CaptureCheck.fingersTogether:
+        return 4;
+      case CaptureCheck.ready:
+        return 5;
+    }
   }
 
   Offset _centroid(List<Offset> pts) {
@@ -195,6 +256,7 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _sub?.cancel();
     final cam = _cam;
     if (cam != null) {
@@ -211,11 +273,6 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: const Text('Line up your hand'),
-      ),
       body: _error != null
           ? _buildError()
           : !_ready
@@ -254,51 +311,60 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
       fit: StackFit.expand,
       children: [
         Center(child: CameraPreview(_cam!)),
-        // Hand outline guide.
+        // Dimmed surround + hand outline guide (spotlights the hand area).
         IgnorePointer(
-          child: CustomPaint(painter: _HandGuidePainter(ready: ready)),
-        ),
-        // Status banner.
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: ready
-                  ? const Color(0xCC1B8A4B)
-                  : Colors.black.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Icon(ready ? Icons.check_circle : Icons.info_outline,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _capturing ? 'Capturing…' : _status.message,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
+          child: CustomPaint(
+            painter: _HandGuidePainter(ready: ready, progress: _progress),
           ),
         ),
-        // Bottom instruction.
-        const Positioned(
-          bottom: 24,
-          left: 24,
-          right: 24,
-          child: Text(
-            'Lay your hand flat on a plain surface and hold the phone directly '
-            'above it. Spread your fingers a little. It snaps automatically.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 13),
+        SafeArea(
+          child: Stack(
+            children: [
+              // Close button, top-left.
+              Positioned(
+                top: 4,
+                left: 4,
+                child: _RoundIconButton(
+                  icon: Icons.close,
+                  onTap: () => Navigator.pop(context),
+                ),
+              ),
+              // Status pill, centered at the top.
+              Positioned(
+                top: 10,
+                left: 60,
+                right: 16,
+                child: _buildStatusPill(ready),
+              ),
+              // Big countdown number, centered over the hand.
+              if (_countdown > 0 && !_capturing)
+                Center(child: _buildCountdown()),
+              // Progress dots + short instruction, along the bottom.
+              Positioned(
+                bottom: 20,
+                left: 24,
+                right: 24,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildProgressDots(),
+                    const SizedBox(height: 14),
+                    Text(
+                      ready
+                          ? 'Perfect — hold still while it snaps.'
+                          : 'Lay your hand flat on a plain surface, hold the '
+                              'phone directly above and fit it inside the outline. '
+                              'It snaps automatically.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 13,
+                          height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
         if (_capturing)
@@ -311,69 +377,242 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
       ],
     );
   }
+
+  Widget _buildStatusPill(bool ready) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        decoration: BoxDecoration(
+          color: ready
+              ? const Color(0xE60E9F53)
+              : Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+              color: Colors.white.withValues(alpha: 0.18), width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(ready ? Icons.check_circle : Icons.pan_tool_alt_outlined,
+                color: Colors.white, size: 19),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                _capturing
+                    ? 'Capturing…'
+                    : (ready ? 'Perfect!' : _status.message),
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountdown() {
+    return Container(
+      width: 96,
+      height: 96,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.black.withValues(alpha: 0.35),
+        border: Border.all(
+            color: Colors.white.withValues(alpha: 0.9), width: 3),
+      ),
+      child: Text(
+        '$_countdown',
+        style: const TextStyle(
+            color: Colors.white,
+            fontSize: 54,
+            fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _buildProgressDots() {
+    const green = Color(0xFF35D67F);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < 5; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.symmetric(horizontal: 5),
+            width: 15,
+            height: 15,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i < _progress
+                  ? green
+                  : Colors.white.withValues(alpha: 0.22),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.7), width: 1.5),
+              boxShadow: i < _progress
+                  ? [
+                      BoxShadow(
+                          color: green.withValues(alpha: 0.6),
+                          blurRadius: 6,
+                          spreadRadius: 0.5)
+                    ]
+                  : null,
+            ),
+          ),
+      ],
+    );
+  }
 }
 
-/// Draws a semi-transparent hand silhouette the user lines their hand up with.
-class _HandGuidePainter extends CustomPainter {
-  final bool ready;
-  _HandGuidePainter({required this.ready});
+/// A translucent circular button used for the corner close control.
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _RoundIconButton({required this.icon, required this.onTap});
 
   @override
-  void paint(Canvas canvas, Size size) {
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.45),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(9),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+      ),
+    );
+  }
+}
+
+/// Draws a clean, natural hand-shaped outline for the user to line their hand
+/// up with, and dims everything outside it so the guide reads clearly against
+/// the live camera feed. The silhouette is built by unioning tapered
+/// finger/thumb "capsules" onto a rounded palm into one smooth outline, so it
+/// looks like a real hand instead of a set of blocks.
+class _HandGuidePainter extends CustomPainter {
+  final bool ready;
+  final int progress;
+  _HandGuidePainter({required this.ready, required this.progress});
+
+  /// A tapered capsule (rounded at both ends) from [a] radius [ra] to [b]
+  /// radius [rb] — one finger, one thumb, or a knuckle joint.
+  Path _capsule(Offset a, double ra, Offset b, double rb) {
+    final p = Path();
+    final d = b - a;
+    final len = d.distance;
+    if (len < 1e-3) {
+      p.addOval(Rect.fromCircle(center: a, radius: math.max(ra, rb)));
+      return p;
+    }
+    final dir = d / len;
+    final perp = Offset(-dir.dy, dir.dx);
+    final a1 = a + perp * ra, a2 = a - perp * ra;
+    final b1 = b + perp * rb, b2 = b - perp * rb;
+    p.moveTo(a1.dx, a1.dy);
+    p.lineTo(b1.dx, b1.dy);
+    p.lineTo(b2.dx, b2.dy);
+    p.lineTo(a2.dx, a2.dy);
+    p.close();
+    p.addOval(Rect.fromCircle(center: a, radius: ra));
+    p.addOval(Rect.fromCircle(center: b, radius: rb));
+    return p;
+  }
+
+  Path _buildHand(Size size) {
     final w = size.width, h = size.height;
     final cx = w / 2;
-    // Guide occupies the central ~64% of the height. palmTop sits low enough
-    // that even the longest finger (up to palmH above palmTop) stays on-screen
-    // with a top margin that clears the status banner — earlier the fingertips
-    // overshot the top edge and were clipped.
-    final palmTop = h * 0.42, palmBottom = h * 0.74;
-    final palmHalf = w * 0.20;
-
-    final path = Path();
-    // Palm as a rounded rectangle.
-    path.addRRect(RRect.fromRectAndRadius(
-      Rect.fromLTRB(cx - palmHalf, palmTop, cx + palmHalf, palmBottom),
-      Radius.circular(w * 0.10),
-    ));
-    // Four fingers as rounded capsules radiating upward. Widths are kept below
-    // the centre-to-centre spacing so adjacent fingers stay separated by a clean
-    // gap — this is a lightly-spread hand, not a mitten. (Earlier the capsules
-    // were wide enough to overlap, which drew the outlines crossing each other.)
-    final fingers = [
-      [-0.15, 0.90, 0.22], // dx frac, length frac of palm height, width frac
-      [-0.05, 1.00, 0.23], // middle — longest
-      [0.05, 0.95, 0.22],
-      [0.15, 0.80, 0.19], // pinky — shortest, thinnest
-    ];
+    // Vertical band the hand occupies; leaves room for the top pill and the
+    // bottom dots so nothing is clipped.
+    final palmTop = h * 0.50, palmBottom = h * 0.80;
+    final palmHalf = w * 0.24;
     final palmH = palmBottom - palmTop;
-    for (final f in fingers) {
-      final fx = cx + w * f[0];
-      final len = palmH * f[1];
-      final fw = palmHalf * f[2];
-      path.addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTRB(fx - fw, palmTop - len, fx + fw, palmTop + fw),
-        Radius.circular(fw),
-      ));
-    }
-    // Thumb off to the side.
-    final tw = palmHalf * 0.32;
-    path.addRRect(RRect.fromRectAndRadius(
-      Rect.fromLTRB(cx - palmHalf - tw * 1.4, palmTop + palmH * 0.18,
-          cx - palmHalf + tw, palmTop + palmH * 0.55),
-      Radius.circular(tw),
-    ));
 
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..color = (ready ? const Color(0xFF5BE58A) : Colors.white)
-          .withValues(alpha: 0.85);
-    final fill = Paint()
-      ..color = Colors.white.withValues(alpha: 0.06);
-    canvas.drawPath(path, fill);
-    canvas.drawPath(path, stroke);
+    // Palm — a generous rounded rectangle; finger bases sink into its top and
+    // the wrist rounds off at the bottom.
+    Path hand = Path()
+      ..addRRect(RRect.fromRectAndCorners(
+        Rect.fromLTRB(cx - palmHalf, palmTop - palmH * 0.10, cx + palmHalf,
+            palmBottom),
+        topLeft: Radius.circular(palmHalf * 0.5),
+        topRight: Radius.circular(palmHalf * 0.5),
+        bottomLeft: Radius.circular(palmHalf * 0.7),
+        bottomRight: Radius.circular(palmHalf * 0.7),
+      ));
+
+    Path union(Path a, Path b) => Path.combine(PathOperation.union, a, b);
+
+    // Four fingers: [baseX frac of palmHalf, length frac, tip X fan (frac of w),
+    // base radius frac of palmHalf]. Index → pinky, middle longest.
+    final fingerMax = h * 0.30;
+    final fingers = <List<double>>[
+      [-0.62, 0.86, -0.09, 0.30], // index
+      [-0.21, 1.00, -0.03, 0.32], // middle
+      [0.21, 0.92, 0.04, 0.30], // ring
+      [0.62, 0.74, 0.12, 0.26], // pinky
+    ];
+    for (final f in fingers) {
+      final base = Offset(cx + palmHalf * f[0], palmTop);
+      final tip = Offset(base.dx + w * f[2], palmTop - fingerMax * f[1]);
+      final rb = palmHalf * f[3];
+      hand = union(hand, _capsule(base, rb, tip, rb * 0.72));
+    }
+
+    // Thumb — thicker, angled out and down to the lower-left of the palm.
+    final thumbBase = Offset(cx - palmHalf * 0.80, palmTop + palmH * 0.42);
+    final thumbTip = Offset(cx - palmHalf * 1.55, palmTop - fingerMax * 0.22);
+    hand = union(hand, _capsule(thumbBase, palmHalf * 0.34, thumbTip,
+        palmHalf * 0.22));
+
+    return hand;
   }
 
   @override
-  bool shouldRepaint(covariant _HandGuidePainter old) => old.ready != ready;
+  void paint(Canvas canvas, Size size) {
+    final hand = _buildHand(size);
+
+    // Dim everything outside the hand so the outline stands out.
+    final surround = Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Offset.zero & size),
+      hand,
+    );
+    canvas.drawPath(
+        surround, Paint()..color = Colors.black.withValues(alpha: 0.45));
+
+    // A faint fill inside keeps the shape legible over a busy background.
+    canvas.drawPath(
+        hand, Paint()..color = Colors.white.withValues(alpha: 0.05));
+
+    final color = ready ? const Color(0xFF35D67F) : Colors.white;
+    // Soft glow, then the crisp outline on top.
+    canvas.drawPath(
+      hand,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
+        ..color = color.withValues(alpha: 0.35),
+    );
+    canvas.drawPath(
+      hand,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeJoin = StrokeJoin.round
+        ..color = color.withValues(alpha: 0.95),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HandGuidePainter old) =>
+      old.ready != ready || old.progress != progress;
 }
