@@ -586,6 +586,11 @@ class _HandGuidePainter extends CustomPainter {
     return path;
   }
 
+  // The hand is designed in this fixed-aspect box, then contain-fitted and
+  // centred into whatever size the widget actually gets, so the shape never
+  // stretches when the screen's aspect ratio differs from the design.
+  static const double _dw = 360, _dh = 760;
+
   Path _buildHand(Size size) {
     final w = size.width, h = size.height;
     final cx = w / 2;
@@ -650,12 +655,22 @@ class _HandGuidePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Build the hand in its fixed design box, then map it into the actual
+    // size with a centred contain-fit (optionally mirrored for the left hand).
+    // This keeps the true hand proportions on every screen shape.
+    final designHand = _buildHand(const Size(_dw, _dh));
+    final sx = size.width / _dw, sy = size.height / _dh;
+    final scale = sx < sy ? sx : sy;
+    final bw = _dw * scale, bh = _dh * scale;
+    final ox = (size.width - bw) / 2, oy = (size.height - bh) / 2;
+    final m = Matrix4.identity();
     if (mirror) {
-      // Flip horizontally so the same shape serves the left hand.
-      canvas.translate(size.width, 0);
-      canvas.scale(-1, 1);
+      m.translateByDouble(size.width, 0, 0, 1);
+      m.scaleByDouble(-1, 1, 1, 1);
     }
-    final hand = _buildHand(size);
+    m.translateByDouble(ox, oy, 0, 1);
+    m.scaleByDouble(scale, scale, 1, 1);
+    final hand = designHand.transform(m.storage);
 
     // Dim everything outside the hand so the outline stands out.
     final surround = Path.combine(

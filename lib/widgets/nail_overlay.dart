@@ -359,6 +359,19 @@ class _NailFinishPainter extends CustomPainter {
     );
   }
 
+  // A small, crisp specular glint — the tight bright core of a light
+  // reflection that sits inside the softer hotspot and sells a wet, glassy top.
+  void _glint(Canvas canvas, Size size, double cx, double cy, double r,
+      double strength) {
+    canvas.drawCircle(
+      Offset(size.width * cx, size.height * cy),
+      size.width * r,
+      Paint()
+        ..color = Colors.white.withValues(alpha: strength)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * r * 0.5),
+    );
+  }
+
   void _tipReflection(Canvas canvas, Size size, Rect rect) {
     canvas.drawRect(
       rect,
@@ -386,7 +399,11 @@ class _NailFinishPainter extends CustomPainter {
         _base(canvas, size, rect);
         _sheen(canvas, size, rect, 0.26);
         _specularStreak(canvas, size, rect, 0.32);
-        _hotspot(canvas, size, 0.62);
+        _hotspot(canvas, size, 0.58);
+        // A tight bright core inside the hotspot + a small secondary reflection
+        // lower down = a convincing wet, glass-coated shine.
+        _glint(canvas, size, 0.40, 0.24, 0.07, 0.95);
+        _glint(canvas, size, 0.60, 0.60, 0.05, 0.30);
         _tipReflection(canvas, size, rect);
         break;
 
@@ -395,7 +412,8 @@ class _NailFinishPainter extends CustomPainter {
         _base(canvas, size, rect, sides: 0.12);
         _sheen(canvas, size, rect, 0.30);
         _specularStreak(canvas, size, rect, 0.30);
-        _hotspot(canvas, size, 0.70);
+        _hotspot(canvas, size, 0.66);
+        _glint(canvas, size, 0.40, 0.24, 0.07, 0.95);
         _tipReflection(canvas, size, rect);
         break;
 
@@ -428,8 +446,9 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Mirror metal: high-contrast horizontal reflection bands + a crisp
-        // highlight, so it reads like polished chrome catching the room.
+        // Mirror metal reflects a room: a cool "sky" up top, a bright horizon
+        // band across the middle, and a warmer, darker "floor" below — plus a
+        // crisp highlight. Reads like polished chrome catching the light.
         canvas.drawRect(
           rect,
           Paint()
@@ -438,57 +457,102 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, size.height),
               [
                 Colors.white.withValues(alpha: 0.55),
-                Colors.white.withValues(alpha: 0.10),
-                Colors.black.withValues(alpha: 0.42),
-                Colors.white.withValues(alpha: 0.30),
-                Colors.black.withValues(alpha: 0.30),
+                const Color(0xFF9FB6D6).withValues(alpha: 0.30), // cool sky
+                Colors.black.withValues(alpha: 0.46),
+                Colors.white.withValues(alpha: 0.55), // bright horizon
+                const Color(0xFF6A5240).withValues(alpha: 0.34), // warm floor
+                Colors.black.withValues(alpha: 0.34),
               ],
-              [0.0, 0.28, 0.5, 0.72, 1.0],
+              [0.0, 0.24, 0.46, 0.60, 0.82, 1.0],
             ),
         );
+        // A thin, crisp horizon streak where the two reflections meet.
+        canvas.drawRect(
+          Rect.fromLTWH(0, size.height * 0.55, size.width, size.height * 0.05),
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.5)
+            ..maskFilter =
+                MaskFilter.blur(BlurStyle.normal, size.height * 0.02),
+        );
         _base(canvas, size, rect, sides: 0.20);
-        _hotspot(canvas, size, 0.75);
+        _hotspot(canvas, size, 0.70);
+        _glint(canvas, size, 0.40, 0.24, 0.06, 0.85);
         break;
 
       case NailFinish.catEye:
         // Magnetic cat-eye: a bright, narrow light bar down the length over a
         // darkened base, like light caught in the magnetic pigment.
-        canvas.drawRect(rect, Paint()..color = Colors.black.withValues(alpha: 0.16));
-        _base(canvas, size, rect, sides: 0.14);
+        // Darker sides for stronger contrast, then a soft glowing bloom under a
+        // thin ultra-bright core — the light "caught" in the magnetic pigment.
+        canvas.drawRect(rect, Paint()..color = Colors.black.withValues(alpha: 0.20));
+        _base(canvas, size, rect, sides: 0.16);
         canvas.drawRect(
           rect,
           Paint()
             ..shader = ui.Gradient.linear(
-              Offset(size.width * 0.34, 0),
-              Offset(size.width * 0.56, 0),
+              Offset(size.width * 0.28, 0),
+              Offset(size.width * 0.62, 0),
               [
                 Colors.white.withValues(alpha: 0.0),
-                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.45),
                 Colors.white.withValues(alpha: 0.0),
               ],
               [0.0, 0.5, 1.0],
-            ),
+            )
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.03),
+        );
+        canvas.drawRect(
+          Rect.fromLTWH(size.width * 0.45, 0, size.width * 0.06, size.height),
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.85)
+            ..maskFilter =
+                MaskFilter.blur(BlurStyle.normal, size.width * 0.015),
         );
         break;
 
       case NailFinish.glitter:
-        // Sparkle: many tiny bright specks (seeded so they don't dance between
-        // repaints) plus a soft sheen so the flecks sit in a shiny coat.
+        // Sparkle: many tiny flecks in mixed metallic/iridescent tints (seeded
+        // so they hold still between repaints), a soft sheen so they sit in a
+        // shiny coat, and a few brighter flecks with tiny cross-flares.
         _base(canvas, size, rect, sides: 0.14);
-        _sheen(canvas, size, rect, 0.18);
+        _sheen(canvas, size, rect, 0.16);
+        const flecks = [
+          Color(0xFFFFFFFF), Color(0xFFFFF3C4), Color(0xFFFFE08A), // silver/gold
+          Color(0xFFFFD1E8), Color(0xFFCDE9FF), Color(0xFFD8FFE6), // iridescent
+        ];
         final rnd = math.Random(7);
-        for (int i = 0; i < 46; i++) {
+        for (int i = 0; i < 60; i++) {
           final x = rnd.nextDouble() * size.width;
           final y = rnd.nextDouble() * size.height;
-          final r = 0.4 + rnd.nextDouble() * 1.1;
-          final a = 0.35 + rnd.nextDouble() * 0.5;
+          final r = 0.4 + rnd.nextDouble() * 1.2;
+          final a = 0.30 + rnd.nextDouble() * 0.55;
           canvas.drawCircle(
             Offset(x, y),
             r,
-            Paint()..color = Colors.white.withValues(alpha: a),
+            Paint()
+              ..color = flecks[rnd.nextInt(flecks.length)].withValues(alpha: a),
           );
         }
-        _hotspot(canvas, size, 0.30);
+        // A handful of standout sparkles with a soft glow + a crisp cross.
+        for (int i = 0; i < 6; i++) {
+          final x = size.width * (0.15 + rnd.nextDouble() * 0.7);
+          final y = size.height * (0.10 + rnd.nextDouble() * 0.7);
+          final s = size.width * (0.05 + rnd.nextDouble() * 0.05);
+          canvas.drawCircle(
+            Offset(x, y),
+            s * 0.9,
+            Paint()
+              ..color = Colors.white.withValues(alpha: 0.5)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.6),
+          );
+          final p = Paint()
+            ..color = Colors.white
+            ..strokeWidth = 0.8
+            ..strokeCap = StrokeCap.round;
+          canvas.drawLine(Offset(x - s, y), Offset(x + s, y), p);
+          canvas.drawLine(Offset(x, y - s), Offset(x, y + s), p);
+        }
+        _hotspot(canvas, size, 0.26);
         break;
     }
 
