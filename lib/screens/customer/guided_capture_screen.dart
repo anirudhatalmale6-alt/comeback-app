@@ -45,6 +45,10 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
   LumaStats _luma = const LumaStats(0, 0);
   int _sensorOrientation = 0;
 
+  // Which hand the user is photographing. The outline mirrors so the thumb sits
+  // on the correct side for each hand, making alignment more accurate.
+  bool _rightHand = true;
+
   DateTime? _steadySince;
   Offset? _steadyCentroid;
 
@@ -313,7 +317,8 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
         // Dimmed surround + hand outline guide (spotlights the hand area).
         IgnorePointer(
           child: CustomPaint(
-            painter: _HandGuidePainter(ready: ready, progress: _progress),
+            painter: _HandGuidePainter(
+                ready: ready, progress: _progress, mirror: !_rightHand),
           ),
         ),
         SafeArea(
@@ -346,14 +351,16 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _buildHandToggle(),
+                    const SizedBox(height: 14),
                     _buildProgressDots(),
                     const SizedBox(height: 14),
                     Text(
                       ready
                           ? 'Perfect — hold still while it snaps.'
-                          : 'Lay your hand flat on a plain surface, hold the '
-                              'phone directly above and fit it inside the outline. '
-                              'It snaps automatically.',
+                          : 'Lay your ${_rightHand ? 'right' : 'left'} hand flat '
+                              'on a plain surface, hold the phone directly above '
+                              'and fit it inside the outline. It snaps automatically.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.85),
@@ -436,6 +443,56 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
     );
   }
 
+  /// A Left / Right hand selector. Switching mirrors the outline so the thumb
+  /// sits on the correct side for the hand being photographed.
+  Widget _buildHandToggle() {
+    Widget seg(String label, bool right) {
+      final sel = _rightHand == right;
+      return GestureDetector(
+        onTap: () {
+          if (_rightHand != right) {
+            setState(() {
+              _rightHand = right;
+              _cancelCountdown();
+              _steadySince = null;
+              _steadyCentroid = null;
+            });
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+          decoration: BoxDecoration(
+            color: sel ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: sel ? Colors.black : Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(24),
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [seg('Left hand', false), seg('Right hand', true)],
+      ),
+    );
+  }
+
   Widget _buildProgressDots() {
     const green = Color(0xFF35D67F);
     return Row(
@@ -501,7 +558,9 @@ class _RoundIconButton extends StatelessWidget {
 class _HandGuidePainter extends CustomPainter {
   final bool ready;
   final int progress;
-  _HandGuidePainter({required this.ready, required this.progress});
+  final bool mirror; // flip horizontally for the left hand
+  _HandGuidePainter(
+      {required this.ready, required this.progress, this.mirror = false});
 
   /// A smooth closed path passing through [p] using a Catmull-Rom spline
   /// converted to cubic Béziers (tension 1/6). Gives organic curves with no
@@ -580,6 +639,11 @@ class _HandGuidePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (mirror) {
+      // Flip horizontally so the same shape serves the left hand.
+      canvas.translate(size.width, 0);
+      canvas.scale(-1, 1);
+    }
     final hand = _buildHand(size);
 
     // Dim everything outside the hand so the outline stands out.
@@ -617,5 +681,5 @@ class _HandGuidePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _HandGuidePainter old) =>
-      old.ready != ready || old.progress != progress;
+      old.ready != ready || old.progress != progress || old.mirror != mirror;
 }
