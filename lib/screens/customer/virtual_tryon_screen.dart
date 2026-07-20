@@ -366,15 +366,17 @@ class _Decal {
   Offset pos;
   double size;
   double rotation;
+  int? tint; // optional ARGB recolour for the charm; null = original colours
   _Decal({
     required this.asset,
     required this.pos,
     required this.size,
     required this.rotation,
+    this.tint,
   });
 
-  _Decal copy() =>
-      _Decal(asset: asset, pos: pos, size: size, rotation: rotation);
+  _Decal copy() => _Decal(
+      asset: asset, pos: pos, size: size, rotation: rotation, tint: tint);
 }
 
 /// A freehand stroke painted on a nail in the Draw tool. [points] are normalised
@@ -1328,6 +1330,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             pos: d.pos,
             size: d.size,
             rotation: d.rotation,
+            tint: d.tint == null ? null : Color(d.tint!),
           ))
       .toList();
 
@@ -1928,7 +1931,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  /// Compact controls for the selected decal: size, rotation and delete.
+  /// Compact controls for the selected decal: recolour, size, rotation, delete.
   Widget _buildDecalToolbar(int i, int k, Color onBg) {
     final d = _studioDecals[i][k];
     Widget sliderRow(IconData icon, double value, double min, double max,
@@ -1950,12 +1953,32 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     }
 
     return SizedBox(
-      height: 96,
+      height: 138,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  Icon(Icons.palette_outlined, size: 18, color: onBg),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _decalOriginalChip(d),
+                        _decalWheelChip(d),
+                        for (final c in kNailPalette)
+                          _decalColorChip(d, c | 0xFF000000),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             SizedBox(
               height: 34,
               child: sliderRow(Icons.photo_size_select_large, d.size, 0.15, 0.9,
@@ -1986,6 +2009,80 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// "Original colours" chip — clears any recolour on the selected decal.
+  Widget _decalOriginalChip(_Decal d) {
+    final selected = d.tint == null;
+    return GestureDetector(
+      onTap: () => setState(() => d.tint = null),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? const Color(0xFF00897B) : Colors.black26,
+            width: selected ? 3 : 1,
+          ),
+        ),
+        child: Icon(Icons.format_color_reset,
+            size: 16, color: Colors.grey.shade600),
+      ),
+    );
+  }
+
+  /// Colour-wheel chip for a custom recolour of the selected decal.
+  Widget _decalWheelChip(_Decal d) {
+    return GestureDetector(
+      onTap: () async {
+        final c = await showColorWheelDialog(context,
+            initial: d.tint == null ? const Color(0xFFEC407A) : Color(d.tint!),
+            title: 'Charm colour');
+        if (c != null) setState(() => d.tint = c.toARGB32());
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        width: 30,
+        height: 30,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: SweepGradient(colors: [
+            Color(0xFFFF0000),
+            Color(0xFFFFFF00),
+            Color(0xFF00FF00),
+            Color(0xFF00FFFF),
+            Color(0xFF0000FF),
+            Color(0xFFFF00FF),
+            Color(0xFFFF0000),
+          ]),
+        ),
+        child: const Icon(Icons.add, size: 16, color: Colors.white),
+      ),
+    );
+  }
+
+  /// One preset recolour swatch for the selected decal.
+  Widget _decalColorChip(_Decal d, int argb) {
+    final selected = d.tint == argb;
+    return GestureDetector(
+      onTap: () => setState(() => d.tint = argb),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Color(argb),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? const Color(0xFF00897B) : Colors.black26,
+            width: selected ? 3 : 1,
+          ),
         ),
       ),
     );

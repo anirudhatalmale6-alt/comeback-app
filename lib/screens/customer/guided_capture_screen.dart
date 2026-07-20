@@ -151,10 +151,11 @@ class _GuidedCaptureScreenState extends State<GuidedCaptureScreen> {
     setState(() => _status = status);
   }
 
-  /// Starts the visible 3-2-1 countdown; captures when it reaches zero.
+  /// Starts the visible 2-1 countdown; captures when it reaches zero. Kept
+  /// short (2 ticks at 600 ms) so a steady hand snaps in a little over a second.
   void _startCountdown() {
-    setState(() => _countdown = 3);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+    setState(() => _countdown = 2);
+    _countdownTimer = Timer.periodic(const Duration(milliseconds: 600), (t) {
       if (!mounted || _capturing) {
         t.cancel();
         return;

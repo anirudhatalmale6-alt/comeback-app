@@ -722,11 +722,19 @@ class DecalSpec {
   final Offset pos;
   final double size;
   final double rotation;
+
+  /// Optional recolour for the charm/decal. Applied with [BlendMode.color] so
+  /// it takes on the chosen hue+saturation while keeping the artwork's own
+  /// highlights and shadows (a gold bow can become a pink or blue bow, etc.).
+  /// Null leaves the sticker in its original colours.
+  final Color? tint;
+
   const DecalSpec({
     required this.image,
     required this.pos,
     required this.size,
     required this.rotation,
+    this.tint,
   });
 }
 
@@ -753,7 +761,13 @@ class _DecalLayer extends StatelessWidget {
                 height: s.size * w,
                 child: Transform.rotate(
                   angle: s.rotation,
-                  child: Image(image: s.image, fit: BoxFit.contain),
+                  child: s.tint == null
+                      ? Image(image: s.image, fit: BoxFit.contain)
+                      : ColorFiltered(
+                          colorFilter:
+                              ColorFilter.mode(s.tint!, BlendMode.color),
+                          child: Image(image: s.image, fit: BoxFit.contain),
+                        ),
                 ),
               ),
           ],
