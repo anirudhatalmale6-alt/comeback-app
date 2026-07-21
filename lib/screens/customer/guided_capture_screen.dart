@@ -612,22 +612,21 @@ class _HandGuidePainter extends CustomPainter {
     // the four tapered fingers, then down the right side back across the wrist.
     final pts = <Offset>[
       Offset(cx - wristHalf, wristY), // wrist, left
-      // Thumb: a tapered wedge that reads as a thumb without over-curving. The
-      // thenar (ball of thumb) rises GENTLY — mirroring the pinky-side taper on
-      // the right — and the outer thumb edge is fairly straight up to a rounded
-      // tip, so the left side stays natural and symmetric rather than a big ball
-      // bulge. Base still wider than tip; shallow, wide web into the index.
-      Offset(cx - w * 0.185, h * 0.745), // thenar start (matches right-side taper)
-      Offset(cx - w * 0.232, h * 0.655), // thenar (gentle bulge, not a ball)
-      Offset(cx - w * 0.300, h * 0.588), // outer thumb base
-      Offset(cx - w * 0.352, h * 0.532), // outer knuckle (straighter)
-      Offset(cx - w * 0.372, h * 0.485), // outer, just below tip
-      Offset(cx - w * 0.360, h * 0.450), // tip outer corner
-      Offset(cx - w * 0.332, h * 0.435), // tip apex (rounded)
-      Offset(cx - w * 0.306, h * 0.451), // tip inner corner
-      Offset(cx - w * 0.304, h * 0.505), // inner shaft (upper)
-      Offset(cx - w * 0.262, h * 0.558), // inner, bulging back toward palm
-      Offset(cx - w * 0.195, h * 0.608), // thumb–index web (shallow, wide)
+      // Thumb: a FULL, natural thumb — wide fleshy base coming off the thenar
+      // ball, thick shaft (inner edge stays well out so it never reads as a thin
+      // noodle), and a broad rounded tip. The outer splay is trimmed only a hair
+      // so it isn't over-curved, but the thumb keeps its real width and shape.
+      Offset(cx - w * 0.200, h * 0.745), // thenar start
+      Offset(cx - w * 0.256, h * 0.666), // thenar (real ball, a hair softer)
+      Offset(cx - w * 0.322, h * 0.600), // outer thumb base
+      Offset(cx - w * 0.374, h * 0.540), // outer knuckle (slightly less splayed)
+      Offset(cx - w * 0.392, h * 0.487), // outer, just below tip
+      Offset(cx - w * 0.382, h * 0.450), // tip outer corner
+      Offset(cx - w * 0.353, h * 0.434), // tip apex (broad rounded)
+      Offset(cx - w * 0.324, h * 0.450), // tip inner corner
+      Offset(cx - w * 0.326, h * 0.505), // inner shaft (kept out → stays thick)
+      Offset(cx - w * 0.276, h * 0.558), // inner bulge (kept out)
+      Offset(cx - w * 0.205, h * 0.608), // thumb–index web
     ];
     for (int i = 0; i < fingers.length; i++) {
       final fx = fingers[i][0];
