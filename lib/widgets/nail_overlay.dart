@@ -763,11 +763,7 @@ class _DecalLayer extends StatelessWidget {
                   angle: s.rotation,
                   child: s.tint == null
                       ? Image(image: s.image, fit: BoxFit.contain)
-                      : ColorFiltered(
-                          colorFilter:
-                              ColorFilter.mode(s.tint!, BlendMode.color),
-                          child: Image(image: s.image, fit: BoxFit.contain),
-                        ),
+                      : _TintedDecal(image: s.image, tint: s.tint!),
                 ),
               ),
           ],
@@ -775,6 +771,106 @@ class _DecalLayer extends StatelessWidget {
       },
     );
   }
+}
+
+/// Renders a decal recoloured to [tint] while keeping BOTH the artwork's own
+/// shading/highlights AND its transparency.
+///
+/// A plain `ColorFiltered(BlendMode.color)` recolours nicely but, with an opaque
+/// tint, also turns every TRANSPARENT pixel around the sticker into solid tint
+/// (output alpha = tint alpha = 1). That fills the whole decal box with a
+/// coloured square, which reads as "the entire nail changed colour". Here we do
+/// the colour blend into an offscreen layer and then re-apply the sticker's
+/// ORIGINAL alpha with a [BlendMode.dstIn] pass, so only the charm itself is
+/// recoloured and the surround stays clear.
+class _TintedDecal extends StatefulWidget {
+  final ImageProvider image;
+  final Color tint;
+  const _TintedDecal({required this.image, required this.tint});
+
+  @override
+  State<_TintedDecal> createState() => _TintedDecalState();
+}
+
+class _TintedDecalState extends State<_TintedDecal> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  ui.Image? _img;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_TintedDecal old) {
+    super.didUpdateWidget(old);
+    if (old.image != widget.image) _resolve();
+  }
+
+  void _resolve() {
+    final stream = widget.image.resolve(createLocalImageConfiguration(context));
+    if (stream.key == _stream?.key) return;
+    if (_stream != null && _listener != null) {
+      _stream!.removeListener(_listener!);
+    }
+    final listener = ImageStreamListener((info, _) {
+      if (mounted) setState(() => _img = info.image);
+    });
+    _stream = stream;
+    _listener = listener;
+    stream.addListener(listener);
+  }
+
+  @override
+  void dispose() {
+    if (_stream != null && _listener != null) {
+      _stream!.removeListener(_listener!);
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final img = _img;
+    // While the sticker decodes, show it in its original colours so it never
+    // pops in as a blank box.
+    if (img == null) return Image(image: widget.image, fit: BoxFit.contain);
+    return CustomPaint(size: Size.infinite, painter: _TintedDecalPainter(img, widget.tint));
+  }
+}
+
+class _TintedDecalPainter extends CustomPainter {
+  final ui.Image image;
+  final Color tint;
+  const _TintedDecalPainter(this.image, this.tint);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final imgSize = Size(image.width.toDouble(), image.height.toDouble());
+    final src = Offset.zero & imgSize;
+    // BoxFit.contain: scale to fit inside the box, centred — matching the plain
+    // Image(fit: BoxFit.contain) used for untinted decals.
+    final fitted = applyBoxFit(BoxFit.contain, imgSize, size);
+    final dst = Alignment.center.inscribe(fitted.destination, Offset.zero & size);
+
+    canvas.saveLayer(Offset.zero & size, Paint());
+    // 1. Recolour: keeps the artwork's luminosity (its shading/highlights) but
+    //    takes the tint's hue+saturation. Fills the transparent surround too.
+    canvas.drawImageRect(
+      image, src, dst,
+      Paint()..colorFilter = ColorFilter.mode(tint, BlendMode.color),
+    );
+    // 2. Re-apply the sticker's ORIGINAL alpha, erasing that solid-colour fill
+    //    so only the charm stays recoloured.
+    canvas.drawImageRect(image, src, dst, Paint()..blendMode = BlendMode.dstIn);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _TintedDecalPainter old) =>
+      old.image != image || old.tint != tint;
 }
 
 /// One freehand stroke painted on a nail: its [color], its [width] as a fraction
