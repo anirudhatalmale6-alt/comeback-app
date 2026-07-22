@@ -46,9 +46,9 @@ const List<List<int>> kFingerJoints = [
 /// fingertip — it sits on the plate, not running down the finger past the
 /// cuticle (which is what 0.58/0.68 did) and not overshooting into a long blob.
 /// Verified by rendering the geometry onto a hand skeleton (placement_render_test).
-/// Bumped 0.52→0.58 on tester feedback that the nails read too small / didn't
-/// fill the real nail bed — this scales the whole auto-nail up ~11%.
-const double kNailLengthFactor = 0.58;
+/// Bumped 0.52→0.58, then 0.58→0.62 on tester feedback that the nails read too
+/// small / didn't fill the real nail bed — this scales the whole auto-nail up.
+const double kNailLengthFactor = 0.62;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail

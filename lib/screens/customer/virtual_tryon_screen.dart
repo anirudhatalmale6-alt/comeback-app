@@ -289,16 +289,15 @@ ColorDesign? colorDesignFor(String id) {
 /// (a drift between the two would size nails wrongly).
 ///
 /// For auto-placed nails the width works out to length / ratio, so a smaller
-/// ratio = wider nail. At 0.88 the auto nail comes out a touch wider than the
-/// tip→plate length, which matches a natural nail plate covering the finger
-/// width: paired with the 0.52 length it caps the fingertip — full width without
-/// bulging past the sides.
+/// ratio = wider nail. Lowered 0.88→0.76 on tester feedback that the nails were
+/// too narrow to cover the real nail bed — a wider plate that fills the finger
+/// width without bulging past the sides.
 const double kNailBaseWidthFactor = 0.125;
-const double kNailAspectRatio = 0.88;
+const double kNailAspectRatio = 0.76;
 
-/// Default nail length multiplier (the "Medium" preset). Bumped 1.0→1.15 on
-/// tester feedback that the nails should be a bit longer to fill the nail bed.
-const double kNailDefaultLengthFactor = 1.15;
+/// Default nail length multiplier (the "Medium" preset). Bumped 1.0→1.15, then
+/// 1.15→1.32 on tester feedback that the medium nails should be longer.
+const double kNailDefaultLengthFactor = 1.32;
 
 /// An asset or upload design may carry suffixes: a recolour and/or a stacked
 /// French tip, e.g. `assets/nail_designs/leopard.png#tint=2196f3#ftip=ffffff`.
