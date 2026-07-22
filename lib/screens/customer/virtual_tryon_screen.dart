@@ -289,11 +289,11 @@ ColorDesign? colorDesignFor(String id) {
 /// (a drift between the two would size nails wrongly).
 ///
 /// For auto-placed nails the width works out to length / ratio, so a smaller
-/// ratio = wider nail. Lowered 0.88→0.76 on tester feedback that the nails were
-/// too narrow to cover the real nail bed — a wider plate that fills the finger
-/// width without bulging past the sides.
+/// ratio = wider nail. Lowered 0.88→0.76 to fill the nail bed, but 0.76 read as
+/// round blobs bulging past the finger sides ("too big"), so raised 0.76→0.80 —
+/// still wider than the original narrow plate, but back inside the finger width.
 const double kNailBaseWidthFactor = 0.125;
-const double kNailAspectRatio = 0.76;
+const double kNailAspectRatio = 0.80;
 
 /// Default nail length multiplier (the "Medium" preset). Bumped 1.0→1.15, then
 /// 1.15→1.32 on tester feedback that the medium nails should be longer.

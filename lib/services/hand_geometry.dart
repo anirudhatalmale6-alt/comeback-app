@@ -48,7 +48,9 @@ const List<List<int>> kFingerJoints = [
 /// Verified by rendering the geometry onto a hand skeleton (placement_render_test).
 /// Bumped 0.52→0.58, then 0.58→0.62 on tester feedback that the nails read too
 /// small / didn't fill the real nail bed — this scales the whole auto-nail up.
-const double kNailLengthFactor = 0.62;
+/// 0.62 (with the wider aspect) then read "too big" — round blobs past the bed —
+/// so trimmed 0.62→0.56 to bring the overall nail size back down.
+const double kNailLengthFactor = 0.56;
 const double kNailWidthFactor = 0.56;
 
 /// How far back from the fingertip (as a fraction of nail length) the nail
@@ -60,8 +62,10 @@ const double kNailWidthFactor = 0.56;
 /// closes that gap and lands the nail on top of the natural nail. If a future
 /// build fixes the landmark mapping this can climb back toward 0.35. (Higher
 /// values pull the nail short / down the finger.) Lowered 0.16→0.10 on tester
-/// feedback ("move all the nails up so you can't see the real nails").
-const double kNailBacksetFactor = 0.10;
+/// feedback ("move all the nails up so you can't see the real nails"). Nudged
+/// 0.10→0.13 after the bigger nails floated ABOVE the fingertips ("aren't lining
+/// up") — a touch more backset seats them back down onto the nail bed.
+const double kNailBacksetFactor = 0.13;
 
 /// The pinky gets its own backset. Its tip→DIP segment is the shortest of the
 /// five, so MediaPipe landmark noise is a bigger FRACTION of it and the pinky
