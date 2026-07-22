@@ -296,8 +296,9 @@ const double kNailBaseWidthFactor = 0.125;
 const double kNailAspectRatio = 0.80;
 
 /// Default nail length multiplier (the "Medium" preset). Bumped 1.0→1.15, then
-/// 1.15→1.32 on tester feedback that the medium nails should be longer.
-const double kNailDefaultLengthFactor = 1.32;
+/// 1.15→1.32, then 1.32→1.42 on repeated tester feedback that the medium nails
+/// should run a bit longer down the free edge / cover more of the nail.
+const double kNailDefaultLengthFactor = 1.42;
 
 /// An asset or upload design may carry suffixes: a recolour and/or a stacked
 /// French tip, e.g. `assets/nail_designs/leopard.png#tint=2196f3#ftip=ffffff`.

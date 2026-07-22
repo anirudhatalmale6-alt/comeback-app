@@ -63,9 +63,11 @@ const double kNailWidthFactor = 0.56;
 /// build fixes the landmark mapping this can climb back toward 0.35. (Higher
 /// values pull the nail short / down the finger.) Lowered 0.16→0.10 on tester
 /// feedback ("move all the nails up so you can't see the real nails"). Nudged
-/// 0.10→0.13 after the bigger nails floated ABOVE the fingertips ("aren't lining
-/// up") — a touch more backset seats them back down onto the nail bed.
-const double kNailBacksetFactor = 0.13;
+/// 0.10→0.13 after the BIGGER nails floated above the tips, but once the nails
+/// were shrunk (v1.6.54) 0.13 read LOW again — bare fingertip above each nail,
+/// "doesn't cover the full nail". Smaller nails need LESS backset to reach the
+/// visible tip, so 0.13→0.08 to ride them back up over the whole nail bed.
+const double kNailBacksetFactor = 0.08;
 
 /// The pinky gets its own backset. Its tip→DIP segment is the shortest of the
 /// five, so MediaPipe landmark noise is a bigger FRACTION of it and the pinky
@@ -73,7 +75,8 @@ const double kNailBacksetFactor = 0.13;
 /// Was 0.06, which over-projected it forward along the pinky's diagonal axis and
 /// threw the nail sideways; the lateral term (below) handles the sideways drift
 /// directly. Lowered 0.10→0.04 with the global up-shift so the pinky rises too.
-const double kNailPinkyBacksetFactor = 0.04;
+/// Nudged 0.04→0.01 with the v1.6.55 up-shift (pinky still read low/short).
+const double kNailPinkyBacksetFactor = 0.01;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the
