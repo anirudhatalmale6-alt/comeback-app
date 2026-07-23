@@ -76,7 +76,18 @@ const double kNailBacksetFactor = 0.08;
 /// threw the nail sideways; the lateral term (below) handles the sideways drift
 /// directly. Lowered 0.10→0.04 with the global up-shift so the pinky rises too.
 /// Nudged 0.04→0.01 with the v1.6.55 up-shift (pinky still read low/short).
-const double kNailPinkyBacksetFactor = 0.01;
+/// v1.6.56: tester wants the pinky nudged DOWN (toward the tip, which is what
+/// down-screen is on the pinky's diagonal axis) a tad to fully cover — the free
+/// edge still peeked out below it — so 0.01→-0.05 to push it onto the whole nail.
+const double kNailPinkyBacksetFactor = -0.05;
+
+/// The ring finger gets its own backset too. It used to fall through to the
+/// global value, but v1.6.55's global up-shift (0.13→0.08) pushed the ring nail
+/// too far toward the tip, leaving the cuticle end of the nail bed exposed. The
+/// tester asked to shift the ring nail DOWN a tad (down-screen = toward the base
+/// on the ring's upward axis) so it covers the whole nail, so it gets a HIGHER
+/// backset than the global default: 0.08→0.12.
+const double kNailRingBacksetFactor = 0.12;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the
@@ -151,6 +162,8 @@ List<NailPose> computeNailPoses(List<Offset> landmarks) {
       backset = kNailThumbBacksetFactor;
     } else if (fj[0] == kPinkyTipIndex) {
       backset = kNailPinkyBacksetFactor;
+    } else if (fj[0] == kRingTipIndex) {
+      backset = kNailRingBacksetFactor;
     }
     var center = Offset(
       tip.dx - dirX * (length * backset),
