@@ -503,6 +503,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final List<String> _customDesigns = [];
   bool _busy = false;
 
+  // True from the instant the guided camera hands back a photo until that photo
+  // is enhanced, decoded and shown in the editor. While it's true we show a
+  // loading screen instead of the chooser, so the "Auto Try-On" button isn't
+  // sitting there re-clickable during the gap (which let customers re-open the
+  // camera and lose the shot they just took).
+  bool _processingCapture = false;
+
   // Design Studio: compose a look (design, colour, shape, finish) on an easy
   // preview BEFORE the photo, then "put it on your hand". _seedFan places the
   // composed design as a starter set on the next manually-chosen photo.
@@ -723,6 +730,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       MaterialPageRoute(builder: (_) => const GuidedCaptureScreen()),
     );
     if (result == null || !mounted) return;
+    // The camera route is gone but the enhanced photo isn't ready yet. Show the
+    // loading screen (not the chooser) so the customer can't tap "Auto Try-On"
+    // again and re-open the camera during this gap.
+    setState(() => _processingCapture = true);
     _resetZoom();
     // A guided capture that didn't come from the Studio starts with a clean
     // per-finger design slate.
@@ -731,25 +742,33 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         _studioDesigns[i] = null;
       }
     }
-    // Auto-enhance the captured frame. Enhancement preserves dimensions, so the
-    // normalized landmarks still map onto it exactly.
-    final enhanced = await _enhancedPhotoFile(result.imageFile);
-    final bytes = await enhanced.readAsBytes();
-    final decoded = await decodeImageFromList(bytes);
-    if (!mounted) return;
-    final ambient = await _computeAmbient(decoded);
-    if (!mounted) return;
-    setState(() {
-      _photo = enhanced;
-      _photoImgSize =
-          Size(decoded.width.toDouble(), decoded.height.toDouble());
-      _pendingLandmarks = result.normalizedLandmarks;
-      _ambient = ambient;
-      _selected = null;
-      _nails.clear();
-      _undoStack.clear();
-      _currentDesign ??= kDefaultDesign;
-    });
+    try {
+      // Auto-enhance the captured frame. Enhancement preserves dimensions, so
+      // the normalized landmarks still map onto it exactly.
+      final enhanced = await _enhancedPhotoFile(result.imageFile);
+      final bytes = await enhanced.readAsBytes();
+      final decoded = await decodeImageFromList(bytes);
+      if (!mounted) return;
+      final ambient = await _computeAmbient(decoded);
+      if (!mounted) return;
+      setState(() {
+        _photo = enhanced;
+        _photoImgSize =
+            Size(decoded.width.toDouble(), decoded.height.toDouble());
+        _pendingLandmarks = result.normalizedLandmarks;
+        _ambient = ambient;
+        _selected = null;
+        _nails.clear();
+        _undoStack.clear();
+        _currentDesign ??= kDefaultDesign;
+        _processingCapture = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _processingCapture = false);
+        _snack('Could not process the photo: $e');
+      }
+    }
   }
 
   /// Places one nail per detected finger, mapping landmark image coordinates
@@ -1062,14 +1081,37 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     _pushUndo();
     setState(() {
       if (_selected != null) {
-        _nails[_selected!].lengthFactor = factor;
+        _setLengthFromTip(_nails[_selected!], factor);
       } else {
         _lengthFactor = factor;
         for (final n in _nails) {
-          n.lengthFactor = factor;
+          _setLengthFromTip(n, factor);
         }
       }
     });
+  }
+
+  /// Changes a nail's [lengthFactor] while keeping its CUTICLE (base) end pinned
+  /// in place, so the nail grows/shrinks from the free-edge (top) rather than
+  /// ballooning around its centre. Without this, lengthening a nail pushes its
+  /// base down onto the finger and the customer has to drag it back up. The nail
+  /// is drawn centred on [_Nail.center] and rotated by [_Nail.rotation], so its
+  /// tip lies half a height along (sin θ, −cos θ) from the centre. When the
+  /// height changes by Δh we shift the centre by Δh/2 along that tip direction,
+  /// which leaves the base exactly where it was.
+  void _setLengthFromTip(_Nail n, double factor) {
+    if (_boxSize != Size.zero) {
+      final baseW = _boxSize.width * kNailBaseWidthFactor;
+      final baseH = baseW * kNailAspectRatio;
+      final dh = baseH * n.scale * (factor - n.lengthFactor);
+      final tipX = math.sin(n.rotation);
+      final tipY = -math.cos(n.rotation);
+      n.center = Offset(
+        n.center.dx + tipX * dh / 2,
+        n.center.dy + tipY * dh / 2,
+      );
+    }
+    n.lengthFactor = factor;
   }
 
   Future<void> _openShapeSheet() async {
@@ -1227,7 +1269,26 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       ),
       body: _photo != null
           ? _buildEditor()
-          : (_studio ? _buildStudio() : _buildChooser()),
+          : _processingCapture
+              ? _buildProcessing()
+              : (_studio ? _buildStudio() : _buildChooser()),
+    );
+  }
+
+  /// Shown between the guided camera closing and the captured photo appearing in
+  /// the editor. Standing in for the chooser here is what stops the customer
+  /// from re-tapping "Auto Try-On" and re-opening the camera mid-placement.
+  Widget _buildProcessing() {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: Color(0xFF7E57C2)),
+          SizedBox(height: 18),
+          Text('Placing your nails…',
+              style: TextStyle(color: Colors.black54, fontSize: 14)),
+        ],
+      ),
     );
   }
 
