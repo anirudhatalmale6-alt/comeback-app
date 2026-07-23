@@ -79,10 +79,15 @@ const double kNailBacksetFactor = 0.08;
 /// v1.6.56 tried per-finger backset tweaks (pinky→-0.05, ring→0.12) to shift the
 /// two outer nails "down a tad" on one tilted photo, but on the NEXT photo (flat
 /// splayed hand) those shifts knocked the nails OFF the bed — single-photo
-/// constant tuning overfits one hand pose and regresses the next. Reverted to the
-/// stable v1.6.55 baseline (pinky 0.01, ring back on the global default); final
-/// per-photo placement is meant to be finished with the per-nail drag/size tool.
-const double kNailPinkyBacksetFactor = 0.01;
+/// constant tuning overfits one hand pose and regresses the next. That was the
+/// RING (0.12, a directional gamble); the pinky reading low, however, is a
+/// CONSISTENT bias across every tester shot (shortest tip→DIP segment, so the tip
+/// landmark maps shortest of all five), so v1.6.58 lowers the pinky backset to a
+/// NEGATIVE value — same treatment as the thumb, which reads low for the same
+/// reason — to lift the pinky nail up onto the bed. This is pose-independent
+/// (always the same direction), unlike the ring change. Final per-photo tweaks
+/// are still meant to be finished with the per-nail drag/size tool.
+const double kNailPinkyBacksetFactor = -0.10;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the

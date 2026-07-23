@@ -73,6 +73,21 @@ void main() {
       expect(backDist, lessThan(0));
       expect(backDist, lessThan(50 * kNailLengthFactor * kNailBacksetFactor));
     });
+
+    test('pinky rides up onto the nail bed (past the tip landmark)', () {
+      final lm = List<Offset>.filled(21, Offset.zero);
+      lm[20] = const Offset(300, 100); // pinky tip
+      lm[19] = const Offset(300, 150); // pinky joint below (finger points up)
+      // Neighbour (ring tip) placed straight left so the lateral pull is purely
+      // horizontal and doesn't touch the vertical backset check below.
+      lm[16] = const Offset(250, 100);
+      final p = computeNailPoses(lm).last;
+      final backDist = p.center.dy - 100; // +y is toward the joint (down)
+      // Negative pinky backset lifts the nail ABOVE the tip, higher than both the
+      // default and the old positive pinky value would.
+      expect(backDist, lessThan(0));
+      expect(backDist, lessThan(50 * kNailLengthFactor * kNailBacksetFactor));
+    });
   });
 
   group('rotateNormalized', () {
