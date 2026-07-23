@@ -414,6 +414,10 @@ class _Nail {
   NailShape shape;
   NailFinish finish;
   double lengthFactor;
+  /// Sideways stretch on top of the auto-fitted size: 1.0 = natural width,
+  /// <1 slimmer, >1 wider. Independent of [lengthFactor] so a customer can
+  /// widen a nail without also lengthening it.
+  double widthFactor;
   /// Decals stacked on this nail (placed in the Studio, carried onto the hand).
   List<_Decal> decals;
   /// Freehand strokes painted on this nail in the Draw tool.
@@ -429,6 +433,7 @@ class _Nail {
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.lengthFactor = 1.0,
+    this.widthFactor = 1.0,
     List<_Decal>? decals,
     List<_Stroke>? strokes,
   })  : decals = decals ?? [],
@@ -445,6 +450,7 @@ class _Nail {
     required this.shape,
     required this.finish,
     required this.lengthFactor,
+    required this.widthFactor,
     required this.decals,
     required this.strokes,
     required this.initCenter,
@@ -463,6 +469,7 @@ class _Nail {
         shape: shape,
         finish: finish,
         lengthFactor: lengthFactor,
+        widthFactor: widthFactor,
         decals: decals.map((d) => d.copy()).toList(),
         strokes: strokes.map((s) => s.copy()).toList(),
         initCenter: initCenter,
@@ -495,6 +502,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   NailShape _shape = NailShape.oval;
   NailFinish _finish = NailFinish.gloss;
   double _lengthFactor = kNailDefaultLengthFactor;
+  double _widthFactor = 1.0;
   // Which category strip is showing, and the customer's own uploaded designs.
   String _category = kDesignCategories.first;
   // The base (background) colour used behind French tips. Palette tip taps keep
@@ -823,6 +831,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           shape: _shape,
           finish: _finish,
           lengthFactor: _lengthFactor,
+          widthFactor: _widthFactor,
           decals: decalsByPose[i].map((d) => d.copy()).toList(),
           strokes: strokesByPose[i].map((s) => s.copy()).toList(),
         ));
@@ -880,6 +889,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             shape: _shape,
             finish: _finish,
             lengthFactor: _lengthFactor,
+            widthFactor: _widthFactor,
           ));
         }
       } else if (_selected != null) {
@@ -922,6 +932,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           shape: _shape,
           finish: _finish,
           lengthFactor: _lengthFactor,
+          widthFactor: _widthFactor,
           decals: _studioDecals[i].map((d) => d.copy()).toList(),
           strokes: _studioStrokes[i].map((s) => s.copy()).toList(),
         ));
@@ -992,6 +1003,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         shape: _shape,
         finish: _finish,
         lengthFactor: _lengthFactor,
+        widthFactor: _widthFactor,
       ));
       _selected = _nails.length - 1;
     });
@@ -1029,6 +1041,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _shape = NailShape.oval;
       _finish = NailFinish.gloss;
       _lengthFactor = kNailDefaultLengthFactor;
+      _widthFactor = 1.0;
       _studio = false;
       _seedFan = false;
       _studioFocus = null;
@@ -1114,6 +1127,23 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     n.lengthFactor = factor;
   }
 
+  /// Widens or slims a nail. Unlike length, width grows symmetrically around the
+  /// nail's centre — the finger's centreline — so the nail stays sitting on the
+  /// finger and there's nothing to re-drag.
+  void _applyWidth(double factor) {
+    _pushUndo();
+    setState(() {
+      if (_selected != null) {
+        _nails[_selected!].widthFactor = factor;
+      } else {
+        _widthFactor = factor;
+        for (final n in _nails) {
+          n.widthFactor = factor;
+        }
+      }
+    });
+  }
+
   Future<void> _openShapeSheet() async {
     final sel = _selected != null ? _nails[_selected!] : null;
     await showModalBottomSheet(
@@ -1129,9 +1159,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         initialShape: sel?.shape ?? _shape,
         initialFinish: sel?.finish ?? _finish,
         initialLength: sel?.lengthFactor ?? _lengthFactor,
+        initialWidth: sel?.widthFactor ?? _widthFactor,
         onShape: _applyShape,
         onFinish: _applyFinish,
         onLength: _applyLength,
+        onWidth: _applyWidth,
       ),
     );
   }
@@ -2489,7 +2521,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final n = _nails[i];
     final baseW = box.width * kNailBaseWidthFactor;
     final baseH = baseW * kNailAspectRatio;
-    final w = baseW * n.scale;
+    final w = baseW * n.scale * n.widthFactor;
     // Length is a style choice on top of the auto-fitted size: longer nails
     // extend the free-edge without changing the nail's width.
     final h = baseH * n.scale * n.lengthFactor;
@@ -3456,17 +3488,21 @@ class _ShapeLengthSheet extends StatefulWidget {
   final NailShape initialShape;
   final NailFinish initialFinish;
   final double initialLength;
+  final double initialWidth;
   final ValueChanged<NailShape> onShape;
   final ValueChanged<NailFinish> onFinish;
   final ValueChanged<double> onLength;
+  final ValueChanged<double> onWidth;
   const _ShapeLengthSheet({
     required this.target,
     required this.initialShape,
     required this.initialFinish,
     required this.initialLength,
+    required this.initialWidth,
     required this.onShape,
     required this.onFinish,
     required this.onLength,
+    required this.onWidth,
   });
 
   @override
@@ -3481,14 +3517,59 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
     ('X-Long', 2.15), // new extra-long option
   ];
 
+  static const _widths = [
+    ('Slim', 0.80),
+    ('Medium', 1.0),
+    ('Wide', 1.20),
+    ('X-Wide', 1.40),
+  ];
+
   late NailShape _shape = widget.initialShape;
   late NailFinish _finish = widget.initialFinish;
   late double _length = widget.initialLength;
+  late double _width = widget.initialWidth;
 
   static const _teal = Color(0xFF00897B);
 
   Widget _sectionTitle(String t) => Text(t,
       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600));
+
+  /// A row of equal-width preset pills (used for both Length and Width). The
+  /// pill matching [selected] is highlighted; tapping one reports its value.
+  Widget _pillRow(
+      List<(String, double)> options, double selected, ValueChanged<double> onPick) {
+    return Row(
+      children: [
+        for (final o in options) ...[
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onPick(o.$2),
+              child: Container(
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected == o.$2 ? _teal : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    o.$1,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: selected == o.$2 ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (o != options.last) const SizedBox(width: 8),
+        ],
+      ],
+    );
+  }
 
   Widget _shapeRow() {
     return SizedBox(
@@ -3614,7 +3695,7 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Shape, finish & length — applies to ${widget.target}',
+                'Shape, finish, length & width — applies to ${widget.target}',
                 style:
                     const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
@@ -3629,43 +3710,17 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
               const SizedBox(height: 16),
               _sectionTitle('Length'),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  for (final l in _lengths) ...[
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() => _length = l.$2);
-                          widget.onLength(l.$2);
-                        },
-                        child: Container(
-                          height: 44,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color:
-                                _length == l.$2 ? _teal : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              l.$1,
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: _length == l.$2
-                                    ? Colors.white
-                                    : Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (l != _lengths.last) const SizedBox(width: 8),
-                  ],
-                ],
-              ),
+              _pillRow(_lengths, _length, (v) {
+                setState(() => _length = v);
+                widget.onLength(v);
+              }),
+              const SizedBox(height: 16),
+              _sectionTitle('Width'),
+              const SizedBox(height: 8),
+              _pillRow(_widths, _width, (v) {
+                setState(() => _width = v);
+                widget.onWidth(v);
+              }),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
