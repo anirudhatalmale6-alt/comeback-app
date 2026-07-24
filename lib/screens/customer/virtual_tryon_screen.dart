@@ -953,17 +953,34 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   /// Lets the customer bring their own inspiration images (designs they saw
-  /// online, photos from a magazine, etc.) and try them on like any swatch.
-  /// Multiple photos can be imported at once, and each has its background
-  /// automatically removed so only the nail art sits on the nail — no white box
-  /// or table behind it. Removal runs on-device in a background isolate.
+  /// online, photos from a magazine, etc.) and try them on as a full-nail
+  /// design. Multiple photos import at once with backgrounds auto-removed.
   Future<void> _pickCustomDesign() async {
+    final added = await _importPhotos();
+    if (added.isNotEmpty) _applyDesign(added.first);
+  }
+
+  /// Imports photos (multi-select), removes each background on-device, adds the
+  /// cut-outs to [_customDesigns], and drops the first onto the focused nail [i]
+  /// as a movable/resizable/rotatable decal — so a customer can place several of
+  /// their own photos on a nail and arrange them freely.
+  Future<void> _importDecalPhotos(int i) async {
+    final added = await _importPhotos();
+    if (added.isNotEmpty) _addDecal(i, added.first);
+  }
+
+  /// Shared import: multi-pick from the gallery, remove each photo's background
+  /// on-device (background isolate), store the cut-outs in [_customDesigns], and
+  /// return the new paths. Drives the busy spinner and a confirmation snack.
+  /// Each has its background automatically removed so only the art remains — no
+  /// white box or table behind it. Nothing is uploaded anywhere.
+  Future<List<String>> _importPhotos() async {
     final picked = await _picker.pickMultiImage(
       maxWidth: 1000,
       maxHeight: 1000,
       imageQuality: 90,
     );
-    if (picked.isEmpty || !mounted) return;
+    if (picked.isEmpty || !mounted) return const [];
 
     setState(() => _busy = true);
     final added = <String>[];
@@ -974,7 +991,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     } catch (_) {
       // fall through — whatever was processed is still added below
     }
-    if (!mounted) return;
+    if (!mounted) return const [];
     setState(() {
       _busy = false;
       // Insert so the imported order is preserved at the front of the strip.
@@ -983,11 +1000,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       }
     });
     if (added.isNotEmpty) {
-      _applyDesign(added.first);
       _snack(picked.length == 1
           ? 'Imported — background removed'
           : 'Imported ${picked.length} photos — backgrounds removed');
     }
+    return added;
   }
 
   /// Runs background removal on [src] and writes the transparent cut-out to a
@@ -1456,7 +1473,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Turns the stored per-nail decals into render specs for [NailOverlay].
   List<DecalSpec> _decalSpecs(List<_Decal>? decals) => (decals ?? const [])
       .map((d) => DecalSpec(
-            image: AssetImage(d.asset),
+            // Handles both bundled charms (assets/…) and the customer's own
+            // uploaded photos (absolute file paths → FileImage).
+            image: designProvider(d.asset),
             pos: d.pos,
             size: d.size,
             rotation: d.rotation,
@@ -2030,33 +2049,79 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  /// The horizontal picker of premade decals; tapping one drops it on the
-  /// focused nail (centred, selected) ready to drag.
+  /// The horizontal picker of decals; tapping one drops it on the focused nail
+  /// (centred, selected) ready to drag, resize and rotate. Leads with an Upload
+  /// tile and the customer's own imported photos (backgrounds removed), followed
+  /// by the premade charms.
   Widget _buildDecalStrip(int i) {
     return Container(
       height: 60,
       color: Colors.white,
-      child: ListView.separated(
+      child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: kDecals.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, k) {
-          return GestureDetector(
-            onTap: () => _addDecal(i, kDecals[k]),
-            child: Container(
-              width: 48,
-              height: 48,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Image.asset(kDecals[k], fit: BoxFit.contain),
-            ),
-          );
-        },
+        children: [
+          _decalUploadTile(i),
+          for (final path in _customDesigns) ...[
+            const SizedBox(width: 8),
+            _decalTile(i, path, isFile: true),
+          ],
+          for (final asset in kDecals) ...[
+            const SizedBox(width: 8),
+            _decalTile(i, asset, isFile: false),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The "Upload" tile at the head of the decal strip: imports the customer's
+  /// own photos (multi-select, backgrounds removed) and drops the first on the
+  /// nail as a movable decal.
+  Widget _decalUploadTile(int i) {
+    return GestureDetector(
+      onTap: _busy ? null : () => _importDecalPhotos(i),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0F2F1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFF00897B), width: 1.2),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_photo_alternate_outlined,
+                size: 20, color: Color(0xFF00897B)),
+            Text('Upload',
+                style: TextStyle(
+                    fontSize: 8,
+                    color: Color(0xFF00897B),
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One tappable decal source in the strip — either a bundled charm asset or an
+  /// uploaded photo (file path). Tapping drops it on the focused nail.
+  Widget _decalTile(int i, String id, {required bool isFile}) {
+    return GestureDetector(
+      onTap: () => _addDecal(i, id),
+      child: Container(
+        width: 48,
+        height: 48,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: isFile
+            ? Image.file(File(id), fit: BoxFit.contain)
+            : Image.asset(id, fit: BoxFit.contain),
       ),
     );
   }
