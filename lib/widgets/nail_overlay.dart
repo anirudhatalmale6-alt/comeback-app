@@ -342,20 +342,29 @@ class _NailFinishPainter extends CustomPainter {
     );
   }
 
-  void _specularStreak(Canvas canvas, Size size, Rect rect, double strength) {
-    canvas.drawRect(
-      rect,
+  // A soft, blurred, vertically-elongated reflection — the window-highlight you
+  // see on a real wet/gel nail. Unlike [_specularStreak] (a hard full-length
+  // bar that reads like a printed sticker) this is a rounded capsule confined to
+  // part of the nail and heavily blurred, so it looks like light curving over a
+  // glossy dome. [cx] is the horizontal centre (0..1), [topFrac]/[botFrac] the
+  // vertical span, [halfW] the half-width — all as fractions of the nail size.
+  void _softStreak(Canvas canvas, Size size, double cx, double topFrac,
+      double botFrac, double halfW, double strength) {
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTRB(
+        size.width * (cx - halfW),
+        size.height * topFrac,
+        size.width * (cx + halfW),
+        size.height * botFrac,
+      ),
+      Radius.circular(size.width * halfW),
+    );
+    canvas.drawRRect(
+      rrect,
       Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(size.width * 0.32, 0),
-          Offset(size.width * 0.52, 0),
-          [
-            Colors.white.withValues(alpha: 0.0),
-            Colors.white.withValues(alpha: strength),
-            Colors.white.withValues(alpha: 0.0),
-          ],
-          [0.0, 0.5, 1.0],
-        ),
+        ..color = Colors.white.withValues(alpha: strength)
+        ..maskFilter =
+            MaskFilter.blur(BlurStyle.normal, size.width * halfW * 1.2),
     );
   }
 
@@ -397,23 +406,26 @@ class _NailFinishPainter extends CustomPainter {
     switch (finish) {
       case NailFinish.gloss:
         _base(canvas, size, rect);
-        _sheen(canvas, size, rect, 0.26);
-        _specularStreak(canvas, size, rect, 0.32);
-        _hotspot(canvas, size, 0.58);
-        // A tight bright core inside the hotspot + a small secondary reflection
-        // lower down = a convincing wet, glass-coated shine.
-        _glint(canvas, size, 0.40, 0.24, 0.07, 0.95);
-        _glint(canvas, size, 0.60, 0.60, 0.05, 0.30);
+        // Soft ambient sheen across the upper-left, then an elongated blurred
+        // window reflection just off-centre and a smaller, dimmer one lower to
+        // the right — light curving over a wet dome, not a printed stripe.
+        _sheen(canvas, size, rect, 0.20);
+        _softStreak(canvas, size, 0.40, 0.10, 0.58, 0.05, 0.40);
+        _softStreak(canvas, size, 0.62, 0.36, 0.66, 0.032, 0.18);
+        _hotspot(canvas, size, 0.30);
+        // A small, softly-blurred bright core reads as the tightest catch of
+        // light — bright but not a hard white dot.
+        _glint(canvas, size, 0.40, 0.22, 0.05, 0.55);
         _tipReflection(canvas, size, rect);
         break;
 
       case NailFinish.jelly:
-        // Translucent but very wet-looking: strong sheen and hotspot.
+        // Translucent but wet-looking: broad sheen and a soft window highlight.
         _base(canvas, size, rect, sides: 0.12);
-        _sheen(canvas, size, rect, 0.30);
-        _specularStreak(canvas, size, rect, 0.30);
-        _hotspot(canvas, size, 0.66);
-        _glint(canvas, size, 0.40, 0.24, 0.07, 0.95);
+        _sheen(canvas, size, rect, 0.24);
+        _softStreak(canvas, size, 0.40, 0.10, 0.60, 0.055, 0.42);
+        _hotspot(canvas, size, 0.36);
+        _glint(canvas, size, 0.40, 0.22, 0.05, 0.55);
         _tipReflection(canvas, size, rect);
         break;
 

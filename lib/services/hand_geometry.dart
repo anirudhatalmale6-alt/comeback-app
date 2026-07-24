@@ -87,7 +87,10 @@ const double kNailBacksetFactor = 0.08;
 /// reason — to lift the pinky nail up onto the bed. This is pose-independent
 /// (always the same direction), unlike the ring change. Final per-photo tweaks
 /// are still meant to be finished with the per-nail drag/size tool.
-const double kNailPinkyBacksetFactor = -0.10;
+/// v1.6.61: -0.10 lifted it but the tester still saw a sliver of bare fingertip
+/// above the pinky nail (still a touch low), so nudged further to -0.15 — a
+/// bounded step in the SAME confirmed direction, not a new gamble.
+const double kNailPinkyBacksetFactor = -0.15;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the
