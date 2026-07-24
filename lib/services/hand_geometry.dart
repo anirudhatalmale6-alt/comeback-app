@@ -90,7 +90,10 @@ const double kNailBacksetFactor = 0.08;
 /// v1.6.61: -0.10 lifted it but the tester still saw a sliver of bare fingertip
 /// above the pinky nail (still a touch low), so nudged further to -0.15 — a
 /// bounded step in the SAME confirmed direction, not a new gamble.
-const double kNailPinkyBacksetFactor = -0.15;
+/// v1.6.62: -0.15 OVERSHOT (tester now says the pinky sits "too high", i.e. the
+/// nail rides too far toward/past the tip), so ease back to the midpoint -0.12 —
+/// bracketed between -0.10 (a sliver too low) and -0.15 (too high).
+const double kNailPinkyBacksetFactor = -0.12;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the

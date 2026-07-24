@@ -458,9 +458,11 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Mirror metal reflects a room: a cool "sky" up top, a bright horizon
-        // band across the middle, and a warmer, darker "floor" below — plus a
-        // crisp highlight. Reads like polished chrome catching the light.
+        // Polished mirror chrome reflects the room, so realism comes from HIGH
+        // contrast and a CRISP horizon, not a soft gradient. Top half reflects
+        // the bright ceiling/light fading into a dark band; a sharp bright
+        // horizon flash sits just below centre; below it a warm floor reflection
+        // darkens into the cuticle. A faint cool tint keeps it metallic silver.
         canvas.drawRect(
           rect,
           Paint()
@@ -468,58 +470,78 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(0, size.height),
               [
-                Colors.white.withValues(alpha: 0.55),
-                const Color(0xFF9FB6D6).withValues(alpha: 0.30), // cool sky
-                Colors.black.withValues(alpha: 0.46),
-                Colors.white.withValues(alpha: 0.55), // bright horizon
-                const Color(0xFF6A5240).withValues(alpha: 0.34), // warm floor
-                Colors.black.withValues(alpha: 0.34),
+                Colors.white.withValues(alpha: 0.66), // bright ceiling
+                const Color(0xFFBED0E8).withValues(alpha: 0.32), // cool reflection
+                Colors.black.withValues(alpha: 0.50), // dark band above horizon
+                Colors.white.withValues(alpha: 0.78), // crisp horizon flash
+                const Color(0xFF7A6552).withValues(alpha: 0.30), // warm floor
+                Colors.black.withValues(alpha: 0.44), // shadow into cuticle
               ],
-              [0.0, 0.24, 0.46, 0.60, 0.82, 1.0],
+              [0.0, 0.30, 0.50, 0.57, 0.80, 1.0],
             ),
         );
-        // A thin, crisp horizon streak where the two reflections meet.
+        // A thin, crisp horizon line — the mirror's sharpest reflection edge.
         canvas.drawRect(
-          Rect.fromLTWH(0, size.height * 0.55, size.width, size.height * 0.05),
+          Rect.fromLTWH(0, size.height * 0.535, size.width, size.height * 0.02),
           Paint()
-            ..color = Colors.white.withValues(alpha: 0.5)
+            ..color = Colors.white.withValues(alpha: 0.8)
             ..maskFilter =
-                MaskFilter.blur(BlurStyle.normal, size.height * 0.02),
+                MaskFilter.blur(BlurStyle.normal, size.height * 0.008),
         );
-        _base(canvas, size, rect, sides: 0.20);
-        _hotspot(canvas, size, 0.70);
-        _glint(canvas, size, 0.40, 0.24, 0.06, 0.85);
+        _base(canvas, size, rect, sides: 0.22);
+        // An off-centre vertical catch of light so the metal reads as a curved
+        // dome rather than a flat card — soft blurred capsule, never a hard bar.
+        _softStreak(canvas, size, 0.34, 0.06, 0.50, 0.055, 0.32);
+        _glint(canvas, size, 0.34, 0.20, 0.05, 0.7);
         break;
 
       case NailFinish.catEye:
-        // Magnetic cat-eye: a bright, narrow light bar down the length over a
-        // darkened base, like light caught in the magnetic pigment.
-        // Darker sides for stronger contrast, then a soft glowing bloom under a
-        // thin ultra-bright core — the light "caught" in the magnetic pigment.
-        canvas.drawRect(rect, Paint()..color = Colors.black.withValues(alpha: 0.20));
+        // Magnetic cat-eye: light "caught" in magnetic pigment as a luminous
+        // slit down the nail — like a cat's-eye gemstone (chatoyancy). Realism
+        // comes from the band FADING toward both ends (top, bottom AND sides)
+        // rather than a hard full-length bar, over a darkened shimmer base.
+        canvas.drawRect(
+            rect, Paint()..color = Colors.black.withValues(alpha: 0.22));
         _base(canvas, size, rect, sides: 0.16);
+        // Wide, soft glow bloom around the slit.
         canvas.drawRect(
           rect,
           Paint()
             ..shader = ui.Gradient.linear(
-              Offset(size.width * 0.28, 0),
-              Offset(size.width * 0.62, 0),
+              Offset(size.width * 0.22, 0),
+              Offset(size.width * 0.72, 0),
               [
                 Colors.white.withValues(alpha: 0.0),
-                Colors.white.withValues(alpha: 0.45),
+                Colors.white.withValues(alpha: 0.32),
                 Colors.white.withValues(alpha: 0.0),
               ],
               [0.0, 0.5, 1.0],
             )
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.03),
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.06),
         );
-        canvas.drawRect(
-          Rect.fromLTWH(size.width * 0.45, 0, size.width * 0.06, size.height),
+        // The bright core: a vertically-elongated radial glow, brightest at the
+        // centre and fading to nothing at the tip, cuticle and sides — the slit
+        // of light that makes a cat-eye read 3D instead of like a painted line.
+        final coreW = size.width * 0.12;
+        final coreH = size.height * 0.44;
+        canvas.save();
+        canvas.translate(size.width * 0.47, size.height * 0.50);
+        canvas.scale(coreW / coreH, 1.0);
+        canvas.drawCircle(
+          Offset.zero,
+          coreH,
           Paint()
-            ..color = Colors.white.withValues(alpha: 0.85)
-            ..maskFilter =
-                MaskFilter.blur(BlurStyle.normal, size.width * 0.015),
+            ..shader = ui.Gradient.radial(
+              Offset.zero,
+              coreH,
+              [
+                Colors.white.withValues(alpha: 0.82),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+            )
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, coreW * 0.6),
         );
+        canvas.restore();
         break;
 
       case NailFinish.glitter:
