@@ -406,26 +406,25 @@ class _NailFinishPainter extends CustomPainter {
     switch (finish) {
       case NailFinish.gloss:
         _base(canvas, size, rect);
-        // Soft ambient sheen across the upper-left, then an elongated blurred
-        // window reflection just off-centre and a smaller, dimmer one lower to
-        // the right — light curving over a wet dome, not a printed stripe.
-        _sheen(canvas, size, rect, 0.20);
-        _softStreak(canvas, size, 0.40, 0.10, 0.58, 0.05, 0.40);
-        _softStreak(canvas, size, 0.62, 0.36, 0.66, 0.032, 0.18);
-        _hotspot(canvas, size, 0.30);
-        // A small, softly-blurred bright core reads as the tightest catch of
-        // light — bright but not a hard white dot.
-        _glint(canvas, size, 0.40, 0.22, 0.05, 0.55);
+        // A real glossy nail reflects the room as ONE broad, soft, off-centre
+        // sheen with a single small catch-light inside it — NOT a hard vertical
+        // bar down the middle (which reads as a printed sticker). So: a wide
+        // feathered upper-left sheen, a gentle wide window that tapers, a faint
+        // secondary reflection lower-right for depth, and one tiny crisp glint.
+        _sheen(canvas, size, rect, 0.17);
+        _softStreak(canvas, size, 0.36, 0.12, 0.56, 0.085, 0.22);
+        _softStreak(canvas, size, 0.63, 0.44, 0.72, 0.05, 0.12);
+        _glint(canvas, size, 0.37, 0.25, 0.04, 0.5);
         _tipReflection(canvas, size, rect);
         break;
 
       case NailFinish.jelly:
-        // Translucent but wet-looking: broad sheen and a soft window highlight.
+        // Translucent but wet-looking: a broad soft sheen and a gentle, WIDE
+        // window highlight (not a hard central bar) with one small catch-light.
         _base(canvas, size, rect, sides: 0.12);
-        _sheen(canvas, size, rect, 0.24);
-        _softStreak(canvas, size, 0.40, 0.10, 0.60, 0.055, 0.42);
-        _hotspot(canvas, size, 0.36);
-        _glint(canvas, size, 0.40, 0.22, 0.05, 0.55);
+        _sheen(canvas, size, rect, 0.20);
+        _softStreak(canvas, size, 0.38, 0.12, 0.58, 0.085, 0.24);
+        _glint(canvas, size, 0.38, 0.24, 0.045, 0.5);
         _tipReflection(canvas, size, rect);
         break;
 
@@ -458,11 +457,12 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Polished mirror chrome reflects the room, so realism comes from HIGH
-        // contrast and a CRISP horizon, not a soft gradient. Top half reflects
-        // the bright ceiling/light fading into a dark band; a sharp bright
-        // horizon flash sits just below centre; below it a warm floor reflection
-        // darkens into the cuticle. A faint cool tint keeps it metallic silver.
+        // Polished mirror chrome reflects the room. Realism comes from rich
+        // tonal contrast that transitions SMOOTHLY — a mirror blurs what it
+        // reflects, so a hard edge-to-edge white bar across the middle reads as
+        // fake. Top reflects a bright-then-darkening ceiling, a soft luminous
+        // horizon glow sits below centre, then a warm floor darkens into the
+        // cuticle. A faint cool tint keeps it metallic silver.
         canvas.drawRect(
           rect,
           Paint()
@@ -470,29 +470,38 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(0, size.height),
               [
-                Colors.white.withValues(alpha: 0.66), // bright ceiling
-                const Color(0xFFBED0E8).withValues(alpha: 0.32), // cool reflection
-                Colors.black.withValues(alpha: 0.50), // dark band above horizon
-                Colors.white.withValues(alpha: 0.78), // crisp horizon flash
-                const Color(0xFF7A6552).withValues(alpha: 0.30), // warm floor
-                Colors.black.withValues(alpha: 0.44), // shadow into cuticle
+                const Color(0xFFEAF1FA).withValues(alpha: 0.60), // cool-white ceiling
+                const Color(0xFFAFC4DE).withValues(alpha: 0.30), // cool reflection
+                Colors.black.withValues(alpha: 0.42), // dark band above horizon
+                Colors.white.withValues(alpha: 0.60), // soft horizon glow
+                const Color(0xFF7A6552).withValues(alpha: 0.26), // warm floor
+                Colors.black.withValues(alpha: 0.40), // shadow into cuticle
               ],
-              [0.0, 0.30, 0.50, 0.57, 0.80, 1.0],
+              [0.0, 0.28, 0.46, 0.62, 0.82, 1.0],
             ),
         );
-        // A thin, crisp horizon line — the mirror's sharpest reflection edge.
+        // The horizon as a WIDE, soft blurred glow band (not a crisp line), so
+        // the brightest reflection reads as a curved mirror surface.
         canvas.drawRect(
-          Rect.fromLTWH(0, size.height * 0.535, size.width, size.height * 0.02),
+          Rect.fromLTWH(0, size.height * 0.52, size.width, size.height * 0.14),
           Paint()
-            ..color = Colors.white.withValues(alpha: 0.8)
-            ..maskFilter =
-                MaskFilter.blur(BlurStyle.normal, size.height * 0.008),
+            ..shader = ui.Gradient.linear(
+              Offset(0, size.height * 0.52),
+              Offset(0, size.height * 0.66),
+              [
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              [0.0, 0.5, 1.0],
+            )
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * 0.03),
         );
         _base(canvas, size, rect, sides: 0.22);
         // An off-centre vertical catch of light so the metal reads as a curved
         // dome rather than a flat card — soft blurred capsule, never a hard bar.
-        _softStreak(canvas, size, 0.34, 0.06, 0.50, 0.055, 0.32);
-        _glint(canvas, size, 0.34, 0.20, 0.05, 0.7);
+        _softStreak(canvas, size, 0.34, 0.06, 0.48, 0.07, 0.24);
+        _glint(canvas, size, 0.34, 0.20, 0.045, 0.55);
         break;
 
       case NailFinish.catEye:
