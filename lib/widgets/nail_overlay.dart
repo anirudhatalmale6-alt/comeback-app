@@ -311,6 +311,29 @@ class _NailFinishPainter extends CustomPainter {
     );
   }
 
+  // An overall "wet coated" vertical sheen: a soft brightening near the free
+  // edge that fades through the middle and drops to a hint of shade at the
+  // cuticle — the ambient shine a gel/gloss top-coat gives across the whole
+  // nail. Deliberately low-contrast and edge-to-edge so it reads as a coating,
+  // not a highlight (the localised catch-lights sit on top of it).
+  void _coat(Canvas canvas, Size size, Rect rect) {
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, 0),
+          Offset(0, size.height),
+          [
+            Colors.white.withValues(alpha: 0.15),
+            Colors.white.withValues(alpha: 0.03),
+            Colors.white.withValues(alpha: 0.0),
+            Colors.black.withValues(alpha: 0.07),
+          ],
+          [0.0, 0.30, 0.55, 1.0],
+        ),
+    );
+  }
+
   void _sheen(Canvas canvas, Size size, Rect rect, double strength) {
     canvas.drawRect(
       rect,
@@ -405,26 +428,26 @@ class _NailFinishPainter extends CustomPainter {
 
     switch (finish) {
       case NailFinish.gloss:
-        _base(canvas, size, rect);
-        // A real glossy nail reflects the room as ONE broad, soft, off-centre
-        // sheen with a single small catch-light inside it — NOT a hard vertical
-        // bar down the middle (which reads as a printed sticker). So: a wide
-        // feathered upper-left sheen, a gentle wide window that tapers, a faint
-        // secondary reflection lower-right for depth, and one tiny crisp glint.
-        _sheen(canvas, size, rect, 0.17);
-        _softStreak(canvas, size, 0.36, 0.12, 0.56, 0.085, 0.22);
-        _softStreak(canvas, size, 0.63, 0.44, 0.72, 0.05, 0.12);
-        _glint(canvas, size, 0.37, 0.25, 0.04, 0.5);
+        _base(canvas, size, rect, sides: 0.15);
+        // A real gel top-coat reads as an overall SOFT vertical sheen (a touch
+        // brighter near the free edge, fading through the middle, a hint of
+        // shade at the cuticle) — the "wet coated" look — with ONE broad, very
+        // diffuse window reflection and a single small catch-light. No hard bar,
+        // no chalky blob.
+        _coat(canvas, size, rect);
+        _softStreak(canvas, size, 0.40, 0.12, 0.56, 0.11, 0.16);
+        _glint(canvas, size, 0.41, 0.22, 0.038, 0.42);
         _tipReflection(canvas, size, rect);
         break;
 
       case NailFinish.jelly:
-        // Translucent but wet-looking: a broad soft sheen and a gentle, WIDE
-        // window highlight (not a hard central bar) with one small catch-light.
+        // Translucent but wet-looking: the same soft coated sheen as gloss with
+        // a slightly stronger broad window (jelly reads juicier), one small
+        // catch-light — never a hard central bar.
         _base(canvas, size, rect, sides: 0.12);
-        _sheen(canvas, size, rect, 0.20);
-        _softStreak(canvas, size, 0.38, 0.12, 0.58, 0.085, 0.24);
-        _glint(canvas, size, 0.38, 0.24, 0.045, 0.5);
+        _coat(canvas, size, rect);
+        _softStreak(canvas, size, 0.40, 0.12, 0.58, 0.11, 0.20);
+        _glint(canvas, size, 0.41, 0.22, 0.04, 0.46);
         _tipReflection(canvas, size, rect);
         break;
 

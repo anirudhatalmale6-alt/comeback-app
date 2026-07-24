@@ -20,6 +20,7 @@ import 'package:comeback_app/widgets/color_wheel_picker.dart';
 import 'package:comeback_app/screens/customer/guided_capture_screen.dart';
 import 'package:comeback_app/services/hand_geometry.dart';
 import 'package:comeback_app/services/photo_enhance.dart';
+import 'package:comeback_app/services/background_removal.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 /// [asset] doubles as the design's identity.
@@ -951,22 +952,58 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     return _currentDesign;
   }
 
-  /// Lets the customer bring their own inspiration image (a design they saw
-  /// online, a photo from a magazine, etc.) and try it on like any swatch.
+  /// Lets the customer bring their own inspiration images (designs they saw
+  /// online, photos from a magazine, etc.) and try them on like any swatch.
+  /// Multiple photos can be imported at once, and each has its background
+  /// automatically removed so only the nail art sits on the nail — no white box
+  /// or table behind it. Removal runs on-device in a background isolate.
   Future<void> _pickCustomDesign() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
+    final picked = await _picker.pickMultiImage(
       maxWidth: 1000,
       maxHeight: 1000,
       imageQuality: 90,
     );
-    if (picked == null || !mounted) return;
+    if (picked.isEmpty || !mounted) return;
+
+    setState(() => _busy = true);
+    final added = <String>[];
+    try {
+      for (final x in picked) {
+        added.add(await _cutoutToFile(File(x.path)));
+      }
+    } catch (_) {
+      // fall through — whatever was processed is still added below
+    }
+    if (!mounted) return;
     setState(() {
-      if (!_customDesigns.contains(picked.path)) {
-        _customDesigns.insert(0, picked.path);
+      _busy = false;
+      // Insert so the imported order is preserved at the front of the strip.
+      for (final p in added.reversed) {
+        if (!_customDesigns.contains(p)) _customDesigns.insert(0, p);
       }
     });
-    _applyDesign(picked.path);
+    if (added.isNotEmpty) {
+      _applyDesign(added.first);
+      _snack(picked.length == 1
+          ? 'Imported — background removed'
+          : 'Imported ${picked.length} photos — backgrounds removed');
+    }
+  }
+
+  /// Runs background removal on [src] and writes the transparent cut-out to a
+  /// PNG, returning its path. Falls back to the original photo path if anything
+  /// goes wrong, so an import never fails outright.
+  Future<String> _cutoutToFile(File src) async {
+    try {
+      final bytes = await src.readAsBytes();
+      final out = await compute(removeBackgroundPng, bytes);
+      final path =
+          '${Directory.systemTemp.path}/tryon_cut_${DateTime.now().microsecondsSinceEpoch}.png';
+      await File(path).writeAsBytes(out, flush: true);
+      return path;
+    } catch (_) {
+      return src.path;
+    }
   }
 
   /// Snapshots the current nails so the next edit can be undone. Call BEFORE
