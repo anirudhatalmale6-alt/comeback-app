@@ -528,52 +528,91 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.catEye:
-        // Magnetic cat-eye: light "caught" in magnetic pigment as a luminous
-        // slit down the nail — like a cat's-eye gemstone (chatoyancy). Realism
-        // comes from the band FADING toward both ends (top, bottom AND sides)
-        // rather than a hard full-length bar, over a darkened shimmer base.
-        canvas.drawRect(
-            rect, Paint()..color = Colors.black.withValues(alpha: 0.22));
-        _base(canvas, size, rect, sides: 0.16);
-        // Wide, soft glow bloom around the slit.
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..shader = ui.Gradient.linear(
-              Offset(size.width * 0.22, 0),
-              Offset(size.width * 0.72, 0),
-              [
-                Colors.white.withValues(alpha: 0.0),
-                Colors.white.withValues(alpha: 0.32),
-                Colors.white.withValues(alpha: 0.0),
-              ],
-              [0.0, 0.5, 1.0],
-            )
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.06),
-        );
-        // The bright core: a vertically-elongated radial glow, brightest at the
-        // centre and fading to nothing at the tip, cuticle and sides — the slit
-        // of light that makes a cat-eye read 3D instead of like a painted line.
-        final coreW = size.width * 0.12;
-        final coreH = size.height * 0.44;
-        canvas.save();
-        canvas.translate(size.width * 0.47, size.height * 0.50);
-        canvas.scale(coreW / coreH, 1.0);
-        canvas.drawCircle(
-          Offset.zero,
-          coreH,
-          Paint()
-            ..shader = ui.Gradient.radial(
-              Offset.zero,
-              coreH,
-              [
-                Colors.white.withValues(alpha: 0.82),
-                Colors.white.withValues(alpha: 0.0),
-              ],
-            )
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, coreW * 0.6),
-        );
-        canvas.restore();
+        {
+          // "Galaxy" magnetic cat-eye (matches the customer's reference): a
+          // near-black base with a dense field of tiny white star-sparkles
+          // (brighter through a diagonal mid-band, like a galaxy), and a bright
+          // CURVED sweep of light arcing across the upper half — the signature
+          // flare of a magnetic cat-eye caught by the light — plus a second,
+          // fainter arc below it.
+          canvas.drawRect(
+              rect, Paint()..color = Colors.black.withValues(alpha: 0.36));
+          _base(canvas, size, rect, sides: 0.18);
+
+          // The galaxy of fine stars. Seeded so they hold still between repaints.
+          final rnd = math.Random(42);
+          for (int i = 0; i < 160; i++) {
+            final x = rnd.nextDouble() * size.width;
+            final y = rnd.nextDouble() * size.height;
+            // Brighten toward the mid-band so the sparkle reads as a swoosh.
+            final band =
+                (1.0 - (y - size.height * 0.52).abs() / (size.height * 0.5))
+                    .clamp(0.0, 1.0);
+            final r = 0.3 + rnd.nextDouble() * 1.1;
+            final a = ((0.16 + rnd.nextDouble() * 0.55) * (0.45 + band * 0.7))
+                .clamp(0.0, 1.0);
+            canvas.drawCircle(Offset(x, y), r,
+                Paint()..color = Colors.white.withValues(alpha: a));
+          }
+          // A handful of standout stars: a soft glow + a crisp 4-point sparkle.
+          for (int i = 0; i < 16; i++) {
+            final x = size.width * (0.12 + rnd.nextDouble() * 0.76);
+            final y = size.height * (0.16 + rnd.nextDouble() * 0.66);
+            final s = size.width * (0.018 + rnd.nextDouble() * 0.03);
+            canvas.drawCircle(
+              Offset(x, y),
+              s * 0.8,
+              Paint()
+                ..color = Colors.white.withValues(alpha: 0.5)
+                ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.6),
+            );
+            final p = Paint()
+              ..color = Colors.white
+              ..strokeWidth = 0.7
+              ..strokeCap = StrokeCap.round;
+            canvas.drawLine(Offset(x - s, y), Offset(x + s, y), p);
+            canvas.drawLine(Offset(x, y - s), Offset(x, y + s), p);
+          }
+
+          // The bright curved flare arcing across the upper half.
+          final arc = Path()
+            ..moveTo(size.width * 0.10, size.height * 0.52)
+            ..quadraticBezierTo(size.width * 0.50, size.height * 0.23,
+                size.width * 0.92, size.height * 0.46);
+          canvas.drawPath(
+            arc,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = size.height * 0.095
+              ..strokeCap = StrokeCap.round
+              ..color = Colors.white.withValues(alpha: 0.34)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * 0.032),
+          );
+          canvas.drawPath(
+            arc,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = size.height * 0.024
+              ..strokeCap = StrokeCap.round
+              ..color = Colors.white
+              ..maskFilter =
+                  MaskFilter.blur(BlurStyle.normal, size.height * 0.006),
+          );
+          // A second, fainter arc lower down for depth.
+          final arc2 = Path()
+            ..moveTo(size.width * 0.16, size.height * 0.73)
+            ..quadraticBezierTo(size.width * 0.52, size.height * 0.50,
+                size.width * 0.88, size.height * 0.66);
+          canvas.drawPath(
+            arc2,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = size.height * 0.03
+              ..strokeCap = StrokeCap.round
+              ..color = Colors.white.withValues(alpha: 0.30)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * 0.02),
+          );
+        }
         break;
 
       case NailFinish.glitter:
