@@ -480,13 +480,18 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Real mirror-chrome (matches the "chrome glazed" reference). The tell
-        // of a true mirror vs a soft pearl is HIGH CONTRAST: it reflects the
-        // room as bright near-white zones next to genuinely DARK zones, with a
-        // crisp curved specular streak. It still takes on the nail colour (a
-        // light-blue base reads "egg blue chrome") because the mid-tones let the
-        // colour through. Structure top→cuticle: bright ceiling, colour, a deep
-        // dark reflection, a bright hard-ish horizon, colour, dark cuticle.
+        // Liquid mirror-chrome (matches the "chrome glazed" reference). A real
+        // chrome nail is a MIRROR: a smooth reflection that is bright where it
+        // catches the sky/ceiling (toward the tip) and dark where it reflects
+        // the foreground (toward the cuticle), broken up by vertical streaky
+        // reflection columns — NOT a symmetric painted cross. The colour reads
+        // through the mid-tones so a light-blue base looks "egg blue chrome".
+        // High contrast between the light and dark reflections is what makes it
+        // read as a mirror rather than a soft pearl.
+        //
+        // Vertical mirror gradient: bright sky at the tip fading through the
+        // colour to a deep foreground reflection at the cuticle. Monotonic (no
+        // mid horizon band) so it reads as one curved reflective surface.
         canvas.drawRect(
           rect,
           Paint()
@@ -494,75 +499,92 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(0, size.height),
               [
-                Colors.white.withValues(alpha: 0.80), // bright ceiling reflection
-                Colors.white.withValues(alpha: 0.05), // colour reads through
-                Colors.black.withValues(alpha: 0.52), // DEEP dark reflection
-                Colors.white.withValues(alpha: 0.88), // bright horizon (crisp)
-                Colors.black.withValues(alpha: 0.34), // dark below horizon
-                Colors.black.withValues(alpha: 0.30), // dark cuticle
+                Colors.white.withValues(alpha: 0.72), // bright sky at tip
+                Colors.white.withValues(alpha: 0.10),
+                Colors.black.withValues(alpha: 0.0), // colour reads through
+                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.52), // deep foreground reflection
               ],
-              [0.0, 0.22, 0.42, 0.56, 0.80, 1.0],
+              [0.0, 0.18, 0.45, 0.75, 1.0],
             ),
         );
-        // Reflected environment: a soft dark shape to one side so the surface
-        // reads as a mirror bouncing the room, not a clean symmetric gradient.
+        // Vertical reflection columns across the width: a bright mirrored
+        // highlight just left of centre and a deep dark reflection to its
+        // right, so the surface reads as streaky polished metal bouncing the
+        // room. This asymmetry is the key tell of a real mirror.
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(0, size.height / 2),
+              Offset(size.width, size.height / 2),
+              [
+                Colors.black.withValues(alpha: 0.22), // dark left edge
+                Colors.white.withValues(alpha: 0.42), // bright reflection column
+                Colors.white.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.30), // dark reflection column
+                Colors.white.withValues(alpha: 0.14), // light right edge
+              ],
+              [0.0, 0.30, 0.5, 0.72, 1.0],
+            ),
+        );
+        _base(canvas, size, rect, sides: 0.14);
+        // Soft reflected-room shape low on the nail to break any symmetry.
         canvas.drawCircle(
-          Offset(size.width * 0.74, size.height * 0.40),
-          size.width * 0.40,
+          Offset(size.width * 0.72, size.height * 0.78),
+          size.width * 0.42,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.74, size.height * 0.40),
-              size.width * 0.40,
+              Offset(size.width * 0.72, size.height * 0.78),
+              size.width * 0.42,
               [
-                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.26),
                 Colors.black.withValues(alpha: 0.0),
               ],
             ),
         );
-        _base(canvas, size, rect, sides: 0.16);
-        // A bright, fairly CRISP curved specular streak, off-centre and bending
-        // with the dome — sharp reflections are correct for chrome (a mirror
-        // shows the light source hard), and the curve + dark flanks keep it from
-        // reading as a printed bar.
+        // The main window highlight: a soft vertical reflection down the bright
+        // column with a crisp bright core on top for the hard specular a mirror
+        // shows. Vertical (following the nail) — never a horizontal bar.
         final chromeStreak = Path()
-          ..moveTo(size.width * 0.30, size.height * 0.03)
-          ..quadraticBezierTo(size.width * 0.40, size.height * 0.44,
-              size.width * 0.29, size.height * 0.95);
+          ..moveTo(size.width * 0.35, size.height * 0.05)
+          ..quadraticBezierTo(size.width * 0.30, size.height * 0.45,
+              size.width * 0.36, size.height * 0.92);
         canvas.drawPath(
           chromeStreak,
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = size.width * 0.12
+            ..strokeWidth = size.width * 0.16
             ..strokeCap = StrokeCap.round
             ..color = Colors.white.withValues(alpha: 0.30)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.05),
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.07),
         );
         canvas.drawPath(
           chromeStreak,
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = size.width * 0.035
+            ..strokeWidth = size.width * 0.03
             ..strokeCap = StrokeCap.round
-            ..color = Colors.white.withValues(alpha: 0.92)
+            ..color = Colors.white.withValues(alpha: 0.85)
             ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.012),
         );
-        _glint(canvas, size, 0.31, 0.18, 0.05, 0.90);
+        _glint(canvas, size, 0.37, 0.12, 0.045, 0.95);
         break;
 
       case NailFinish.catEye:
         {
-          // Magnetic "cat-eye" gel (matches the Vettsy reference). The real look
-          // is a chatoyant "gemstone slit": a FINE, DENSE metallic shimmer over
-          // the whole nail, one bright band of light ACROSS the width (curved,
-          // sharp core), and the metal DARKENING sharply above and below that
-          // band — that quick fall-off is what gives the 3D "eye", and its
-          // absence is why a soft wide glow just reads as gloss.
+          // Magnetic "cat-eye" gel (matches the rose-gold Vettsy reference). The
+          // real look is chatoyancy: a FINE, DENSE metallic shimmer over the
+          // whole nail with one bright band of light running the LENGTH of the
+          // nail (cuticle→tip) down the centre, and the metal DARKENING sharply
+          // toward both side edges. That quick side fall-off is what gives the
+          // 3D "eye"; its absence is why a soft even sheen just reads as gloss.
 
-          _base(canvas, size, rect, sides: 0.16);
+          _base(canvas, size, rect, sides: 0.14);
 
           // Fine, dense magnetic flake shimmer, seeded so it holds still.
           final rnd = math.Random(42);
-          for (int i = 0; i < 440; i++) {
+          for (int i = 0; i < 460; i++) {
             final x = rnd.nextDouble() * size.width;
             final y = rnd.nextDouble() * size.height;
             final r = 0.25 + rnd.nextDouble() * 0.6;
@@ -571,9 +593,28 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
           }
 
-          // Chatoyancy: darken toward the tip and toward the cuticle so the mid
-          // band stands out as a concentrated slit of light (deep contrast, not
-          // a soft wash). The band sits a touch above centre.
+          // Chatoyancy across the WIDTH: bright down the central column,
+          // darkening sharply to deep shade at both side edges so the centre
+          // reads as a concentrated slit of light (the 3D "eye"), not a flat
+          // wash.
+          canvas.drawRect(
+            rect,
+            Paint()
+              ..shader = ui.Gradient.linear(
+                Offset(0, size.height / 2),
+                Offset(size.width, size.height / 2),
+                [
+                  Colors.black.withValues(alpha: 0.55), // deep shade, left edge
+                  Colors.black.withValues(alpha: 0.10),
+                  Colors.black.withValues(alpha: 0.0), // bright centre
+                  Colors.black.withValues(alpha: 0.10),
+                  Colors.black.withValues(alpha: 0.55), // deep shade, right edge
+                ],
+                [0.0, 0.28, 0.5, 0.72, 1.0],
+              ),
+          );
+          // Slight darkening at the very tip and cuticle so the glowing band
+          // tapers toward both ends like a real cat-eye.
           canvas.drawRect(
             rect,
             Paint()
@@ -581,49 +622,48 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(0, 0),
                 Offset(0, size.height),
                 [
-                  Colors.black.withValues(alpha: 0.40), // dark tip
-                  Colors.black.withValues(alpha: 0.06), // approaching band
-                  Colors.black.withValues(alpha: 0.0), // at band
-                  Colors.black.withValues(alpha: 0.34), // below band
-                  Colors.black.withValues(alpha: 0.46), // dark cuticle
+                  Colors.black.withValues(alpha: 0.28),
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.30),
                 ],
-                [0.0, 0.30, 0.42, 0.72, 1.0],
+                [0.0, 0.20, 0.80, 1.0],
               ),
           );
-
-          // The bright cat-eye band ACROSS the width, a shallow curve, built as
-          // a wide soft glow, a mid halo and a sharp bright core.
-          const bandY = 0.42;
+          // The bright cat-eye band running the LENGTH of the nail down the
+          // centre, a shallow curve, built as a wide soft glow, a mid halo and
+          // a sharp bright core.
+          const bandX = 0.48;
           final eye = Path()
-            ..moveTo(size.width * 0.05, size.height * (bandY + 0.05))
-            ..quadraticBezierTo(size.width * 0.50, size.height * (bandY - 0.07),
-                size.width * 0.95, size.height * (bandY + 0.05));
+            ..moveTo(size.width * (bandX - 0.03), size.height * 0.06)
+            ..quadraticBezierTo(size.width * (bandX + 0.04), size.height * 0.5,
+                size.width * (bandX - 0.02), size.height * 0.94);
           canvas.drawPath(
             eye,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size.height * 0.13
+              ..strokeWidth = size.width * 0.34
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.22)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * 0.055),
+              ..color = Colors.white.withValues(alpha: 0.20)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.14),
           );
           canvas.drawPath(
             eye,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size.height * 0.045
+              ..strokeWidth = size.width * 0.12
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.55)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * 0.016),
+              ..color = Colors.white.withValues(alpha: 0.45)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.05),
           );
           canvas.drawPath(
             eye,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size.height * 0.013
+              ..strokeWidth = size.width * 0.035
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.95)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.height * 0.004),
+              ..color = Colors.white.withValues(alpha: 0.92)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.012),
           );
         }
         break;
