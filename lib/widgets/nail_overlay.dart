@@ -582,21 +582,11 @@ class _NailFinishPainter extends CustomPainter {
 
           _base(canvas, size, rect, sides: 0.14);
 
-          // Fine, dense magnetic flake shimmer, seeded so it holds still.
-          final rnd = math.Random(42);
-          for (int i = 0; i < 460; i++) {
-            final x = rnd.nextDouble() * size.width;
-            final y = rnd.nextDouble() * size.height;
-            final r = 0.25 + rnd.nextDouble() * 0.6;
-            final a = 0.05 + rnd.nextDouble() * 0.18;
-            canvas.drawCircle(
-                Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
-          }
-
           // Chatoyancy across the WIDTH: bright down the central column,
           // darkening sharply to deep shade at both side edges so the centre
           // reads as a concentrated slit of light (the 3D "eye"), not a flat
-          // wash.
+          // wash. Laid down FIRST so the shimmer flakes sit on top of the
+          // shading and catch the light in the bright band.
           canvas.drawRect(
             rect,
             Paint()
@@ -604,13 +594,13 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(0, size.height / 2),
                 Offset(size.width, size.height / 2),
                 [
-                  Colors.black.withValues(alpha: 0.55), // deep shade, left edge
-                  Colors.black.withValues(alpha: 0.10),
+                  Colors.black.withValues(alpha: 0.58), // deep shade, left edge
+                  Colors.black.withValues(alpha: 0.12),
                   Colors.black.withValues(alpha: 0.0), // bright centre
-                  Colors.black.withValues(alpha: 0.10),
-                  Colors.black.withValues(alpha: 0.55), // deep shade, right edge
+                  Colors.black.withValues(alpha: 0.12),
+                  Colors.black.withValues(alpha: 0.58), // deep shade, right edge
                 ],
-                [0.0, 0.28, 0.5, 0.72, 1.0],
+                [0.0, 0.30, 0.5, 0.70, 1.0],
               ),
           );
           // Slight darkening at the very tip and cuticle so the glowing band
@@ -622,49 +612,107 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(0, 0),
                 Offset(0, size.height),
                 [
-                  Colors.black.withValues(alpha: 0.28),
-                  Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.0),
                   Colors.black.withValues(alpha: 0.30),
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.32),
                 ],
                 [0.0, 0.20, 0.80, 1.0],
               ),
           );
-          // The bright cat-eye band running the LENGTH of the nail down the
-          // centre, a shallow curve, built as a wide soft glow, a mid halo and
-          // a sharp bright core.
-          const bandX = 0.48;
+
+          // The "big shine" — a broad, SOFT bloom of light down the centre,
+          // NOT a hard white line. It is kept at moderate alpha and heavily
+          // blurred so the polish colour glows THROUGH it (a bright tint of the
+          // real colour), which is what makes it read as a magnetic shine
+          // rather than a painted-on white stripe.
+          const bandX = 0.49;
           final eye = Path()
-            ..moveTo(size.width * (bandX - 0.03), size.height * 0.06)
-            ..quadraticBezierTo(size.width * (bandX + 0.04), size.height * 0.5,
-                size.width * (bandX - 0.02), size.height * 0.94);
+            ..moveTo(size.width * (bandX - 0.02), size.height * 0.08)
+            ..quadraticBezierTo(size.width * (bandX + 0.03), size.height * 0.5,
+                size.width * (bandX - 0.01), size.height * 0.92);
+          // Wide outer halo.
           canvas.drawPath(
             eye,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size.width * 0.34
+              ..strokeWidth = size.width * 0.46
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.20)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.14),
+              ..color = Colors.white.withValues(alpha: 0.16)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.18),
           );
+          // Mid glow.
           canvas.drawPath(
             eye,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size.width * 0.12
+              ..strokeWidth = size.width * 0.20
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.45)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.05),
+              ..color = Colors.white.withValues(alpha: 0.30)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.08),
           );
+          // Soft bright core — blurred, NOT a crisp line (this was the "fake"
+          // tell before). Base colour still reads through it.
           canvas.drawPath(
             eye,
             Paint()
               ..style = PaintingStyle.stroke
-              ..strokeWidth = size.width * 0.035
+              ..strokeWidth = size.width * 0.07
               ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.92)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.012),
+              ..color = Colors.white.withValues(alpha: 0.55)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.035),
           );
+          // A large elongated bloom at the centre of the nail so the shine
+          // swells in the middle and fades toward the ends — the "big shine".
+          canvas.save();
+          canvas.translate(size.width * bandX, size.height * 0.5);
+          canvas.scale(0.55, 1.35);
+          canvas.drawCircle(
+            Offset.zero,
+            size.width * 0.42,
+            Paint()
+              ..shader = ui.Gradient.radial(
+                Offset.zero,
+                size.width * 0.42,
+                [
+                  Colors.white.withValues(alpha: 0.28),
+                  Colors.white.withValues(alpha: 0.0),
+                ],
+              ),
+          );
+          canvas.restore();
+
+          // Fine, dense magnetic flake shimmer laid ON TOP so the sparkle
+          // reads over the shading and shine — "small sparklers". Seeded so it
+          // holds still between repaints.
+          final rnd = math.Random(42);
+          for (int i = 0; i < 620; i++) {
+            final x = rnd.nextDouble() * size.width;
+            final y = rnd.nextDouble() * size.height;
+            final r = 0.3 + rnd.nextDouble() * 0.7;
+            final a = 0.10 + rnd.nextDouble() * 0.22;
+            canvas.drawCircle(
+                Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
+          }
+          // A scatter of brighter sparkle glints, biased toward the lit centre
+          // band where real flakes flash hardest — the "big shine" sparkle.
+          for (int i = 0; i < 70; i++) {
+            final bias = rnd.nextDouble();
+            // Pull x toward the centre band for most glints.
+            final x = bias < 0.7
+                ? size.width * (bandX + (rnd.nextDouble() - 0.5) * 0.34)
+                : rnd.nextDouble() * size.width;
+            final y = rnd.nextDouble() * size.height;
+            final r = 0.7 + rnd.nextDouble() * 1.1;
+            final a = 0.45 + rnd.nextDouble() * 0.4;
+            canvas.drawCircle(
+                Offset(x, y),
+                r,
+                Paint()
+                  ..color = Colors.white.withValues(alpha: a)
+                  ..maskFilter =
+                      MaskFilter.blur(BlurStyle.normal, size.width * 0.004));
+          }
         }
         break;
 
