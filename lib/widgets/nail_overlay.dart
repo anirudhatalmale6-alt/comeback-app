@@ -626,11 +626,16 @@ class _NailFinishPainter extends CustomPainter {
           // blurred so the polish colour glows THROUGH it (a bright tint of the
           // real colour), which is what makes it read as a magnetic shine
           // rather than a painted-on white stripe.
-          const bandX = 0.49;
+          // A clear CRESCENT curve (client: "the big main shine curves more").
+          // Ends sit left of centre, the belly bows well to the right, so the
+          // shine arcs like a real magnetic cat-eye instead of a straight line.
+          const endX = 0.38; // both ends
+          const ctrlX = 0.74; // control pulls the belly right
+          const bellyX = 0.25 * endX + 0.5 * ctrlX + 0.25 * endX; // = 0.56
           final eye = Path()
-            ..moveTo(size.width * (bandX - 0.02), size.height * 0.08)
-            ..quadraticBezierTo(size.width * (bandX + 0.03), size.height * 0.5,
-                size.width * (bandX - 0.01), size.height * 0.92);
+            ..moveTo(size.width * endX, size.height * 0.08)
+            ..quadraticBezierTo(size.width * ctrlX, size.height * 0.5,
+                size.width * endX, size.height * 0.92);
           // Wide outer halo.
           canvas.drawPath(
             eye,
@@ -662,10 +667,11 @@ class _NailFinishPainter extends CustomPainter {
               ..color = Colors.white.withValues(alpha: 0.55)
               ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.035),
           );
-          // A large elongated bloom at the centre of the nail so the shine
-          // swells in the middle and fades toward the ends — the "big shine".
+          // A large elongated bloom on the BELLY of the curve so the shine
+          // swells where the arc bows out and fades toward the ends — the "big
+          // shine", now following the crescent.
           canvas.save();
-          canvas.translate(size.width * bandX, size.height * 0.5);
+          canvas.translate(size.width * bellyX, size.height * 0.5);
           canvas.scale(0.55, 1.35);
           canvas.drawCircle(
             Offset.zero,
@@ -700,7 +706,7 @@ class _NailFinishPainter extends CustomPainter {
             final bias = rnd.nextDouble();
             // Pull x toward the centre band for most glints.
             final x = bias < 0.7
-                ? size.width * (bandX + (rnd.nextDouble() - 0.5) * 0.34)
+                ? size.width * (bellyX + (rnd.nextDouble() - 0.5) * 0.40)
                 : rnd.nextDouble() * size.width;
             final y = rnd.nextDouble() * size.height;
             final r = 0.7 + rnd.nextDouble() * 1.1;
