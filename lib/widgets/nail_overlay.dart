@@ -480,18 +480,20 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Liquid mirror-chrome (matches the "chrome glazed" reference). A real
-        // chrome nail is a MIRROR: a smooth reflection that is bright where it
-        // catches the sky/ceiling (toward the tip) and dark where it reflects
-        // the foreground (toward the cuticle), broken up by vertical streaky
-        // reflection columns — NOT a symmetric painted cross. The colour reads
-        // through the mid-tones so a light-blue base looks "egg blue chrome".
-        // High contrast between the light and dark reflections is what makes it
-        // read as a mirror rather than a soft pearl.
-        //
-        // Vertical mirror gradient: bright sky at the tip fading through the
-        // colour to a deep foreground reflection at the cuticle. Monotonic (no
-        // mid horizon band) so it reads as one curved reflective surface.
+        // Liquid mirror-chrome. A real chrome nail is a MIRROR: a smooth,
+        // polished metallic surface with a bright reflected light band up top
+        // and a darker reflected foreground toward the cuticle, the colour
+        // reading through the midtones so a pink base becomes "pink chrome".
+        // The shine is a SOFT, broad specular reflection with a smooth light-to-
+        // dark run — NEVER a crisp painted line and NEVER sparkle/glitter. The
+        // key tell of chrome is a smooth mirror gradient, not a bright stripe.
+        _base(canvas, size, rect, sides: 0.16);
+        // Vertical mirror gradient with a reflection HORIZON: bright reflected
+        // sky at the tip, a dark "horizon" band across the middle where the
+        // curved metal turns away from the light, then the colour foreground
+        // reading through toward the cuticle. This bright-then-dark banding is
+        // the wrapped-metal look a soft pearl gradient lacks — high contrast is
+        // what makes it read as a mirror.
         canvas.drawRect(
           rect,
           Paint()
@@ -499,76 +501,74 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(0, size.height),
               [
-                Colors.white.withValues(alpha: 0.72), // bright sky at tip
-                Colors.white.withValues(alpha: 0.10),
-                Colors.black.withValues(alpha: 0.0), // colour reads through
-                Colors.black.withValues(alpha: 0.30),
-                Colors.black.withValues(alpha: 0.52), // deep foreground reflection
+                Colors.white.withValues(alpha: 0.78), // bright reflected sky
+                Colors.white.withValues(alpha: 0.14),
+                Colors.black.withValues(alpha: 0.34), // dark reflection horizon
+                Colors.black.withValues(alpha: 0.06), // colour reads through
+                Colors.black.withValues(alpha: 0.54), // deep cuticle reflection
               ],
-              [0.0, 0.18, 0.45, 0.75, 1.0],
+              [0.0, 0.26, 0.46, 0.66, 1.0],
             ),
         );
-        // Vertical reflection columns across the width: a bright mirrored
-        // highlight just left of centre and a deep dark reflection to its
-        // right, so the surface reads as streaky polished metal bouncing the
-        // room. This asymmetry is the key tell of a real mirror.
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..shader = ui.Gradient.linear(
-              Offset(0, size.height / 2),
-              Offset(size.width, size.height / 2),
-              [
-                Colors.black.withValues(alpha: 0.22), // dark left edge
-                Colors.white.withValues(alpha: 0.42), // bright reflection column
-                Colors.white.withValues(alpha: 0.0),
-                Colors.black.withValues(alpha: 0.30), // dark reflection column
-                Colors.white.withValues(alpha: 0.14), // light right edge
-              ],
-              [0.0, 0.30, 0.5, 0.72, 1.0],
-            ),
-        );
-        _base(canvas, size, rect, sides: 0.14);
-        // Soft reflected-room shape low on the nail to break any symmetry.
+        // The signature chrome tell: a bright, fairly defined horizontal strip
+        // of reflected overhead light sitting just above the horizon. Broad
+        // (not a thin line) but crisper than a pearl sheen, so it reads as the
+        // surface mirroring a ceiling light — this is the "bit of shine".
+        canvas.save();
+        canvas.translate(size.width * 0.48, size.height * 0.28);
+        canvas.scale(1.15, 0.30);
         canvas.drawCircle(
-          Offset(size.width * 0.72, size.height * 0.78),
-          size.width * 0.42,
+          Offset.zero,
+          size.width * 0.56,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.72, size.height * 0.78),
-              size.width * 0.42,
+              Offset.zero,
+              size.width * 0.56,
               [
-                Colors.black.withValues(alpha: 0.26),
+                Colors.white.withValues(alpha: 0.78),
+                Colors.white.withValues(alpha: 0.16),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              [0.0, 0.55, 1.0],
+            ),
+        );
+        canvas.restore();
+        // A soft dark reflection band low on the nail (reflected foreground),
+        // set off-centre so the mirror is not symmetric — the asymmetry sells a
+        // real reflection.
+        canvas.save();
+        canvas.translate(size.width * 0.58, size.height * 0.72);
+        canvas.scale(1.1, 0.42);
+        canvas.drawCircle(
+          Offset.zero,
+          size.width * 0.5,
+          Paint()
+            ..shader = ui.Gradient.radial(
+              Offset.zero,
+              size.width * 0.5,
+              [
+                Colors.black.withValues(alpha: 0.28),
                 Colors.black.withValues(alpha: 0.0),
               ],
             ),
         );
-        // The main window highlight: a soft vertical reflection down the bright
-        // column with a crisp bright core on top for the hard specular a mirror
-        // shows. Vertical (following the nail) — never a horizontal bar.
-        final chromeStreak = Path()
-          ..moveTo(size.width * 0.35, size.height * 0.05)
-          ..quadraticBezierTo(size.width * 0.30, size.height * 0.45,
-              size.width * 0.36, size.height * 0.92);
+        canvas.restore();
+        // A soft diagonal window reflection just left of centre — the vertical
+        // highlight of a curved mirror. Broad and blurred so there is no hard
+        // core: light glides over metal, it is not a painted stripe.
+        final chromeGlow = Path()
+          ..moveTo(size.width * 0.34, size.height * 0.05)
+          ..quadraticBezierTo(size.width * 0.28, size.height * 0.5,
+              size.width * 0.40, size.height * 0.95);
         canvas.drawPath(
-          chromeStreak,
+          chromeGlow,
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = size.width * 0.16
             ..strokeCap = StrokeCap.round
             ..color = Colors.white.withValues(alpha: 0.30)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.07),
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.075),
         );
-        canvas.drawPath(
-          chromeStreak,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = size.width * 0.03
-            ..strokeCap = StrokeCap.round
-            ..color = Colors.white.withValues(alpha: 0.85)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.012),
-        );
-        _glint(canvas, size, 0.37, 0.12, 0.045, 0.95);
         break;
 
       case NailFinish.catEye:
@@ -692,32 +692,29 @@ class _NailFinishPainter extends CustomPainter {
           // reads over the shading and shine — "small sparklers". Seeded so it
           // holds still between repaints.
           final rnd = math.Random(42);
-          for (int i = 0; i < 620; i++) {
+          for (int i = 0; i < 260; i++) {
             final x = rnd.nextDouble() * size.width;
             final y = rnd.nextDouble() * size.height;
-            final r = 0.3 + rnd.nextDouble() * 0.7;
-            final a = 0.10 + rnd.nextDouble() * 0.22;
+            final r = 0.35 + rnd.nextDouble() * 0.75;
+            final a = 0.12 + rnd.nextDouble() * 0.24;
             canvas.drawCircle(
                 Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
           }
           // A scatter of brighter sparkle glints, biased toward the lit centre
           // band where real flakes flash hardest — the "big shine" sparkle.
-          for (int i = 0; i < 70; i++) {
+          // Drawn as plain tiny circles (no per-speck blur) so a set of nails
+          // stays smooth over the live camera.
+          for (int i = 0; i < 34; i++) {
             final bias = rnd.nextDouble();
             // Pull x toward the centre band for most glints.
             final x = bias < 0.7
                 ? size.width * (bellyX + (rnd.nextDouble() - 0.5) * 0.40)
                 : rnd.nextDouble() * size.width;
             final y = rnd.nextDouble() * size.height;
-            final r = 0.7 + rnd.nextDouble() * 1.1;
-            final a = 0.45 + rnd.nextDouble() * 0.4;
+            final r = 0.8 + rnd.nextDouble() * 1.2;
+            final a = 0.5 + rnd.nextDouble() * 0.4;
             canvas.drawCircle(
-                Offset(x, y),
-                r,
-                Paint()
-                  ..color = Colors.white.withValues(alpha: a)
-                  ..maskFilter =
-                      MaskFilter.blur(BlurStyle.normal, size.width * 0.004));
+                Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
           }
         }
         break;
@@ -913,13 +910,20 @@ class NailOverlay extends StatelessWidget {
     if (!ambient.isNeutral) {
       design = ColorFiltered(colorFilter: ambient.filter, child: design);
     }
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        CustomPaint(painter: _ContactShadowPainter(shape)),
-        Opacity(opacity: finish.opacity, child: design),
-        CustomPaint(painter: _NailFinishPainter(shape, finish)),
-      ],
+    // RepaintBoundary caches each finished nail as its own layer. Over the live
+    // camera the set of nails is repositioned every frame to follow the hand;
+    // isolating each nail lets Flutter re-composite the cached texture instead
+    // of re-running the (fairly heavy) finish painters each frame, which keeps
+    // the try-on smooth.
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CustomPaint(painter: _ContactShadowPainter(shape)),
+          Opacity(opacity: finish.opacity, child: design),
+          CustomPaint(painter: _NailFinishPainter(shape, finish)),
+        ],
+      ),
     );
   }
 }
