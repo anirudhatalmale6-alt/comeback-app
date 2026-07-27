@@ -480,115 +480,100 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Liquid mirror-chrome, coloured. NO sparkle/glitter — the shine is
-        // reflection, not flakes. But NOT a soft pearl either: it needs real
-        // mirror punch so a pink or purple reads as polished metal, not a
-        // pastel dome.
-        // A chrome nail is a MIRROR of the room, so it must carry real MIRROR
-        // CONTRAST: a near-white blown-out highlight where it catches the light
-        // and near-black where it reflects shadow, with the colour reading as a
-        // saturated metallic band between. Silver reads as chrome "for free"
-        // because grey already spans that light-to-dark range; a colour only
-        // reads as chrome if the SAME near-white/near-black contrast is pushed
-        // hard over it — otherwise it is just a muddy pastel dome (the problem
-        // Ashlyn saw). High contrast + crisp bright reflections is the trick.
+        // Mirror-chrome, coloured. The signature of a real chrome/mirror nail
+        // is NOT a stack of horizontal light/dark bands — at nail size those
+        // compress into what reads as painted satin stripes (the problem Ashlyn
+        // kept seeing). What actually says "mirror" is a bright DIAGONAL sweep
+        // of reflected window light crossing a smooth, high-contrast surface,
+        // plus a hot specular glare. Diagonal reflection = polished metal;
+        // horizontal bands = ribbon. So: one SMOOTH tonal gradient for depth,
+        // a big diagonal reflection streak, a crisp second streak beside it,
+        // and a blown-out glint. High contrast so a colour reads as metal (not
+        // a pastel dome); smooth + diagonal so it reads as a mirror (not satin).
         _base(canvas, size, rect, sides: 0.20);
-        // Sky/foreground mirror split: a hot reflected sky over the top, the
-        // colour blazing through the middle, and a deep near-black reflected
-        // foreground at the cuticle.
+        // 1) Smooth top-to-bottom tonal sweep: bright reflected light at the
+        //    tip, the colour blazing through the upper-middle, deep reflected
+        //    shadow at the cuticle. Many close stops → a continuous roll, never
+        //    a hard band edge.
         canvas.drawRect(
           rect,
           Paint()
             ..shader = ui.Gradient.linear(
-              Offset(0, 0),
-              Offset(0, size.height),
+              Offset(size.width * 0.35, 0),
+              Offset(size.width * 0.65, size.height),
               [
-                Colors.white.withValues(alpha: 0.90), // hot reflected sky
+                Colors.white.withValues(alpha: 0.82),
                 Colors.white.withValues(alpha: 0.30),
+                Colors.white.withValues(alpha: 0.04),
                 Colors.black.withValues(alpha: 0.0), // colour blazes through
-                Colors.black.withValues(alpha: 0.32),
-                Colors.black.withValues(alpha: 0.68), // deep reflected foreground
+                Colors.black.withValues(alpha: 0.26),
+                Colors.black.withValues(alpha: 0.58),
+                Colors.black.withValues(alpha: 0.86), // deep cuticle shadow
               ],
-              [0.0, 0.16, 0.40, 0.66, 1.0],
+              [0.0, 0.12, 0.24, 0.40, 0.58, 0.80, 1.0],
             ),
         );
-        // The reflection HORIZON: a fairly crisp dark band across the middle
-        // where the curved metal rolls from the light into shadow. A defined
-        // edge (not a soft fade) is what reads as a hard mirror reflection.
+        // 2) The DIAGONAL mirror reflection — the wide soft bright sweep of a
+        //    window the polished metal catches, running corner-to-corner. This
+        //    is the core "it's a mirror" cue and, being diagonal, never reads as
+        //    a horizontal stripe.
         canvas.save();
-        canvas.translate(size.width * 0.5, size.height * 0.52);
-        canvas.scale(1.3, 0.34);
+        canvas.translate(size.width * 0.46, size.height * 0.46);
+        canvas.rotate(-0.62);
+        canvas.scale(0.34, 1.35);
         canvas.drawCircle(
           Offset.zero,
-          size.width * 0.55,
+          size.width * 0.62,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset.zero,
-              size.width * 0.55,
+              size.width * 0.62,
               [
-                Colors.black.withValues(alpha: 0.46),
-                Colors.black.withValues(alpha: 0.30),
-                Colors.black.withValues(alpha: 0.0),
-              ],
-              [0.0, 0.6, 1.0],
-            ),
-        );
-        canvas.restore();
-        // The bright reflected-light strip just above the horizon — the ceiling
-        // light the mirror catches. Bright and defined, the main "mirror" read.
-        canvas.save();
-        canvas.translate(size.width * 0.5, size.height * 0.30);
-        canvas.scale(1.2, 0.26);
-        canvas.drawCircle(
-          Offset.zero,
-          size.width * 0.55,
-          Paint()
-            ..shader = ui.Gradient.radial(
-              Offset.zero,
-              size.width * 0.55,
-              [
-                Colors.white.withValues(alpha: 0.94),
-                Colors.white.withValues(alpha: 0.34),
+                Colors.white.withValues(alpha: 0.68),
+                Colors.white.withValues(alpha: 0.16),
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.5, 1.0],
+              [0.0, 0.52, 1.0],
             ),
         );
         canvas.restore();
-        // A second, smaller bright reflection bounce low near the tip — a real
-        // mirror shows more than one light, and the double highlight sells
-        // "polished metal" over "shiny paint".
+        // 3) A tighter, brighter second reflection streak just beside the first
+        //    — the double parallel highlight is exactly what polished metal
+        //    throws and what "shiny paint" never does.
         canvas.save();
-        canvas.translate(size.width * 0.54, size.height * 0.80);
-        canvas.scale(1.05, 0.20);
+        canvas.translate(size.width * 0.66, size.height * 0.52);
+        canvas.rotate(-0.62);
+        canvas.scale(0.12, 1.15);
         canvas.drawCircle(
           Offset.zero,
-          size.width * 0.4,
+          size.width * 0.6,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset.zero,
-              size.width * 0.4,
+              size.width * 0.6,
               [
-                Colors.white.withValues(alpha: 0.52),
+                Colors.white.withValues(alpha: 0.72),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
         );
         canvas.restore();
-        // A hot blown-out specular glint high up — the hard white glare a real
-        // mirror always throws. This near-white point is exactly what a
-        // coloured chrome needs and a muddy pastel lacks.
+        // 4) Hot blown-out specular glare where the diagonal reflection catches
+        //    the tip — the hard white point a real mirror always throws, and
+        //    exactly what a coloured chrome needs to read as metal.
         canvas.drawCircle(
-          Offset(size.width * 0.40, size.height * 0.19),
-          size.width * 0.12,
+          Offset(size.width * 0.40, size.height * 0.20),
+          size.width * 0.14,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.40, size.height * 0.19),
-              size.width * 0.12,
+              Offset(size.width * 0.40, size.height * 0.20),
+              size.width * 0.14,
               [
-                Colors.white.withValues(alpha: 0.96),
+                Colors.white.withValues(alpha: 0.98),
+                Colors.white.withValues(alpha: 0.40),
                 Colors.white.withValues(alpha: 0.0),
               ],
+              [0.0, 0.42, 1.0],
             ),
         );
         break;
