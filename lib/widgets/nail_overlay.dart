@@ -480,20 +480,22 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Liquid mirror-chrome. A real chrome nail is a MIRROR: a smooth,
-        // polished metallic surface with a bright reflected light band up top
-        // and a darker reflected foreground toward the cuticle, the colour
-        // reading through the midtones so a pink base becomes "pink chrome".
-        // The shine is a SOFT, broad specular reflection with a smooth light-to-
-        // dark run — NEVER a crisp painted line and NEVER sparkle/glitter. The
-        // key tell of chrome is a smooth mirror gradient, not a bright stripe.
-        _base(canvas, size, rect, sides: 0.16);
-        // Vertical mirror gradient with a reflection HORIZON: bright reflected
-        // sky at the tip, a dark "horizon" band across the middle where the
-        // curved metal turns away from the light, then the colour foreground
-        // reading through toward the cuticle. This bright-then-dark banding is
-        // the wrapped-metal look a soft pearl gradient lacks — high contrast is
-        // what makes it read as a mirror.
+        // Liquid mirror-chrome, coloured. NO sparkle/glitter — the shine is
+        // reflection, not flakes. But NOT a soft pearl either: it needs real
+        // mirror punch so a pink or purple reads as polished metal, not a
+        // pastel dome.
+        // A chrome nail is a MIRROR of the room, so it must carry real MIRROR
+        // CONTRAST: a near-white blown-out highlight where it catches the light
+        // and near-black where it reflects shadow, with the colour reading as a
+        // saturated metallic band between. Silver reads as chrome "for free"
+        // because grey already spans that light-to-dark range; a colour only
+        // reads as chrome if the SAME near-white/near-black contrast is pushed
+        // hard over it — otherwise it is just a muddy pastel dome (the problem
+        // Ashlyn saw). High contrast + crisp bright reflections is the trick.
+        _base(canvas, size, rect, sides: 0.20);
+        // Sky/foreground mirror split: a hot reflected sky over the top, the
+        // colour blazing through the middle, and a deep near-black reflected
+        // foreground at the cuticle.
         canvas.drawRect(
           rect,
           Paint()
@@ -501,73 +503,93 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(0, size.height),
               [
-                Colors.white.withValues(alpha: 0.78), // bright reflected sky
-                Colors.white.withValues(alpha: 0.14),
-                Colors.black.withValues(alpha: 0.34), // dark reflection horizon
-                Colors.black.withValues(alpha: 0.06), // colour reads through
-                Colors.black.withValues(alpha: 0.54), // deep cuticle reflection
+                Colors.white.withValues(alpha: 0.90), // hot reflected sky
+                Colors.white.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.0), // colour blazes through
+                Colors.black.withValues(alpha: 0.32),
+                Colors.black.withValues(alpha: 0.68), // deep reflected foreground
               ],
-              [0.0, 0.26, 0.46, 0.66, 1.0],
+              [0.0, 0.16, 0.40, 0.66, 1.0],
             ),
         );
-        // The signature chrome tell: a bright, fairly defined horizontal strip
-        // of reflected overhead light sitting just above the horizon. Broad
-        // (not a thin line) but crisper than a pearl sheen, so it reads as the
-        // surface mirroring a ceiling light — this is the "bit of shine".
+        // The reflection HORIZON: a fairly crisp dark band across the middle
+        // where the curved metal rolls from the light into shadow. A defined
+        // edge (not a soft fade) is what reads as a hard mirror reflection.
         canvas.save();
-        canvas.translate(size.width * 0.48, size.height * 0.28);
-        canvas.scale(1.15, 0.30);
+        canvas.translate(size.width * 0.5, size.height * 0.52);
+        canvas.scale(1.3, 0.34);
         canvas.drawCircle(
           Offset.zero,
-          size.width * 0.56,
+          size.width * 0.55,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset.zero,
-              size.width * 0.56,
+              size.width * 0.55,
               [
-                Colors.white.withValues(alpha: 0.78),
-                Colors.white.withValues(alpha: 0.16),
-                Colors.white.withValues(alpha: 0.0),
-              ],
-              [0.0, 0.55, 1.0],
-            ),
-        );
-        canvas.restore();
-        // A soft dark reflection band low on the nail (reflected foreground),
-        // set off-centre so the mirror is not symmetric — the asymmetry sells a
-        // real reflection.
-        canvas.save();
-        canvas.translate(size.width * 0.58, size.height * 0.72);
-        canvas.scale(1.1, 0.42);
-        canvas.drawCircle(
-          Offset.zero,
-          size.width * 0.5,
-          Paint()
-            ..shader = ui.Gradient.radial(
-              Offset.zero,
-              size.width * 0.5,
-              [
-                Colors.black.withValues(alpha: 0.28),
+                Colors.black.withValues(alpha: 0.46),
+                Colors.black.withValues(alpha: 0.30),
                 Colors.black.withValues(alpha: 0.0),
               ],
+              [0.0, 0.6, 1.0],
             ),
         );
         canvas.restore();
-        // A soft diagonal window reflection just left of centre — the vertical
-        // highlight of a curved mirror. Broad and blurred so there is no hard
-        // core: light glides over metal, it is not a painted stripe.
-        final chromeGlow = Path()
-          ..moveTo(size.width * 0.34, size.height * 0.05)
-          ..quadraticBezierTo(size.width * 0.28, size.height * 0.5,
-              size.width * 0.40, size.height * 0.95);
-        canvas.drawPath(
-          chromeGlow,
+        // The bright reflected-light strip just above the horizon — the ceiling
+        // light the mirror catches. Bright and defined, the main "mirror" read.
+        canvas.save();
+        canvas.translate(size.width * 0.5, size.height * 0.30);
+        canvas.scale(1.2, 0.26);
+        canvas.drawCircle(
+          Offset.zero,
+          size.width * 0.55,
           Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = size.width * 0.16
-            ..strokeCap = StrokeCap.round
-            ..color = Colors.white.withValues(alpha: 0.30)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.075),
+            ..shader = ui.Gradient.radial(
+              Offset.zero,
+              size.width * 0.55,
+              [
+                Colors.white.withValues(alpha: 0.94),
+                Colors.white.withValues(alpha: 0.34),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              [0.0, 0.5, 1.0],
+            ),
+        );
+        canvas.restore();
+        // A second, smaller bright reflection bounce low near the tip — a real
+        // mirror shows more than one light, and the double highlight sells
+        // "polished metal" over "shiny paint".
+        canvas.save();
+        canvas.translate(size.width * 0.54, size.height * 0.80);
+        canvas.scale(1.05, 0.20);
+        canvas.drawCircle(
+          Offset.zero,
+          size.width * 0.4,
+          Paint()
+            ..shader = ui.Gradient.radial(
+              Offset.zero,
+              size.width * 0.4,
+              [
+                Colors.white.withValues(alpha: 0.52),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+            ),
+        );
+        canvas.restore();
+        // A hot blown-out specular glint high up — the hard white glare a real
+        // mirror always throws. This near-white point is exactly what a
+        // coloured chrome needs and a muddy pastel lacks.
+        canvas.drawCircle(
+          Offset(size.width * 0.40, size.height * 0.19),
+          size.width * 0.12,
+          Paint()
+            ..shader = ui.Gradient.radial(
+              Offset(size.width * 0.40, size.height * 0.19),
+              size.width * 0.12,
+              [
+                Colors.white.withValues(alpha: 0.96),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+            ),
         );
         break;
 
