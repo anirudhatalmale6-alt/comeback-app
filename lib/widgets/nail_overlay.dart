@@ -480,21 +480,20 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Mirror-chrome, coloured. The signature of a real chrome/mirror nail
-        // is NOT a stack of horizontal light/dark bands — at nail size those
-        // compress into what reads as painted satin stripes (the problem Ashlyn
-        // kept seeing). What actually says "mirror" is a bright DIAGONAL sweep
-        // of reflected window light crossing a smooth, high-contrast surface,
-        // plus a hot specular glare. Diagonal reflection = polished metal;
-        // horizontal bands = ribbon. So: one SMOOTH tonal gradient for depth,
-        // a big diagonal reflection streak, a crisp second streak beside it,
-        // and a blown-out glint. High contrast so a colour reads as metal (not
-        // a pastel dome); smooth + diagonal so it reads as a mirror (not satin).
+        // Iridescent aurora / oil-slick mirror-chrome. Ashlyn's white nail
+        // exposed two real problems: (a) a plain WHITE-on-white mirror shine
+        // VANISHES on a white/pale base, and (b) real modern chrome-powder
+        // nails aren't just white glare — they flash HUES (pink, gold, cyan,
+        // violet) as they catch the light. So the reflection now carries
+        // COLOUR: a full-nail iridescent wash (visible on ANY base, incl.
+        // white, because it is normal-blended real colour, not white), a bright
+        // diagonal mirror streak, an iridescent tint over the shine itself, and
+        // a hot glint. Diagonal keeps it reading as a mirror (not satin bands);
+        // multi-hue makes it read as chrome-powder and show up on white.
         _base(canvas, size, rect, sides: 0.20);
-        // 1) Smooth top-to-bottom tonal sweep: bright reflected light at the
-        //    tip, the colour blazing through the upper-middle, deep reflected
-        //    shadow at the cuticle. Many close stops → a continuous roll, never
-        //    a hard band edge.
+        // 1) Tonal depth (diagonal, high contrast so it reads as polished
+        //    metal). Kept lighter at the top so the hues below aren't washed
+        //    out, but a deep cuticle shadow for real mirror punch.
         canvas.drawRect(
           rect,
           Paint()
@@ -502,21 +501,40 @@ class _NailFinishPainter extends CustomPainter {
               Offset(size.width * 0.35, 0),
               Offset(size.width * 0.65, size.height),
               [
-                Colors.white.withValues(alpha: 0.82),
-                Colors.white.withValues(alpha: 0.30),
-                Colors.white.withValues(alpha: 0.04),
-                Colors.black.withValues(alpha: 0.0), // colour blazes through
-                Colors.black.withValues(alpha: 0.26),
+                Colors.white.withValues(alpha: 0.52),
+                Colors.white.withValues(alpha: 0.10),
+                Colors.black.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.22),
                 Colors.black.withValues(alpha: 0.58),
-                Colors.black.withValues(alpha: 0.86), // deep cuticle shadow
+                Colors.black.withValues(alpha: 0.88), // deep cuticle shadow
               ],
-              [0.0, 0.12, 0.24, 0.40, 0.58, 0.80, 1.0],
+              [0.0, 0.18, 0.40, 0.60, 0.82, 1.0],
             ),
         );
-        // 2) The DIAGONAL mirror reflection — the wide soft bright sweep of a
-        //    window the polished metal catches, running corner-to-corner. This
-        //    is the core "it's a mirror" cue and, being diagonal, never reads as
-        //    a horizontal stripe.
+        // 2) Iridescent hue wash across the WHOLE nail — the oil-slick shift of
+        //    real chrome powder. Normal-blended saturated hues so they show on
+        //    a white base (where white glare vanished) and tint every colour.
+        //    Diagonal so the hues streak like a reflection rather than banding.
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(size.width * 0.05, size.height * 0.05),
+              Offset(size.width * 0.95, size.height * 0.95),
+              [
+                const Color(0xFFFF3D9E).withValues(alpha: 0.46), // magenta
+                const Color(0xFFFFC24D).withValues(alpha: 0.38), // gold
+                const Color(0xFF44E0C0).withValues(alpha: 0.44), // aqua
+                const Color(0xFF3D93FF).withValues(alpha: 0.42), // blue
+                const Color(0xFFAD52FF).withValues(alpha: 0.46), // violet
+              ],
+              [0.0, 0.27, 0.50, 0.73, 1.0],
+            ),
+        );
+        // 3) The DIAGONAL mirror reflection — the bright soft sweep of window
+        //    light the polished metal catches, corner-to-corner. Kept at
+        //    moderate alpha so the iridescent hues still glow through it (a
+        //    coloured shine, not a white one).
         canvas.save();
         canvas.translate(size.width * 0.46, size.height * 0.46);
         canvas.rotate(-0.62);
@@ -529,21 +547,45 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.62,
               [
-                Colors.white.withValues(alpha: 0.68),
-                Colors.white.withValues(alpha: 0.16),
+                Colors.white.withValues(alpha: 0.58),
+                Colors.white.withValues(alpha: 0.12),
                 Colors.white.withValues(alpha: 0.0),
               ],
               [0.0, 0.52, 1.0],
             ),
         );
         canvas.restore();
-        // 3) A tighter, brighter second reflection streak just beside the first
-        //    — the double parallel highlight is exactly what polished metal
-        //    throws and what "shiny paint" never does.
+        // 4) A second iridescent tint laid OVER the shine so the bright streak
+        //    itself flashes colour (the aurora reflection), running along the
+        //    same diagonal as the mirror sweep.
+        canvas.save();
+        canvas.translate(size.width * 0.50, size.height * 0.50);
+        canvas.rotate(-0.62);
+        canvas.scale(0.5, 1.4);
+        canvas.drawCircle(
+          Offset.zero,
+          size.width * 0.55,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(0, -size.width * 0.55),
+              Offset(0, size.width * 0.55),
+              [
+                const Color(0xFFFF4DA6).withValues(alpha: 0.0),
+                const Color(0xFFFF4DA6).withValues(alpha: 0.30), // magenta
+                const Color(0xFFFFD24D).withValues(alpha: 0.30), // gold
+                const Color(0xFF57E0FF).withValues(alpha: 0.32), // cyan
+                const Color(0xFFB268FF).withValues(alpha: 0.0), // violet
+              ],
+              [0.0, 0.28, 0.5, 0.72, 1.0],
+            ),
+        );
+        canvas.restore();
+        // 5) A tighter, brighter second reflection streak beside the first —
+        //    the double parallel highlight polished metal throws.
         canvas.save();
         canvas.translate(size.width * 0.66, size.height * 0.52);
         canvas.rotate(-0.62);
-        canvas.scale(0.12, 1.15);
+        canvas.scale(0.11, 1.15);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.6,
@@ -552,15 +594,14 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.6,
               [
-                Colors.white.withValues(alpha: 0.72),
+                Colors.white.withValues(alpha: 0.78),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
         );
         canvas.restore();
-        // 4) Hot blown-out specular glare where the diagonal reflection catches
-        //    the tip — the hard white point a real mirror always throws, and
-        //    exactly what a coloured chrome needs to read as metal.
+        // 6) Hot blown-out specular glare where the reflection catches the tip
+        //    — the hard bright point a real mirror always throws.
         canvas.drawCircle(
           Offset(size.width * 0.40, size.height * 0.20),
           size.width * 0.14,
