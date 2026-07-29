@@ -480,65 +480,73 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Iridescent aurora / oil-slick mirror-chrome. Ashlyn's white nail
-        // exposed two real problems: (a) a plain WHITE-on-white mirror shine
-        // VANISHES on a white/pale base, and (b) real modern chrome-powder
-        // nails aren't just white glare — they flash HUES (pink, gold, cyan,
-        // violet) as they catch the light. So the reflection now carries
-        // COLOUR: a full-nail iridescent wash (visible on ANY base, incl.
-        // white, because it is normal-blended real colour, not white), a bright
-        // diagonal mirror streak, an iridescent tint over the shine itself, and
-        // a hot glint. Diagonal keeps it reading as a mirror (not satin bands);
-        // multi-hue makes it read as chrome-powder and show up on white.
-        _base(canvas, size, rect, sides: 0.20);
-        // 1) Tonal depth (diagonal, high contrast so it reads as polished
-        //    metal). Kept lighter at the top so the hues below aren't washed
-        //    out, but a deep cuticle shadow for real mirror punch.
+        // Holographic mirror-chrome. The previous version washed the WHOLE
+        // nail in five saturated hues, so on white it read as a rainbow ombré
+        // rather than a mirror (Ashlyn: "looks more like rainbow than a
+        // holographic or a mirror finish"). Real holo-chrome is FIRST a bright
+        // SILVER MIRROR — a neutral, high-contrast reflective body that shows
+        // on any base incl. white because it's real grey metal (not
+        // transparent white, which vanished on white) — and the rainbow is
+        // confined to a NARROW refraction FLASH inside the reflection, a thin
+        // holo streak, not a full coat. Base colour still tints the mid-tones,
+        // so coloured chromes work too.
+        _base(canvas, size, rect, sides: 0.16);
+        // 1) Silver mirror body. Real neutral-metal gradient, diagonal for a
+        //    polished sweep: hot top-left highlight → bright silver → mid steel
+        //    → deep cuticle shadow. Mid-tones kept semi-transparent so the base
+        //    colour tints the metal; highlight + shadow stay strong so the
+        //    mirror contrast (and the look on white) survives.
         canvas.drawRect(
           rect,
           Paint()
             ..shader = ui.Gradient.linear(
-              Offset(size.width * 0.35, 0),
-              Offset(size.width * 0.65, size.height),
+              Offset(size.width * 0.30, 0),
+              Offset(size.width * 0.72, size.height),
               [
-                Colors.white.withValues(alpha: 0.52),
-                Colors.white.withValues(alpha: 0.10),
-                Colors.black.withValues(alpha: 0.0),
-                Colors.black.withValues(alpha: 0.22),
-                Colors.black.withValues(alpha: 0.58),
-                Colors.black.withValues(alpha: 0.88), // deep cuticle shadow
+                Colors.white.withValues(alpha: 0.88), // hot highlight
+                const Color(0xFFEDF1F5).withValues(alpha: 0.50), // bright silver
+                const Color(0xFFB4BCC5).withValues(alpha: 0.40), // mid silver
+                const Color(0xFF5C6672).withValues(alpha: 0.60), // steel
+                const Color(0xFF2C333C).withValues(alpha: 0.82), // dark steel
+                const Color(0xFF12151A).withValues(alpha: 0.94), // deep shadow
               ],
-              [0.0, 0.18, 0.40, 0.60, 0.82, 1.0],
+              [0.0, 0.18, 0.42, 0.64, 0.84, 1.0],
             ),
         );
-        // 2) Iridescent hue wash across the WHOLE nail — the oil-slick shift of
-        //    real chrome powder. Normal-blended saturated hues so they show on
-        //    a white base (where white glare vanished) and tint every colour.
-        //    Diagonal so the hues streak like a reflection rather than banding.
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..shader = ui.Gradient.linear(
-              Offset(size.width * 0.05, size.height * 0.05),
-              Offset(size.width * 0.95, size.height * 0.95),
-              [
-                const Color(0xFFFF3D9E).withValues(alpha: 0.46), // magenta
-                const Color(0xFFFFC24D).withValues(alpha: 0.38), // gold
-                const Color(0xFF44E0C0).withValues(alpha: 0.44), // aqua
-                const Color(0xFF3D93FF).withValues(alpha: 0.42), // blue
-                const Color(0xFFAD52FF).withValues(alpha: 0.46), // violet
-              ],
-              [0.0, 0.27, 0.50, 0.73, 1.0],
-            ),
-        );
-        // 3) The DIAGONAL mirror reflection — the bright soft sweep of window
-        //    light the polished metal catches, corner-to-corner. Kept at
-        //    moderate alpha so the iridescent hues still glow through it (a
-        //    coloured shine, not a white one).
+        // 2) NARROW holographic refraction — the rainbow lives ONLY here, a
+        //    thin diagonal band of hues along the reflection edge. It flashes
+        //    colour like a holo film without coating the nail, so it reads as
+        //    "holographic", not "rainbow". Real colour → shows on white too.
         canvas.save();
-        canvas.translate(size.width * 0.46, size.height * 0.46);
+        canvas.translate(size.width * 0.44, size.height * 0.46);
         canvas.rotate(-0.62);
-        canvas.scale(0.34, 1.35);
+        canvas.scale(0.26, 1.5);
+        canvas.drawCircle(
+          Offset.zero,
+          size.width * 0.66,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(0, -size.width * 0.66),
+              Offset(0, size.width * 0.66),
+              [
+                const Color(0xFFFF4DA6).withValues(alpha: 0.0),
+                const Color(0xFFFF4DA6).withValues(alpha: 0.60), // magenta
+                const Color(0xFFFFD24D).withValues(alpha: 0.54), // gold
+                const Color(0xFF57E0FF).withValues(alpha: 0.60), // cyan
+                const Color(0xFFB268FF).withValues(alpha: 0.56), // violet
+                const Color(0xFFB268FF).withValues(alpha: 0.0),
+              ],
+              [0.0, 0.20, 0.42, 0.60, 0.80, 1.0],
+            ),
+        );
+        canvas.restore();
+        // 3) Bright diagonal mirror streak laid OVER the holo band — the sweep
+        //    of window light the polished metal throws. White and strong so the
+        //    surface reads unmistakably as a mirror.
+        canvas.save();
+        canvas.translate(size.width * 0.50, size.height * 0.50);
+        canvas.rotate(-0.62);
+        canvas.scale(0.15, 1.4);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.62,
@@ -547,45 +555,20 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.62,
               [
-                Colors.white.withValues(alpha: 0.58),
-                Colors.white.withValues(alpha: 0.12),
+                Colors.white.withValues(alpha: 0.94),
+                Colors.white.withValues(alpha: 0.28),
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.52, 1.0],
+              [0.0, 0.45, 1.0],
             ),
         );
         canvas.restore();
-        // 4) A second iridescent tint laid OVER the shine so the bright streak
-        //    itself flashes colour (the aurora reflection), running along the
-        //    same diagonal as the mirror sweep.
+        // 4) A tighter parallel second streak — the double highlight polished
+        //    metal throws.
         canvas.save();
-        canvas.translate(size.width * 0.50, size.height * 0.50);
+        canvas.translate(size.width * 0.66, size.height * 0.54);
         canvas.rotate(-0.62);
-        canvas.scale(0.5, 1.4);
-        canvas.drawCircle(
-          Offset.zero,
-          size.width * 0.55,
-          Paint()
-            ..shader = ui.Gradient.linear(
-              Offset(0, -size.width * 0.55),
-              Offset(0, size.width * 0.55),
-              [
-                const Color(0xFFFF4DA6).withValues(alpha: 0.0),
-                const Color(0xFFFF4DA6).withValues(alpha: 0.30), // magenta
-                const Color(0xFFFFD24D).withValues(alpha: 0.30), // gold
-                const Color(0xFF57E0FF).withValues(alpha: 0.32), // cyan
-                const Color(0xFFB268FF).withValues(alpha: 0.0), // violet
-              ],
-              [0.0, 0.28, 0.5, 0.72, 1.0],
-            ),
-        );
-        canvas.restore();
-        // 5) A tighter, brighter second reflection streak beside the first —
-        //    the double parallel highlight polished metal throws.
-        canvas.save();
-        canvas.translate(size.width * 0.66, size.height * 0.52);
-        canvas.rotate(-0.62);
-        canvas.scale(0.11, 1.15);
+        canvas.scale(0.07, 1.2);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.6,
@@ -594,24 +577,24 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.6,
               [
-                Colors.white.withValues(alpha: 0.78),
+                Colors.white.withValues(alpha: 0.88),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
         );
         canvas.restore();
-        // 6) Hot blown-out specular glare where the reflection catches the tip
-        //    — the hard bright point a real mirror always throws.
+        // 5) Hot blown-out specular glint near the tip — the hard bright point
+        //    a real mirror always throws.
         canvas.drawCircle(
-          Offset(size.width * 0.40, size.height * 0.20),
-          size.width * 0.14,
+          Offset(size.width * 0.38, size.height * 0.18),
+          size.width * 0.13,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.40, size.height * 0.20),
-              size.width * 0.14,
+              Offset(size.width * 0.38, size.height * 0.18),
+              size.width * 0.13,
               [
-                Colors.white.withValues(alpha: 0.98),
-                Colors.white.withValues(alpha: 0.40),
+                Colors.white.withValues(alpha: 1.0),
+                Colors.white.withValues(alpha: 0.42),
                 Colors.white.withValues(alpha: 0.0),
               ],
               [0.0, 0.42, 1.0],
