@@ -480,22 +480,20 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Holographic mirror-chrome. The previous version washed the WHOLE
-        // nail in five saturated hues, so on white it read as a rainbow ombré
-        // rather than a mirror (Ashlyn: "looks more like rainbow than a
-        // holographic or a mirror finish"). Real holo-chrome is FIRST a bright
-        // SILVER MIRROR — a neutral, high-contrast reflective body that shows
-        // on any base incl. white because it's real grey metal (not
-        // transparent white, which vanished on white) — and the rainbow is
-        // confined to a NARROW refraction FLASH inside the reflection, a thin
-        // holo streak, not a full coat. Base colour still tints the mid-tones,
-        // so coloured chromes work too.
+        // Holographic mirror-chrome. v1.6.76 read too DARK on coloured bases
+        // (deep near-black cuticle shadow → most of a red/maroon nail was dark,
+        // only the thin holo streak showed). Ashlyn: "still not give a mirror
+        // halo effect can u make it have more a shine effect". So this pass is
+        // BRIGHTER and adds the "halo": (a) the mirror body is lightened — the
+        // cuticle shadow is much shallower so the whole nail glows like polished
+        // metal instead of going black; (b) a big soft BRIGHT HALO bloom (the
+        // glowing pool of reflected light a mirror shows); (c) the diagonal
+        // shine streak is broader + hotter for more shine; the narrow holo
+        // refraction stays but softer so shine leads. Base colour still tints.
         _base(canvas, size, rect, sides: 0.16);
-        // 1) Silver mirror body. Real neutral-metal gradient, diagonal for a
-        //    polished sweep: hot top-left highlight → bright silver → mid steel
-        //    → deep cuticle shadow. Mid-tones kept semi-transparent so the base
-        //    colour tints the metal; highlight + shadow stay strong so the
-        //    mirror contrast (and the look on white) survives.
+        // 1) Silver mirror body — LIGHTENED. Diagonal polished sweep, hot
+        //    top-left highlight → bright silver → light-mid → mid → moderate
+        //    (not black) cuticle shadow, so the metal stays luminous/shiny.
         canvas.drawRect(
           rect,
           Paint()
@@ -503,24 +501,41 @@ class _NailFinishPainter extends CustomPainter {
               Offset(size.width * 0.30, 0),
               Offset(size.width * 0.72, size.height),
               [
-                Colors.white.withValues(alpha: 0.88), // hot highlight
-                const Color(0xFFEDF1F5).withValues(alpha: 0.50), // bright silver
-                const Color(0xFFB4BCC5).withValues(alpha: 0.40), // mid silver
-                const Color(0xFF5C6672).withValues(alpha: 0.60), // steel
-                const Color(0xFF2C333C).withValues(alpha: 0.82), // dark steel
-                const Color(0xFF12151A).withValues(alpha: 0.94), // deep shadow
+                Colors.white.withValues(alpha: 0.92), // hot highlight
+                const Color(0xFFF2F5F8).withValues(alpha: 0.66), // bright silver
+                const Color(0xFFCED5DC).withValues(alpha: 0.44), // light-mid
+                const Color(0xFF919AA5).withValues(alpha: 0.42), // mid silver
+                const Color(0xFF515B67).withValues(alpha: 0.52), // steel
+                const Color(0xFF262D36).withValues(alpha: 0.70), // soft shadow
               ],
-              [0.0, 0.18, 0.42, 0.64, 0.84, 1.0],
+              [0.0, 0.16, 0.40, 0.62, 0.83, 1.0],
             ),
         );
-        // 2) NARROW holographic refraction — the rainbow lives ONLY here, a
-        //    thin diagonal band of hues along the reflection edge. It flashes
-        //    colour like a holo film without coating the nail, so it reads as
-        //    "holographic", not "rainbow". Real colour → shows on white too.
+        // 2) Big soft BRIGHT HALO bloom — the glowing pool of reflected light
+        //    that makes a mirror read as a mirror. Broad and luminous, set
+        //    upper-centre where the light source reflects.
+        canvas.drawCircle(
+          Offset(size.width * 0.44, size.height * 0.34),
+          size.width * 0.62,
+          Paint()
+            ..shader = ui.Gradient.radial(
+              Offset(size.width * 0.44, size.height * 0.34),
+              size.width * 0.62,
+              [
+                Colors.white.withValues(alpha: 0.52),
+                Colors.white.withValues(alpha: 0.18),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              [0.0, 0.48, 1.0],
+            ),
+        );
+        // 3) NARROW holographic refraction — the rainbow lives ONLY here, a
+        //    thin diagonal band of hues along the reflection edge (softened a
+        //    touch so the shine leads and it doesn't read as rainbow).
         canvas.save();
         canvas.translate(size.width * 0.44, size.height * 0.46);
         canvas.rotate(-0.62);
-        canvas.scale(0.26, 1.5);
+        canvas.scale(0.24, 1.5);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.66,
@@ -530,23 +545,22 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, size.width * 0.66),
               [
                 const Color(0xFFFF4DA6).withValues(alpha: 0.0),
-                const Color(0xFFFF4DA6).withValues(alpha: 0.60), // magenta
-                const Color(0xFFFFD24D).withValues(alpha: 0.54), // gold
-                const Color(0xFF57E0FF).withValues(alpha: 0.60), // cyan
-                const Color(0xFFB268FF).withValues(alpha: 0.56), // violet
+                const Color(0xFFFF4DA6).withValues(alpha: 0.48), // magenta
+                const Color(0xFFFFD24D).withValues(alpha: 0.44), // gold
+                const Color(0xFF57E0FF).withValues(alpha: 0.50), // cyan
+                const Color(0xFFB268FF).withValues(alpha: 0.46), // violet
                 const Color(0xFFB268FF).withValues(alpha: 0.0),
               ],
               [0.0, 0.20, 0.42, 0.60, 0.80, 1.0],
             ),
         );
         canvas.restore();
-        // 3) Bright diagonal mirror streak laid OVER the holo band — the sweep
-        //    of window light the polished metal throws. White and strong so the
-        //    surface reads unmistakably as a mirror.
+        // 4) Bright diagonal mirror streak — BROADER + HOTTER for more shine.
+        //    The sweep of window light the polished metal throws.
         canvas.save();
         canvas.translate(size.width * 0.50, size.height * 0.50);
         canvas.rotate(-0.62);
-        canvas.scale(0.15, 1.4);
+        canvas.scale(0.20, 1.4);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.62,
@@ -555,20 +569,20 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.62,
               [
-                Colors.white.withValues(alpha: 0.94),
-                Colors.white.withValues(alpha: 0.28),
+                Colors.white.withValues(alpha: 1.0),
+                Colors.white.withValues(alpha: 0.34),
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.45, 1.0],
+              [0.0, 0.46, 1.0],
             ),
         );
         canvas.restore();
-        // 4) A tighter parallel second streak — the double highlight polished
+        // 5) A tighter parallel second streak — the double highlight polished
         //    metal throws.
         canvas.save();
         canvas.translate(size.width * 0.66, size.height * 0.54);
         canvas.rotate(-0.62);
-        canvas.scale(0.07, 1.2);
+        canvas.scale(0.08, 1.2);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.6,
@@ -577,27 +591,27 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.6,
               [
-                Colors.white.withValues(alpha: 0.88),
+                Colors.white.withValues(alpha: 0.92),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
         );
         canvas.restore();
-        // 5) Hot blown-out specular glint near the tip — the hard bright point
+        // 6) Hot blown-out specular glint near the tip — the hard bright point
         //    a real mirror always throws.
         canvas.drawCircle(
           Offset(size.width * 0.38, size.height * 0.18),
-          size.width * 0.13,
+          size.width * 0.15,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset(size.width * 0.38, size.height * 0.18),
-              size.width * 0.13,
+              size.width * 0.15,
               [
                 Colors.white.withValues(alpha: 1.0),
-                Colors.white.withValues(alpha: 0.42),
+                Colors.white.withValues(alpha: 0.46),
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.42, 1.0],
+              [0.0, 0.44, 1.0],
             ),
         );
         break;
