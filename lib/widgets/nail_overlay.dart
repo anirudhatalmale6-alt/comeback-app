@@ -480,20 +480,25 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Glossy metallic-DOME chrome, matched to Ashlyn's reference photo (a
-        // tray of chrome-powder swatches). Those chrome nails are NOT a silver
-        // body with a diagonal line of shine — each is a smooth, rounded,
-        // richly-COLOURED metallic bead: a BROAD soft reflection across the top
-        // third, deep saturated colour through the body, the rim + cuticle
-        // rounding off darker for a 3-D bead, and a small hard specular pop.
-        // Ashlyn: "make it look like these nails... more realistic instead of a
-        // line of shine". So drop the diagonal streak + horizon banding, keep
-        // the BASE COLOUR rich (minimal neutral coverage mid-body) and light it
-        // like a wet reflective dome. Base colour drives it (red → chrome-red).
+        // COLOURED-MIRROR chrome, matched to Ashlyn's reference photo (a tray of
+        // chrome-powder swatches). The chrome NAILS in that photo are polished
+        // tinted MIRRORS: a bright silvery-white reflection band across the top,
+        // then RICH saturated coloured metal below (deep red / green / blue),
+        // deepening at the edges + cuticle. What makes them read as metal is the
+        // high dynamic range — a very bright band AND deep darks — not a soft
+        // single highlight. v1.6.79 was too low-contrast (bright-ish top, washed
+        // mid) so it read as GLOSS. Ashlyn: "looks more like a gloss then a
+        // chrome... make it look like the previous photo". So: bring back mirror
+        // CONTRAST — a crisp bright top band, a dark contrast band right under
+        // it (the reflected light-source edge), a RICH saturated colour body,
+        // and a dark rounded cuticle. Smooth horizontal bands, no diagonal
+        // streak, no rainbow. Base colour tints the whole mirror.
         _base(canvas, size, rect, sides: 0.14);
-        // 1) Dome shading — bright at the tip, PURE colour through the middle
-        //    (so the metal colour stays rich/saturated), deepening to a rounded
-        //    cuticle. Vertical, no diagonal, no stripe.
+        // 1) The mirror itself — vertical reflected-environment gradient.
+        //    tip → bright silvery reflection band (the ceiling/light) → a DARK
+        //    contrast band (edge of the reflected light) → rich pure colour body
+        //    → dark rounded cuticle. The bright band + dark band together are
+        //    the high dynamic range that says "polished metal", not "gel".
         canvas.drawRect(
           rect,
           Paint()
@@ -501,18 +506,21 @@ class _NailFinishPainter extends CustomPainter {
               Offset(size.width * 0.5, 0),
               Offset(size.width * 0.5, size.height),
               [
-                Colors.white.withValues(alpha: 0.60), // lit tip
-                Colors.white.withValues(alpha: 0.16),
-                Colors.white.withValues(alpha: 0.0), // pure rich colour
-                Colors.black.withValues(alpha: 0.06),
-                Colors.black.withValues(alpha: 0.22),
-                Colors.black.withValues(alpha: 0.44), // rounded cuticle
+                Colors.white.withValues(alpha: 0.55), // lit tip edge
+                Colors.white.withValues(alpha: 0.86), // BRIGHT mirror band
+                Colors.white.withValues(alpha: 0.20),
+                Colors.black.withValues(alpha: 0.18), // dark contrast band
+                Colors.black.withValues(alpha: 0.04),
+                Colors.white.withValues(alpha: 0.10), // faint mid bounce
+                Colors.black.withValues(alpha: 0.10),
+                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.50), // rounded cuticle
               ],
-              [0.0, 0.14, 0.32, 0.64, 0.86, 1.0],
+              [0.0, 0.11, 0.22, 0.31, 0.42, 0.60, 0.78, 0.90, 1.0],
             ),
         );
-        // 2) Side vignette — darkens the left/right rim so the nail reads as a
-        //    rounded 3-D bead and the colour deepens at the edges.
+        // 2) Side vignette — darkens the left/right rim so the mirror reads as a
+        //    rounded 3-D bead and the colour deepens toward the edges.
         canvas.drawRect(
           rect,
           Paint()
@@ -520,41 +528,42 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(size.width, 0),
               [
-                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.34),
                 Colors.black.withValues(alpha: 0.0),
                 Colors.black.withValues(alpha: 0.0),
-                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.34),
               ],
-              [0.0, 0.22, 0.78, 1.0],
+              [0.0, 0.24, 0.76, 1.0],
             ),
         );
-        // 3) BROAD main reflection — the big soft highlight a glossy chrome dome
-        //    throws across its upper third. This is what replaces the "line of
-        //    shine": a wide soft bloom, not a streak.
+        // 3) Bright reflection bloom — concentrates the top band into a crisp
+        //    curved mirror hotspot (kept TIGHT so the colour below stays rich,
+        //    unlike the wide wash that made v1.6.79 look glossy).
         canvas.save();
-        canvas.translate(size.width * 0.48, size.height * 0.24);
-        canvas.scale(1.15, 0.62);
+        canvas.translate(size.width * 0.50, size.height * 0.13);
+        canvas.scale(1.25, 0.55);
         canvas.drawCircle(
           Offset.zero,
-          size.width * 0.52,
+          size.width * 0.44,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset.zero,
-              size.width * 0.52,
+              size.width * 0.44,
               [
-                Colors.white.withValues(alpha: 0.90),
-                Colors.white.withValues(alpha: 0.30),
+                Colors.white.withValues(alpha: 0.95),
+                Colors.white.withValues(alpha: 0.35),
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.55, 1.0],
+              [0.0, 0.5, 1.0],
             ),
         );
         canvas.restore();
-        // 4) Lower bounce reflection — the softer secondary gloss a rounded wet
-        //    surface shows nearer the cuticle; sells the reflective finish.
+        // 4) Lower environment bounce — a soft light band near the cuticle (the
+        //    mirror catching the floor/light bounce). Subtle; sells the mirror
+        //    without washing the colour.
         canvas.save();
-        canvas.translate(size.width * 0.52, size.height * 0.74);
-        canvas.scale(1.05, 0.42);
+        canvas.translate(size.width * 0.52, size.height * 0.72);
+        canvas.scale(1.15, 0.36);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.46,
@@ -563,23 +572,22 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.46,
               [
-                Colors.white.withValues(alpha: 0.26),
+                Colors.white.withValues(alpha: 0.22),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
         );
         canvas.restore();
-        // 5) Hard specular pop near the tip — the tight bright glint wet metal
-        //    always throws.
+        // 5) Hard specular pop — the tight bright glint polished metal throws.
         canvas.drawCircle(
-          Offset(size.width * 0.40, size.height * 0.13),
-          size.width * 0.09,
+          Offset(size.width * 0.40, size.height * 0.10),
+          size.width * 0.07,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.40, size.height * 0.13),
-              size.width * 0.09,
+              Offset(size.width * 0.40, size.height * 0.10),
+              size.width * 0.07,
               [
-                Colors.white.withValues(alpha: 0.98),
+                Colors.white.withValues(alpha: 1.0),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
