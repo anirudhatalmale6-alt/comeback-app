@@ -480,116 +480,108 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // Pure MIRROR chrome. Every prior pass kept a diagonal band of rainbow
-        // hues (holographic refraction); on-device that band was the loudest
-        // thing on the nail and Ashlyn read the whole finish as "rainbow, not
-        // chrome — it needs to reflect like a mirror". So this pass DROPS all
-        // hue entirely and builds a real reflected-environment mirror in
-        // NEUTRAL silver only. The trick that makes chrome read as a mirror is
-        // the reflected horizon: a curved mirror shows a bright band (ceiling /
-        // sky), a crisp DARK band (the wall / horizon line), then a lighter
-        // band bouncing back up (floor), and hard specular glints. That
-        // light→dark→light banding — not a smooth sheen — is the mirror cue.
-        // All layers are neutral + semi-transparent so the base colour tints
-        // the metal (red → rose-chrome, etc.) while it still reads as mirror.
-        _base(canvas, size, rect, sides: 0.16);
-        // 1) Reflected-environment mirror body. Diagonal so it follows the
-        //    finger: hot highlight → bright → crisp dark HORIZON band → light
-        //    bounce → bright floor → settle to a moderate (not black) cuticle.
+        // Glossy metallic-DOME chrome, matched to Ashlyn's reference photo (a
+        // tray of chrome-powder swatches). Those chrome nails are NOT a silver
+        // body with a diagonal line of shine — each is a smooth, rounded,
+        // richly-COLOURED metallic bead: a BROAD soft reflection across the top
+        // third, deep saturated colour through the body, the rim + cuticle
+        // rounding off darker for a 3-D bead, and a small hard specular pop.
+        // Ashlyn: "make it look like these nails... more realistic instead of a
+        // line of shine". So drop the diagonal streak + horizon banding, keep
+        // the BASE COLOUR rich (minimal neutral coverage mid-body) and light it
+        // like a wet reflective dome. Base colour drives it (red → chrome-red).
+        _base(canvas, size, rect, sides: 0.14);
+        // 1) Dome shading — bright at the tip, PURE colour through the middle
+        //    (so the metal colour stays rich/saturated), deepening to a rounded
+        //    cuticle. Vertical, no diagonal, no stripe.
         canvas.drawRect(
           rect,
           Paint()
             ..shader = ui.Gradient.linear(
-              Offset(size.width * 0.28, 0),
-              Offset(size.width * 0.74, size.height),
+              Offset(size.width * 0.5, 0),
+              Offset(size.width * 0.5, size.height),
               [
-                Colors.white.withValues(alpha: 0.95), // hot sky highlight
-                const Color(0xFFDFE6EC).withValues(alpha: 0.70), // bright
-                const Color(0xFFB4BEC8).withValues(alpha: 0.46), // light-mid
-                const Color(0xFF57616C).withValues(alpha: 0.62), // horizon edge
-                const Color(0xFF3F4954).withValues(alpha: 0.66), // horizon core
-                const Color(0xFFAEB7C1).withValues(alpha: 0.46), // light bounce
-                const Color(0xFFE6ECF1).withValues(alpha: 0.54), // bright floor
-                const Color(0xFF7C8792).withValues(alpha: 0.48), // settle
-                const Color(0xFF39414B).withValues(alpha: 0.58), // soft cuticle
-              ],
-              [0.0, 0.12, 0.30, 0.42, 0.50, 0.60, 0.74, 0.88, 1.0],
-            ),
-        );
-        // 2) Big soft halo bloom — the glowing pool of reflected light, kept
-        //    neutral-white and upper-centre where the light source reflects.
-        canvas.drawCircle(
-          Offset(size.width * 0.44, size.height * 0.32),
-          size.width * 0.60,
-          Paint()
-            ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.44, size.height * 0.32),
-              size.width * 0.60,
-              [
-                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.60), // lit tip
                 Colors.white.withValues(alpha: 0.16),
-                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.0), // pure rich colour
+                Colors.black.withValues(alpha: 0.06),
+                Colors.black.withValues(alpha: 0.22),
+                Colors.black.withValues(alpha: 0.44), // rounded cuticle
               ],
-              [0.0, 0.48, 1.0],
+              [0.0, 0.14, 0.32, 0.64, 0.86, 1.0],
             ),
         );
-        // 3) Bright diagonal mirror streak — the sweep of window light the
-        //    polished metal throws (broad + hot for shine).
-        canvas.save();
-        canvas.translate(size.width * 0.48, size.height * 0.48);
-        canvas.rotate(-0.62);
-        canvas.scale(0.20, 1.4);
-        canvas.drawCircle(
-          Offset.zero,
-          size.width * 0.64,
+        // 2) Side vignette — darkens the left/right rim so the nail reads as a
+        //    rounded 3-D bead and the colour deepens at the edges.
+        canvas.drawRect(
+          rect,
           Paint()
-            ..shader = ui.Gradient.radial(
-              Offset.zero,
-              size.width * 0.64,
+            ..shader = ui.Gradient.linear(
+              Offset(0, 0),
+              Offset(size.width, 0),
               [
-                Colors.white.withValues(alpha: 1.0),
-                Colors.white.withValues(alpha: 0.32),
-                Colors.white.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.30),
               ],
-              [0.0, 0.46, 1.0],
+              [0.0, 0.22, 0.78, 1.0],
             ),
         );
-        canvas.restore();
-        // 4) A tighter parallel second streak — the double highlight polished
-        //    metal throws.
+        // 3) BROAD main reflection — the big soft highlight a glossy chrome dome
+        //    throws across its upper third. This is what replaces the "line of
+        //    shine": a wide soft bloom, not a streak.
         canvas.save();
-        canvas.translate(size.width * 0.66, size.height * 0.56);
-        canvas.rotate(-0.62);
-        canvas.scale(0.08, 1.2);
+        canvas.translate(size.width * 0.48, size.height * 0.24);
+        canvas.scale(1.15, 0.62);
         canvas.drawCircle(
           Offset.zero,
-          size.width * 0.6,
+          size.width * 0.52,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset.zero,
-              size.width * 0.6,
+              size.width * 0.52,
               [
                 Colors.white.withValues(alpha: 0.90),
+                Colors.white.withValues(alpha: 0.30),
+                Colors.white.withValues(alpha: 0.0),
+              ],
+              [0.0, 0.55, 1.0],
+            ),
+        );
+        canvas.restore();
+        // 4) Lower bounce reflection — the softer secondary gloss a rounded wet
+        //    surface shows nearer the cuticle; sells the reflective finish.
+        canvas.save();
+        canvas.translate(size.width * 0.52, size.height * 0.74);
+        canvas.scale(1.05, 0.42);
+        canvas.drawCircle(
+          Offset.zero,
+          size.width * 0.46,
+          Paint()
+            ..shader = ui.Gradient.radial(
+              Offset.zero,
+              size.width * 0.46,
+              [
+                Colors.white.withValues(alpha: 0.26),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
         );
         canvas.restore();
-        // 5) Hot blown-out specular glint near the tip — the hard bright point
-        //    a real mirror always throws.
+        // 5) Hard specular pop near the tip — the tight bright glint wet metal
+        //    always throws.
         canvas.drawCircle(
-          Offset(size.width * 0.38, size.height * 0.18),
-          size.width * 0.15,
+          Offset(size.width * 0.40, size.height * 0.13),
+          size.width * 0.09,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.38, size.height * 0.18),
-              size.width * 0.15,
+              Offset(size.width * 0.40, size.height * 0.13),
+              size.width * 0.09,
               [
-                Colors.white.withValues(alpha: 1.0),
-                Colors.white.withValues(alpha: 0.46),
+                Colors.white.withValues(alpha: 0.98),
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.44, 1.0],
             ),
         );
         break;
