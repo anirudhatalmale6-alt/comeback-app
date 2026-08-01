@@ -480,25 +480,25 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // COLOURED-MIRROR chrome, matched to Ashlyn's reference photo (a tray of
-        // chrome-powder swatches). The chrome NAILS in that photo are polished
-        // tinted MIRRORS: a bright silvery-white reflection band across the top,
-        // then RICH saturated coloured metal below (deep red / green / blue),
-        // deepening at the edges + cuticle. What makes them read as metal is the
-        // high dynamic range — a very bright band AND deep darks — not a soft
-        // single highlight. v1.6.79 was too low-contrast (bright-ish top, washed
-        // mid) so it read as GLOSS. Ashlyn: "looks more like a gloss then a
-        // chrome... make it look like the previous photo". So: bring back mirror
-        // CONTRAST — a crisp bright top band, a dark contrast band right under
-        // it (the reflected light-source edge), a RICH saturated colour body,
-        // and a dark rounded cuticle. Smooth horizontal bands, no diagonal
-        // streak, no rainbow. Base colour tints the whole mirror.
+        // REFLECTED-ENVIRONMENT coloured chrome, matched to Ashlyn's reference
+        // photo. Studying the reference RED chrome nail vs my on-device render,
+        // the missing cue was clear: a real chrome nail reflects a whole scene —
+        // a DARK reflection at the very tip (the dark surroundings), then a
+        // bright crisp reflection band, then a DEEP rich colour body darkening
+        // to the cuticle. You see dark AND bright reflection zones with defined
+        // edges = mirror. v1.6.79/80 only had a soft bright highlight fading into
+        // a medium, uniform colour = no darks, no crisp edges = GLOSS. Ashlyn:
+        // "still looking more like a gloss than a reflection... more realistic
+        // like the photo". So this rebuild adds (a) a dark reflection at the tip,
+        // (b) a crisper/brighter reflection band, and (c) a much DEEPER colour
+        // body — real reflected-environment contrast. Colour kept (base tints
+        // it all); no diagonal streak, no rainbow.
         _base(canvas, size, rect, sides: 0.14);
-        // 1) The mirror itself — vertical reflected-environment gradient.
-        //    tip → bright silvery reflection band (the ceiling/light) → a DARK
-        //    contrast band (edge of the reflected light) → rich pure colour body
-        //    → dark rounded cuticle. The bright band + dark band together are
-        //    the high dynamic range that says "polished metal", not "gel".
+        // 1) The reflected environment — vertical, tip → cuticle:
+        //    dark tip (reflected surroundings) → bright crisp reflection band
+        //    (the light/window) → its defined lower edge → deep rich colour body
+        //    with a faint floor bounce → deep dark cuticle. Dark-bright-dark with
+        //    edges = a scene reflected in polished metal, not a gel highlight.
         canvas.drawRect(
           rect,
           Paint()
@@ -506,21 +506,24 @@ class _NailFinishPainter extends CustomPainter {
               Offset(size.width * 0.5, 0),
               Offset(size.width * 0.5, size.height),
               [
-                Colors.white.withValues(alpha: 0.55), // lit tip edge
-                Colors.white.withValues(alpha: 0.86), // BRIGHT mirror band
-                Colors.white.withValues(alpha: 0.20),
-                Colors.black.withValues(alpha: 0.18), // dark contrast band
+                Colors.black.withValues(alpha: 0.30), // dark reflection at tip
                 Colors.black.withValues(alpha: 0.04),
-                Colors.white.withValues(alpha: 0.10), // faint mid bounce
-                Colors.black.withValues(alpha: 0.10),
-                Colors.black.withValues(alpha: 0.30),
-                Colors.black.withValues(alpha: 0.50), // rounded cuticle
+                Colors.white.withValues(alpha: 0.66), // reflection ramps up
+                Colors.white.withValues(alpha: 0.94), // BRIGHT reflection band
+                Colors.white.withValues(alpha: 0.42),
+                Colors.white.withValues(alpha: 0.0), // reflection ends (crisp)
+                Colors.black.withValues(alpha: 0.20), // defined lower edge
+                Colors.black.withValues(alpha: 0.06), // rich colour
+                Colors.white.withValues(alpha: 0.08), // faint floor bounce
+                Colors.black.withValues(alpha: 0.26),
+                Colors.black.withValues(alpha: 0.44),
+                Colors.black.withValues(alpha: 0.60), // deep cuticle
               ],
-              [0.0, 0.11, 0.22, 0.31, 0.42, 0.60, 0.78, 0.90, 1.0],
+              [0.0, 0.05, 0.11, 0.18, 0.27, 0.34, 0.38, 0.49, 0.61, 0.79, 0.90, 1.0],
             ),
         );
-        // 2) Side vignette — darkens the left/right rim so the mirror reads as a
-        //    rounded 3-D bead and the colour deepens toward the edges.
+        // 2) Side vignette — deep left/right rim so the mirror reads as a rounded
+        //    3-D bead and the colour darkens richly toward the edges.
         canvas.drawRect(
           rect,
           Paint()
@@ -528,20 +531,20 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, 0),
               Offset(size.width, 0),
               [
-                Colors.black.withValues(alpha: 0.34),
+                Colors.black.withValues(alpha: 0.38),
                 Colors.black.withValues(alpha: 0.0),
                 Colors.black.withValues(alpha: 0.0),
-                Colors.black.withValues(alpha: 0.34),
+                Colors.black.withValues(alpha: 0.38),
               ],
               [0.0, 0.24, 0.76, 1.0],
             ),
         );
-        // 3) Bright reflection bloom — concentrates the top band into a crisp
-        //    curved mirror hotspot (kept TIGHT so the colour below stays rich,
-        //    unlike the wide wash that made v1.6.79 look glossy).
+        // 3) Bright reflection bloom — sharpens the top band into a defined,
+        //    curved mirror reflection (tight vertically so it reads as a crisp
+        //    band, not a soft glossy blob; colour below stays deep & rich).
         canvas.save();
-        canvas.translate(size.width * 0.50, size.height * 0.13);
-        canvas.scale(1.25, 0.55);
+        canvas.translate(size.width * 0.50, size.height * 0.19);
+        canvas.scale(1.35, 0.48);
         canvas.drawCircle(
           Offset.zero,
           size.width * 0.44,
@@ -550,8 +553,8 @@ class _NailFinishPainter extends CustomPainter {
               Offset.zero,
               size.width * 0.44,
               [
-                Colors.white.withValues(alpha: 0.95),
-                Colors.white.withValues(alpha: 0.35),
+                Colors.white.withValues(alpha: 0.92),
+                Colors.white.withValues(alpha: 0.28),
                 Colors.white.withValues(alpha: 0.0),
               ],
               [0.0, 0.5, 1.0],
@@ -559,20 +562,19 @@ class _NailFinishPainter extends CustomPainter {
         );
         canvas.restore();
         // 4) Lower environment bounce — a soft light band near the cuticle (the
-        //    mirror catching the floor/light bounce). Subtle; sells the mirror
-        //    without washing the colour.
+        //    mirror catching the floor/light bounce). Subtle; the mirror double.
         canvas.save();
-        canvas.translate(size.width * 0.52, size.height * 0.72);
-        canvas.scale(1.15, 0.36);
+        canvas.translate(size.width * 0.52, size.height * 0.64);
+        canvas.scale(1.2, 0.28);
         canvas.drawCircle(
           Offset.zero,
-          size.width * 0.46,
+          size.width * 0.44,
           Paint()
             ..shader = ui.Gradient.radial(
               Offset.zero,
-              size.width * 0.46,
+              size.width * 0.44,
               [
-                Colors.white.withValues(alpha: 0.22),
+                Colors.white.withValues(alpha: 0.16),
                 Colors.white.withValues(alpha: 0.0),
               ],
             ),
@@ -580,12 +582,12 @@ class _NailFinishPainter extends CustomPainter {
         canvas.restore();
         // 5) Hard specular pop — the tight bright glint polished metal throws.
         canvas.drawCircle(
-          Offset(size.width * 0.40, size.height * 0.10),
-          size.width * 0.07,
+          Offset(size.width * 0.42, size.height * 0.16),
+          size.width * 0.055,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.40, size.height * 0.10),
-              size.width * 0.07,
+              Offset(size.width * 0.42, size.height * 0.16),
+              size.width * 0.055,
               [
                 Colors.white.withValues(alpha: 1.0),
                 Colors.white.withValues(alpha: 0.0),
