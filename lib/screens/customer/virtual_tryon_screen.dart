@@ -36,6 +36,8 @@ class BundledDesign {
 const List<String> kDesignCategories = [
   'Solids',
   'French',
+  'Chrome',
+  'Cat Eye',
   'Glitter',
   'Ombré',
   'Patterns',
@@ -848,13 +850,36 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   /// First design tap auto-arranges five nails in a natural fan; later taps
   /// just re-skin whatever nails are already placed.
-  void _applyDesign(String asset) {
+  /// The finish currently in effect for the strip's selection: the focused
+  /// nail's finish, otherwise the shared finish. Drives which base-style swatch
+  /// (Chrome/Cat Eye) shows as active.
+  NailFinish _activeFinish() {
+    if (_photo != null && _selected != null && _selected! < _nails.length) {
+      return _nails[_selected!].finish;
+    }
+    return _finish;
+  }
+
+  /// Applies a design (colour or artwork). When [finish] is given the same tap
+  /// also sets the finish — this is how the Chrome/Cat Eye base categories paint
+  /// colour + finish in one go. When [resetSpecial] is set (a plain Solids/
+  /// French pick), a chrome/cat-eye base is returned to a normal glossy finish
+  /// so leaving those categories doesn't strand the special finish.
+  void _applyDesign(String asset, {NailFinish? finish, bool resetSpecial = false}) {
+    NailFinish? f = finish;
+    if (f == null && resetSpecial) {
+      final cur = _activeFinish();
+      if (cur == NailFinish.chrome || cur == NailFinish.catEye) {
+        f = NailFinish.gloss;
+      }
+    }
     // In the Studio (no photo yet) a design tap just updates the composed look
     // shown in the preview; nails are placed later, once there's a photo. If a
     // single nail is focused, only that finger changes; otherwise the whole set
     // takes the new design.
     if (_photo == null) {
       setState(() {
+        if (f != null) _finish = f;
         if (_studioFocus != null) {
           _studioDesigns[_studioFocus!] = asset;
         } else {
@@ -869,6 +894,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     _pushUndo();
     setState(() {
       _currentDesign = asset;
+      // Set the shared finish before placing nails so a fresh fan is created
+      // with it; when a single nail is focused, only that finger's finish moves.
+      if (f != null && _selected == null) _finish = f;
       if (_nails.isEmpty) {
         if (_boxSize == Size.zero) return;
         // x, y, rotation, scale - each finger gets its own size and angle so
@@ -897,9 +925,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         // A nail is selected: re-skin just that one, so users can build a
         // custom set with a different design per finger.
         _nails[_selected!].asset = asset;
+        if (f != null) _nails[_selected!].finish = f;
       } else {
         for (final n in _nails) {
           n.asset = asset;
+          if (f != null) n.finish = f;
         }
       }
     });
@@ -2926,6 +2956,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     if (_category == 'Solids' || _category == 'French') {
       return _buildColorPalette(french: _category == 'French');
     }
+    // Chrome and Cat Eye are BASE styles: the customer picks a colour and it's
+    // painted with that finish. Same colour palette, but each tap applies the
+    // finish too — so these live in the base picker, not the brush menu.
+    if (_category == 'Chrome') {
+      return _buildColorPalette(french: false, finish: NailFinish.chrome);
+    }
+    if (_category == 'Cat Eye') {
+      return _buildColorPalette(french: false, finish: NailFinish.catEye);
+    }
     final isUploads = _category == 'My Uploads';
     final designs =
         kBundledDesigns.where((d) => d.category == _category).toList();
@@ -2961,7 +3000,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// A horizontal palette of colours led by a "Custom" wheel tile. For Solids
   /// each swatch paints the whole nail; for French each swatch sets the tip
   /// colour over the current base.
-  Widget _buildColorPalette({required bool french}) {
+  Widget _buildColorPalette({required bool french, NailFinish? finish}) {
     return Container(
       height: 92,
       color: Colors.white,
@@ -2971,17 +3010,25 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         itemCount: kNailPalette.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          if (i == 0) return _buildCustomColorTile(french: french);
+          if (i == 0) {
+            return _buildCustomColorTile(french: french, finish: finish);
+          }
           final argb = kNailPalette[i - 1] | 0xFF000000;
           final id =
               french ? frenchDesignId(argb, _frenchBase) : solidDesignId(argb);
-          final active = _activeDesignId() == id;
+          // For a base-style palette (Chrome/Cat Eye) a swatch only counts as
+          // active when both its colour AND its finish match what's on the nail.
+          final active = _activeDesignId() == id &&
+              (finish == null || _activeFinish() == finish);
           final design = french
               ? ColorDesign(Color(_frenchBase), tip: Color(argb))
               : ColorDesign(Color(argb));
           return Center(
             child: GestureDetector(
-              onTap: () => _applyDesign(id),
+              // Chrome/Cat Eye apply their finish with the colour; plain Solids/
+              // French reset a chrome/cat-eye base back to a normal glossy finish.
+              onTap: () => _applyDesign(id,
+                  finish: finish, resetSpecial: finish == null),
               child: Container(
                 width: 54,
                 height: 54,
@@ -2995,7 +3042,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     width: active ? 2.5 : 1,
                   ),
                 ),
-                child: NailColorSwatch(design),
+                child: NailColorSwatch(design, finish: finish ?? NailFinish.gloss),
               ),
             ),
           );
@@ -3006,10 +3053,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   /// The leading palette tile: a rainbow wheel that opens the colour picker so
   /// the customer can dial in any exact colour (and, for French, the base too).
-  Widget _buildCustomColorTile({required bool french}) {
+  Widget _buildCustomColorTile({required bool french, NailFinish? finish}) {
     return Center(
       child: GestureDetector(
-        onTap: french ? _pickFrenchCustom : _pickSolidCustom,
+        onTap: french ? _pickFrenchCustom : () => _pickSolidCustom(finish: finish),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3040,14 +3087,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   }
 
   /// Solids: pick any exact colour with the wheel and paint the whole nail.
-  Future<void> _pickSolidCustom() async {
+  Future<void> _pickSolidCustom({NailFinish? finish}) async {
     final activeId = _activeDesignId();
     final cd = activeId == null ? null : colorDesignFor(activeId);
     final start = (cd != null && cd.tip == null) ? cd.base : const Color(0xFFE23B4E);
     final picked =
         await showColorWheelDialog(context, initial: start, title: 'Nail colour');
     if (picked == null) return;
-    _applyDesign(solidDesignId(picked.toARGB32()));
+    _applyDesign(solidDesignId(picked.toARGB32()),
+        finish: finish, resetSpecial: finish == null);
   }
 
   /// French: choose both the tip colour and the base colour, each with the
@@ -3722,14 +3770,19 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
   }
 
   Widget _finishRow() {
+    // Chrome and Cat Eye are chosen from the base colour picker (they're a
+    // colour + finish in one), so they're left out of the plain finish menu.
+    final finishes = NailFinish.values
+        .where((f) => f != NailFinish.chrome && f != NailFinish.catEye)
+        .toList();
     return SizedBox(
       height: 90,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: NailFinish.values.length,
+        itemCount: finishes.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          final f = NailFinish.values[i];
+          final f = finishes[i];
           final active = _finish == f;
           return GestureDetector(
             onTap: () {

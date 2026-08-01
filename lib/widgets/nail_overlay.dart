@@ -505,24 +505,25 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, size.height * 0.5),
               Offset(size.width, size.height * 0.5),
               [
-                Colors.black.withValues(alpha: 0.44), // dark left rim
-                Colors.black.withValues(alpha: 0.10),
+                Colors.black.withValues(alpha: 0.58), // deep dark left rim
+                Colors.black.withValues(alpha: 0.18),
                 Colors.white.withValues(alpha: 0.60), // reflection ramps up
                 Colors.white.withValues(alpha: 0.95), // BRIGHT vertical strip
-                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.48),
                 Colors.white.withValues(alpha: 0.0), // strip ends (crisp)
-                Colors.black.withValues(alpha: 0.22), // defined edge
-                Colors.black.withValues(alpha: 0.06), // rich colour
+                Colors.black.withValues(alpha: 0.34), // defined shadow edge
+                Colors.black.withValues(alpha: 0.14), // shadowed colour body
                 Colors.white.withValues(alpha: 0.10), // faint 2nd reflection
-                Colors.black.withValues(alpha: 0.20),
-                Colors.black.withValues(alpha: 0.44), // dark right rim
+                Colors.black.withValues(alpha: 0.32),
+                Colors.black.withValues(alpha: 0.58), // deep dark right rim
               ],
               [0.0, 0.10, 0.24, 0.34, 0.44, 0.52, 0.57, 0.68, 0.80, 0.90, 1.0],
             ),
         );
-        // 2) Vertical body depth — SUBTLE tip → cuticle shade so the nail still
-        //    reads as a rounded bead, without competing with the vertical shine:
-        //    a slightly dark tip, rich colour through the middle, deep cuticle.
+        // 2) Vertical body depth — tip → cuticle shading so the nail reads as a
+        //    rounded bead with real depth: a dark reflection at the tip, colour
+        //    through the middle, a DEEP shadowed cuticle. Deepened per Ashlyn's
+        //    "it needs more shadows" so the mirror has stronger dark zones.
         canvas.drawRect(
           rect,
           Paint()
@@ -530,12 +531,13 @@ class _NailFinishPainter extends CustomPainter {
               Offset(size.width * 0.5, 0),
               Offset(size.width * 0.5, size.height),
               [
-                Colors.black.withValues(alpha: 0.18), // dark tip reflection
+                Colors.black.withValues(alpha: 0.28), // dark tip reflection
                 Colors.black.withValues(alpha: 0.0),
                 Colors.black.withValues(alpha: 0.0),
-                Colors.black.withValues(alpha: 0.34), // deep cuticle
+                Colors.black.withValues(alpha: 0.30),
+                Colors.black.withValues(alpha: 0.50), // deep shadow cuticle
               ],
-              [0.0, 0.16, 0.70, 1.0],
+              [0.0, 0.14, 0.62, 0.85, 1.0],
             ),
         );
         // 3) Bright reflection bloom — a TALL, NARROW vertical bloom along the
@@ -1250,27 +1252,31 @@ class _ColorDesignPainter extends CustomPainter {
 class NailColorSwatch extends StatelessWidget {
   final ColorDesign design;
   final NailShape shape;
-  const NailColorSwatch(this.design, {super.key, this.shape = NailShape.oval});
+  final NailFinish finish;
+  const NailColorSwatch(this.design,
+      {super.key, this.shape = NailShape.oval, this.finish = NailFinish.gloss});
 
   @override
   Widget build(BuildContext context) =>
-      CustomPaint(painter: _ColorSwatchPainter(shape, design));
+      CustomPaint(painter: _ColorSwatchPainter(shape, design, finish));
 }
 
 class _ColorSwatchPainter extends CustomPainter {
   final NailShape shape;
   final ColorDesign design;
-  const _ColorSwatchPainter(this.shape, this.design);
+  final NailFinish finish;
+  const _ColorSwatchPainter(this.shape, this.design, this.finish);
 
   @override
   void paint(Canvas canvas, Size size) {
     _ColorDesignPainter(shape, design).paint(canvas, size);
-    _NailFinishPainter(shape, NailFinish.gloss).paint(canvas, size);
+    _NailFinishPainter(shape, finish).paint(canvas, size);
   }
 
   @override
   bool shouldRepaint(covariant _ColorSwatchPainter old) =>
       old.shape != shape ||
+      old.finish != finish ||
       old.design.base != design.base ||
       old.design.tip != design.tip;
 }
