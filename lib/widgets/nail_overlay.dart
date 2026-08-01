@@ -480,24 +480,27 @@ class _NailFinishPainter extends CustomPainter {
         break;
 
       case NailFinish.chrome:
-        // REFLECTED-ENVIRONMENT coloured chrome with a VERTICAL reflection,
-        // matched to Ashlyn's reference photo. A nail is convex ACROSS its
-        // WIDTH, so an overhead light/window reflects as a bright vertical
-        // COLUMN running down the length of the nail, with the left and right
-        // rims falling into dark reflected surroundings. Ashlyn: "the shine is
-        // supposed to be more vertical then horizontal". Earlier builds ran the
-        // bright band HORIZONTALLY (tip → cuticle) — so this rebuild rotates the
-        // whole reflection 90°: dark left rim → bright crisp vertical strip →
-        // deep colour → dark right rim, i.e. the mirror scene now runs across
-        // the width. Still a real mirror (bright AND dark zones, crisp edges),
-        // colour kept, no diagonal streak, no rainbow.
-        _base(canvas, size, rect, sides: 0.14);
-        // 1) The reflected environment — HORIZONTAL gradient across the width so
-        //    the reflection reads as a VERTICAL column: dark left rim (dark
-        //    surroundings) → bright crisp reflection strip (the light/window,
-        //    just left of centre) → its defined edge → deep rich colour → a
-        //    faint second reflection → dark right rim. Dark-bright-dark across
-        //    the width = a scene mirrored in a curved polished surface.
+        // MIRROR-CHROME reflection model (Ashlyn: needs to look like real
+        // mirror-powder / glazed chrome, not a flat gradient with one white
+        // stripe). A polished nail is a curved mirror, so instead of a single
+        // highlight we paint a whole STUDIO ENVIRONMENT reflected in it and
+        // push the contrast hard. Two things sell "chrome" over "gloss":
+        //   (a) a reflected HORIZON — a crisp dark band where the bright
+        //       ceiling/window reflection meets the darker room below; and
+        //   (b) MULTIPLE reflections at very high dynamic range (near-black
+        //       rims and horizon, near-white strip), with the reflections
+        //       CURVED to follow the nail's dome and a bright FRESNEL rim at
+        //       the grazing edges.
+        // The bright reflection still runs as a VERTICAL column (approved
+        // orientation), but now a curved horizon cuts across it and the rims
+        // fall to near-black, giving the metallic depth she asked for.
+        _base(canvas, size, rect, sides: 0.16);
+
+        // 1) Reflected environment ACROSS the width → a bright VERTICAL column.
+        //    Contrast pushed to the limit: near-black rims (dark surroundings
+        //    at grazing angle), a crisp pure-white window strip just left of
+        //    centre, a hard shadow edge, then a distinct SECOND reflection
+        //    column on the right (mirror chrome shows the scene more than once).
         canvas.drawRect(
           rect,
           Paint()
@@ -505,25 +508,29 @@ class _NailFinishPainter extends CustomPainter {
               Offset(0, size.height * 0.5),
               Offset(size.width, size.height * 0.5),
               [
-                Colors.black.withValues(alpha: 0.58), // deep dark left rim
-                Colors.black.withValues(alpha: 0.18),
-                Colors.white.withValues(alpha: 0.60), // reflection ramps up
-                Colors.white.withValues(alpha: 0.95), // BRIGHT vertical strip
-                Colors.white.withValues(alpha: 0.48),
+                Colors.black.withValues(alpha: 0.80), // near-black left rim
+                Colors.black.withValues(alpha: 0.34),
+                Colors.white.withValues(alpha: 0.55), // window ramps up
+                Colors.white.withValues(alpha: 1.0), // BRIGHT crisp strip
+                Colors.white.withValues(alpha: 0.42),
                 Colors.white.withValues(alpha: 0.0), // strip ends (crisp)
-                Colors.black.withValues(alpha: 0.34), // defined shadow edge
-                Colors.black.withValues(alpha: 0.14), // shadowed colour body
-                Colors.white.withValues(alpha: 0.10), // faint 2nd reflection
-                Colors.black.withValues(alpha: 0.32),
-                Colors.black.withValues(alpha: 0.58), // deep dark right rim
+                Colors.black.withValues(alpha: 0.55), // hard shadow edge
+                Colors.black.withValues(alpha: 0.16),
+                Colors.white.withValues(alpha: 0.30), // 2nd reflection column
+                Colors.white.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.42),
+                Colors.black.withValues(alpha: 0.80), // near-black right rim
               ],
-              [0.0, 0.10, 0.24, 0.34, 0.44, 0.52, 0.57, 0.68, 0.80, 0.90, 1.0],
+              [0.0, 0.09, 0.22, 0.31, 0.40, 0.48, 0.55, 0.66, 0.75, 0.83, 0.92, 1.0],
             ),
         );
-        // 2) Vertical body depth — tip → cuticle shading so the nail reads as a
-        //    rounded bead with real depth: a dark reflection at the tip, colour
-        //    through the middle, a DEEP shadowed cuticle. Deepened per Ashlyn's
-        //    "it needs more shadows" so the mirror has stronger dark zones.
+
+        // 2) Reflected environment DOWN the length → sky/ceiling reflection at
+        //    the tip, a dark HORIZON band across the middle, a dim room below
+        //    with a faint floor bounce, and a deep-shadow cuticle. This vertical
+        //    structure crossing the bright column is the core "mirror" cue: the
+        //    horizon visibly notches the bright strip, exactly like polished
+        //    metal reflecting a real room.
         canvas.drawRect(
           rect,
           Paint()
@@ -531,64 +538,111 @@ class _NailFinishPainter extends CustomPainter {
               Offset(size.width * 0.5, 0),
               Offset(size.width * 0.5, size.height),
               [
-                Colors.black.withValues(alpha: 0.28), // dark tip reflection
+                Colors.white.withValues(alpha: 0.20), // ceiling glow at tip
+                Colors.white.withValues(alpha: 0.06),
                 Colors.black.withValues(alpha: 0.0),
-                Colors.black.withValues(alpha: 0.0),
+                Colors.black.withValues(alpha: 0.52), // DARK HORIZON band
+                Colors.black.withValues(alpha: 0.18),
+                Colors.white.withValues(alpha: 0.12), // faint floor bounce
                 Colors.black.withValues(alpha: 0.30),
-                Colors.black.withValues(alpha: 0.50), // deep shadow cuticle
+                Colors.black.withValues(alpha: 0.58), // deep shadow cuticle
               ],
-              [0.0, 0.14, 0.62, 0.85, 1.0],
+              [0.0, 0.08, 0.34, 0.54, 0.63, 0.74, 0.88, 1.0],
             ),
         );
-        // 3) Bright reflection bloom — a TALL, NARROW vertical bloom along the
-        //    strip so it reads as a crisp mirrored column, not a soft blob.
-        canvas.save();
-        canvas.translate(size.width * 0.34, size.height * 0.44);
-        canvas.scale(0.42, 1.55);
-        canvas.drawCircle(
-          Offset.zero,
-          size.width * 0.42,
+
+        // 3) CURVED horizon — a crisp dark arc bowing up in the middle so the
+        //    reflection follows the nail's 3D dome instead of reading as a flat
+        //    straight line, with a thin bright glance just above it (the light
+        //    catching the ridge where sky meets horizon). This curvature is what
+        //    stops the chrome looking 2D.
+        final double hY = size.height * 0.54;
+        final double hBow = size.height * 0.06;
+        final Path horizon = Path()
+          ..moveTo(0, hY)
+          ..quadraticBezierTo(size.width * 0.5, hY - hBow, size.width, hY);
+        canvas.drawPath(
+          horizon,
           Paint()
-            ..shader = ui.Gradient.radial(
-              Offset.zero,
-              size.width * 0.42,
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = size.height * 0.045
+            ..color = Colors.black.withValues(alpha: 0.42)
+            ..maskFilter =
+                MaskFilter.blur(BlurStyle.normal, size.height * 0.022),
+        );
+        final Path horizonHi = Path()
+          ..moveTo(0, hY - size.height * 0.05)
+          ..quadraticBezierTo(size.width * 0.5, hY - hBow - size.height * 0.05,
+              size.width, hY - size.height * 0.05);
+        canvas.drawPath(
+          horizonHi,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = size.height * 0.018
+            ..color = Colors.white.withValues(alpha: 0.55)
+            ..maskFilter =
+                MaskFilter.blur(BlurStyle.normal, size.height * 0.012),
+        );
+
+        // 4) Bright reflection column — a TALL, NARROW, slightly BOWED bloom
+        //    along the strip (two overlapping blooms offset left→right give it a
+        //    gentle curve, following the dome) plus a tight bright core.
+        for (final b in const [
+          [0.31, 0.30, 0.44, 1.45, 0.62],
+          [0.33, 0.62, 0.40, 1.35, 0.55],
+        ]) {
+          canvas.save();
+          canvas.translate(size.width * b[0], size.height * b[1]);
+          canvas.scale(b[2], b[3]);
+          canvas.drawCircle(
+            Offset.zero,
+            size.width * 0.42,
+            Paint()
+              ..shader = ui.Gradient.radial(
+                Offset.zero,
+                size.width * 0.42,
+                [
+                  Colors.white.withValues(alpha: b[4]),
+                  Colors.white.withValues(alpha: 0.22),
+                  Colors.white.withValues(alpha: 0.0),
+                ],
+                [0.0, 0.5, 1.0],
+              ),
+          );
+          canvas.restore();
+        }
+
+        // 5) FRESNEL rims — a thin bright line just inside each grazing edge.
+        //    Real metal flips bright at the very rim even where the surface next
+        //    to it is dark; this crisp edge highlight reads unmistakably as
+        //    polished chrome.
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(0, size.height * 0.5),
+              Offset(size.width, size.height * 0.5),
               [
-                Colors.white.withValues(alpha: 0.90),
-                Colors.white.withValues(alpha: 0.26),
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.50), // left Fresnel line
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.0),
+                Colors.white.withValues(alpha: 0.50), // right Fresnel line
                 Colors.white.withValues(alpha: 0.0),
               ],
-              [0.0, 0.5, 1.0],
+              [0.0, 0.035, 0.08, 0.92, 0.965, 1.0],
             ),
         );
-        canvas.restore();
-        // 4) Second, fainter vertical reflection on the right (the mirror double
-        //    — a curved surface catches the environment twice). Tall & subtle.
-        canvas.save();
-        canvas.translate(size.width * 0.74, size.height * 0.48);
-        canvas.scale(0.30, 1.35);
+
+        // 6) Hard specular pop — the tight bright glint polished metal throws,
+        //    sitting high on the vertical column near the tip (above the horizon).
         canvas.drawCircle(
-          Offset.zero,
-          size.width * 0.42,
+          Offset(size.width * 0.32, size.height * 0.19),
+          size.width * 0.055,
           Paint()
             ..shader = ui.Gradient.radial(
-              Offset.zero,
-              size.width * 0.42,
-              [
-                Colors.white.withValues(alpha: 0.14),
-                Colors.white.withValues(alpha: 0.0),
-              ],
-            ),
-        );
-        canvas.restore();
-        // 5) Hard specular pop — the tight bright glint polished metal throws,
-        //    sitting high on the vertical strip near the tip.
-        canvas.drawCircle(
-          Offset(size.width * 0.34, size.height * 0.20),
-          size.width * 0.05,
-          Paint()
-            ..shader = ui.Gradient.radial(
-              Offset(size.width * 0.34, size.height * 0.20),
-              size.width * 0.05,
+              Offset(size.width * 0.32, size.height * 0.19),
+              size.width * 0.055,
               [
                 Colors.white.withValues(alpha: 1.0),
                 Colors.white.withValues(alpha: 0.0),
