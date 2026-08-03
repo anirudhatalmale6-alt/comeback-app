@@ -1174,8 +1174,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
   /// Applies a length multiplier (Short/Medium/Long) with the same
   /// selected-nail-vs-all behaviour as [_applyShape].
-  void _applyLength(double factor) {
-    _pushUndo();
+  void _applyLength(double factor, {bool record = true}) {
+    if (record) _pushUndo();
     setState(() {
       if (_selected != null) {
         _setLengthFromTip(_nails[_selected!], factor);
@@ -1214,8 +1214,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Widens or slims a nail. Unlike length, width grows symmetrically around the
   /// nail's centre — the finger's centreline — so the nail stays sitting on the
   /// finger and there's nothing to re-drag.
-  void _applyWidth(double factor) {
-    _pushUndo();
+  void _applyWidth(double factor, {bool record = true}) {
+    if (record) _pushUndo();
     setState(() {
       if (_selected != null) {
         _nails[_selected!].widthFactor = factor;
@@ -1246,8 +1246,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         initialWidth: sel?.widthFactor ?? _widthFactor,
         onShape: _applyShape,
         onFinish: _applyFinish,
-        onLength: _applyLength,
-        onWidth: _applyWidth,
+        // Sliders apply live: push one Undo step when a drag starts, then update
+        // continuously without recording (so a single drag = one Undo, not one
+        // per pixel).
+        onSizeStart: _pushUndo,
+        onLength: (v) => _applyLength(v, record: false),
+        onWidth: (v) => _applyWidth(v, record: false),
       ),
     );
   }
@@ -3748,6 +3752,9 @@ class _ShapeLengthSheet extends StatefulWidget {
   final ValueChanged<NailFinish> onFinish;
   final ValueChanged<double> onLength;
   final ValueChanged<double> onWidth;
+  /// Called once when a size slider drag begins, so the whole drag is a single
+  /// Undo step.
+  final VoidCallback onSizeStart;
   const _ShapeLengthSheet({
     required this.target,
     required this.initialShape,
@@ -3758,6 +3765,7 @@ class _ShapeLengthSheet extends StatefulWidget {
     required this.onFinish,
     required this.onLength,
     required this.onWidth,
+    required this.onSizeStart,
   });
 
   @override
@@ -3765,19 +3773,13 @@ class _ShapeLengthSheet extends StatefulWidget {
 }
 
 class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
-  static const _lengths = [
-    ('Short', 0.90),
-    ('Medium', kNailDefaultLengthFactor), // 1.15 — the new default
-    ('Long', 1.65), // lengthened on tester feedback
-    ('X-Long', 2.15), // new extra-long option
-  ];
-
-  static const _widths = [
-    ('Slim', 0.80),
-    ('Medium', 1.0),
-    ('Wide', 1.20),
-    ('X-Wide', 1.40),
-  ];
+  // Continuous slider ranges (replaced the old Short/Medium/Long presets on
+  // tester request for a free slider). Ranges span a touch past the old end
+  // presets so nothing that used to be reachable is lost.
+  static const double _lengthMin = 0.70; // shorter than old "Short" (0.90)
+  static const double _lengthMax = 2.30; // longer than old "X-Long" (2.15)
+  static const double _widthMin = 0.70; // slimmer than old "Slim" (0.80)
+  static const double _widthMax = 1.60; // wider than old "X-Wide" (1.40)
 
   late NailShape _shape = widget.initialShape;
   late NailFinish _finish = widget.initialFinish;
@@ -3789,39 +3791,49 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
   Widget _sectionTitle(String t) => Text(t,
       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600));
 
-  /// A row of equal-width preset pills (used for both Length and Width). The
-  /// pill matching [selected] is highlighted; tapping one reports its value.
-  Widget _pillRow(
-      List<(String, double)> options, double selected, ValueChanged<double> onPick) {
-    return Row(
+  /// A labelled slider used for both Length and Width. [minLabel]/[maxLabel] sit
+  /// under the ends so the customer knows which way is longer/wider. The drag is
+  /// wrapped so it becomes a single Undo step (onStart) and applies live.
+  Widget _slider({
+    required double value,
+    required double min,
+    required double max,
+    required String minLabel,
+    required String maxLabel,
+    required ValueChanged<double> onChanged,
+  }) {
+    final clamped = value.clamp(min, max);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final o in options) ...[
-          Expanded(
-            child: GestureDetector(
-              onTap: () => onPick(o.$2),
-              child: Container(
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected == o.$2 ? _teal : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    o.$1,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: selected == o.$2 ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: _teal,
+            thumbColor: _teal,
+            overlayColor: _teal.withValues(alpha: 0.15),
+            inactiveTrackColor: Colors.grey.shade300,
+            trackHeight: 4,
           ),
-          if (o != options.last) const SizedBox(width: 8),
-        ],
+          child: Slider(
+            value: clamped,
+            min: min,
+            max: max,
+            onChangeStart: (_) => widget.onSizeStart(),
+            onChanged: onChanged,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(minLabel,
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+              Text(maxLabel,
+                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -3969,18 +3981,32 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
               _finishRow(),
               const SizedBox(height: 16),
               _sectionTitle('Length'),
-              const SizedBox(height: 8),
-              _pillRow(_lengths, _length, (v) {
-                setState(() => _length = v);
-                widget.onLength(v);
-              }),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
+              _slider(
+                value: _length,
+                min: _lengthMin,
+                max: _lengthMax,
+                minLabel: 'Short',
+                maxLabel: 'Long',
+                onChanged: (v) {
+                  setState(() => _length = v);
+                  widget.onLength(v);
+                },
+              ),
+              const SizedBox(height: 12),
               _sectionTitle('Width'),
-              const SizedBox(height: 8),
-              _pillRow(_widths, _width, (v) {
-                setState(() => _width = v);
-                widget.onWidth(v);
-              }),
+              const SizedBox(height: 4),
+              _slider(
+                value: _width,
+                min: _widthMin,
+                max: _widthMax,
+                minLabel: 'Slim',
+                maxLabel: 'Wide',
+                onChanged: (v) {
+                  setState(() => _width = v);
+                  widget.onWidth(v);
+                },
+              ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
