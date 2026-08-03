@@ -1296,6 +1296,101 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     }
   }
 
+  /// The finish/shape that appears on the most nails — used to tailor the
+  /// technician tutorial to what the customer actually designed.
+  NailFinish _dominantFinish() {
+    final counts = <NailFinish, int>{};
+    for (final n in _nails) {
+      counts[n.finish] = (counts[n.finish] ?? 0) + 1;
+    }
+    return counts.entries
+        .reduce((a, b) => b.value > a.value ? b : a)
+        .key;
+  }
+
+  NailShape _dominantShape() {
+    final counts = <NailShape, int>{};
+    for (final n in _nails) {
+      counts[n.shape] = (counts[n.shape] ?? 0) + 1;
+    }
+    return counts.entries
+        .reduce((a, b) => b.value > a.value ? b : a)
+        .key;
+  }
+
+  /// A short, finish-specific 4-step guide the customer sends to the salon so
+  /// the technician knows how to recreate the look. Tailored to the dominant
+  /// finish and shape in the design.
+  String _designTutorial() {
+    final finish = _dominantFinish();
+    final shape = _dominantShape().label.toLowerCase();
+    List<String> steps;
+    switch (finish) {
+      case NailFinish.gloss:
+        steps = [
+          'Prep the natural nail — push back cuticles, lightly buff and cleanse. Apply a thin bonder + base coat and cure.',
+          'Shape to $shape, then apply the first thin, even coat of the chosen colour gel, capping the free edge. Cure.',
+          'Apply a second thin coat for full, even colour and cure again.',
+          'Finish with a glossy top coat, cure, and wipe off the tacky layer for a high-shine finish.',
+        ];
+        break;
+      case NailFinish.matte:
+        steps = [
+          'Prep the nail, apply base coat and cure.',
+          'Shape to $shape, then apply two thin coats of the chosen colour gel, curing each one.',
+          'Apply a matte top coat evenly instead of a glossy one.',
+          'Cure and leave it un-wiped for a smooth, velvety matte finish.',
+        ];
+        break;
+      case NailFinish.chrome:
+        steps = [
+          'Prep the nail and apply base + colour gel — a black base gives the deepest mirror, a light base gives bright silver. Cure fully.',
+          'Apply a no-wipe gloss top coat and cure — chrome powder only bonds to a cured, glossy, non-tacky surface.',
+          'Rub the chrome powder over the whole nail with an applicator/eyeshadow sponge in circular motions until it turns fully mirror-reflective, then dust off the excess.',
+          'Seal with a chrome-safe top coat, cure and cleanse. Shape to $shape.',
+        ];
+        break;
+      case NailFinish.catEye:
+        steps = [
+          'Prep the nail, apply base coat and cure.',
+          'Apply one coat of magnetic cat-eye gel.',
+          'Before curing, hold a magnet close to the wet gel for a few seconds to pull the shimmer into a bright band, then cure.',
+          'Add a second magnetic coat for a stronger effect if you like, re-magnetise, cure, then top coat and cure.',
+        ];
+        break;
+      case NailFinish.jelly:
+        steps = [
+          'Prep the nail, apply base coat and cure.',
+          'Apply 2–3 thin, sheer coats of the jelly gel, curing each — build the colour up gradually.',
+          'Keep it translucent for that see-through jelly look; don\'t make it fully opaque.',
+          'Finish with a glossy top coat and cure for a juicy, glass-like shine. Shape to $shape.',
+        ];
+        break;
+      case NailFinish.glitter:
+        steps = [
+          'Prep the nail, apply base coat and cure. Add a colour base if desired.',
+          'Apply a glitter gel (or press dry glitter into a tacky layer) over the base, then cure.',
+          'Add a second glitter coat for more density and cure.',
+          'Apply an extra-thick glossy top coat to smooth over the texture, cure and cleanse. Shape to $shape.',
+        ];
+        break;
+      case NailFinish.velvet:
+        steps = [
+          'Prep the nail, apply base coat and cure.',
+          'Apply the chosen colour gel as the base and cure.',
+          'Apply the velvet/flocking powder (or a velvet magnetic gel, using a magnet) evenly over the nail.',
+          'Cure and gently dust/seal for a soft, suede-like velvet texture. Shape to $shape.',
+        ];
+        break;
+    }
+    final b = StringBuffer();
+    b.writeln('How to recreate this look (${finish.label}, $shape):');
+    for (var i = 0; i < steps.length; i++) {
+      b.writeln('${i + 1}. ${steps[i]}');
+    }
+    return b.toString().trimRight();
+  }
+
   Future<void> _sendToTechnician() async {
     if (_nails.isEmpty) {
       _snack('Add a design to your nails first');
@@ -1334,6 +1429,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         timestamp: DateTime.now(),
         chatRoomId: roomId,
         imageUrl: url,
+      ));
+      // Follow up with a short, finish-specific 4-step guide so the technician
+      // knows exactly how to recreate the design.
+      await firestore.sendMessage(ChatMessage(
+        id: const Uuid().v4(),
+        senderId: myUid,
+        senderName: '',
+        text: _designTutorial(),
+        timestamp: DateTime.now().add(const Duration(milliseconds: 1)),
+        chatRoomId: roomId,
       ));
       if (!mounted) return;
       Navigator.push(

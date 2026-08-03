@@ -485,51 +485,51 @@ class _NailFinishPainter extends CustomPainter {
 
       case NailFinish.chrome:
         {
-          // SMOOTH MIRROR-CHROME. Ashlyn: "a true mirror chrome finish, like
-          // real chrome powder nails — smooth, highly reflective, and clean,
-          // WITHOUT the dark cross or repeating metallic pattern. Each chrome
-          // colour should have its OWN realistic mirror appearance rather than
-          // the same texture with a different tint." So this rebuild drops the
-          // horizon line / Fresnel rims / double column (those read as a
-          // brushed pattern) and instead paints ONE continuous, high-gloss
-          // reflection that grades cleanly from a bright light reflection to a
-          // dark reflected surrounding — and it builds every tone FROM THE BASE
-          // COLOUR (lightened → highlight, colour → mid, darkened → shadow) so
-          // silver, gold, rose-gold and black each look like their own metal.
+          // FULL-NAIL MIRROR-CHROME. Ashlyn (latest): the shine was only a bright
+          // patch reaching the half-way point with two darker lines coming up
+          // from the cuticle end — i.e. the reflection stopped halfway and the
+          // side shading read as "two lines". A real chrome-powder nail is a
+          // mirror over the WHOLE surface, edge to edge, tip to cuticle. So this
+          // rebuild:
+          //   * reflects across the ENTIRE length (bright reflected sky up top,
+          //     a smooth dark reflected surround, then a bright floor-bounce at
+          //     the cuticle so the bottom is reflective too — never stopping at
+          //     the middle),
+          //   * carries the soft shine column the FULL height (not a top-half
+          //     patch),
+          //   * removes the hard side rims that read as two dark lines, keeping
+          //     only a whisper of corner shading to round the form.
+          // Every tone is still built FROM THE BASE COLOUR so silver, gold,
+          // rose-gold and black each look like their own metal.
           final Color c = baseColor ?? const Color(0xFFC7CBD2);
           Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
-          final Color hi = mix(c, Colors.white, 0.92); // bright reflected light
-          final Color lit = mix(c, Colors.white, 0.50); // softly-lit surround
-          final Color mid = mix(c, Colors.white, 0.04); // the metal's own colour
-          final Color dk = mix(c, Colors.black, 0.52); // reflected darker room
-          final Color dkDeep = mix(c, Colors.black, 0.74); // deep shadow
-          final Color floor = mix(c, Colors.black, 0.40); // floor light bounce
+          final Color hi = mix(c, Colors.white, 0.95); // near-white reflection
+          final Color lit = mix(c, Colors.white, 0.58); // softly-lit surround
+          final Color mid = mix(c, Colors.white, 0.10); // the metal's own colour
+          final Color dk = mix(c, Colors.black, 0.44); // reflected darker room
+          final Color dkDeep = mix(c, Colors.black, 0.62); // deep reflected shade
+          final Color glow = mix(c, Colors.white, 0.34); // cuticle floor-bounce
 
-          // 1) The whole mirror, as ONE smooth vertical reflection down the
-          //    length. A polished metal surface reflects a scene: a strong,
-          //    almost-white reflected LIGHT held across the upper nail, grading
-          //    continuously through the metal's own colour into a DARK reflected
-          //    surrounding, then lifting slightly at the very cuticle (light
-          //    bouncing off the surface below). High reflectivity, high contrast
-          //    — but perfectly continuous, no bands and no cross. Holding the
-          //    bright zone then dropping fast into the dark is what reads as a
-          //    MIRROR rather than a soft satin dome.
+          // 1) ONE continuous mirror reflection spanning the FULL length. A
+          //    polished surface reflects a bright light high on the nail, grades
+          //    smoothly through the metal's own colour into a dark reflected
+          //    surround, then lifts again at the cuticle where light bounces off
+          //    the skin below — so the whole nail is reflective, top to bottom,
+          //    with no half-way cut-off and no seam.
           canvas.drawRect(
             rect,
             Paint()
               ..shader = ui.Gradient.linear(
                 Offset(size.width * 0.5, 0),
                 Offset(size.width * 0.5, size.height),
-                [lit, hi, hi, mid, dk, dkDeep, floor],
-                [0.0, 0.11, 0.25, 0.45, 0.66, 0.87, 1.0],
+                [lit, hi, hi, lit, mid, dk, dkDeep, glow],
+                [0.0, 0.15, 0.30, 0.45, 0.60, 0.76, 0.90, 1.0],
               ),
           );
 
-          // 2) Convex form across the width — a smooth darkening toward both
-          //    rims (never a hard edge) so the nail reads as a rounded polished
-          //    surface and the reflection naturally concentrates into a soft
-          //    VERTICAL column of light down the centre (the shine she likes),
-          //    with no second stripe.
+          // 2) The faintest corner shading only — heavily feathered so there is
+          //    NO discernible line down either side (the old rims read as "two
+          //    dark lines"). Just enough to keep the nail from looking flat.
           canvas.drawRect(
             rect,
             Paint()
@@ -537,22 +537,23 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(0, size.height * 0.5),
                 Offset(size.width, size.height * 0.5),
                 [
-                  dkDeep.withValues(alpha: 0.55), // rim falls into shadow
+                  dkDeep.withValues(alpha: 0.22),
                   Colors.transparent,
                   Colors.transparent,
-                  dkDeep.withValues(alpha: 0.55),
+                  dkDeep.withValues(alpha: 0.22),
                 ],
-                [0.0, 0.30, 0.70, 1.0],
+                [0.0, 0.26, 0.74, 1.0],
               ),
           );
 
-          // 3) The soft vertical shine — one clean, broad, blurred column of the
-          //    metal's OWN highlight tone running down the centre. Soft-edged and
-          //    singular, so it reads as light gliding over polished metal, not a
-          //    painted stripe or a pattern.
+          // 3) The shine — ONE broad, soft, blurred column of the metal's own
+          //    highlight tone running the FULL height of the nail (tip to
+          //    cuticle), so the reflection glides over the whole surface instead
+          //    of fading out half-way. Singular and soft-edged: reads as light
+          //    on polished metal, not a stripe or a pattern.
           canvas.save();
-          canvas.translate(size.width * 0.47, size.height * 0.34);
-          canvas.scale(0.60, 1.7);
+          canvas.translate(size.width * 0.48, size.height * 0.5);
+          canvas.scale(0.58, 2.7);
           canvas.drawCircle(
             Offset.zero,
             size.width * 0.5,
@@ -561,8 +562,8 @@ class _NailFinishPainter extends CustomPainter {
                 Offset.zero,
                 size.width * 0.5,
                 [
-                  hi.withValues(alpha: 0.88),
-                  hi.withValues(alpha: 0.22),
+                  hi.withValues(alpha: 0.50),
+                  hi.withValues(alpha: 0.14),
                   hi.withValues(alpha: 0.0),
                 ],
                 [0.0, 0.55, 1.0],
@@ -570,18 +571,17 @@ class _NailFinishPainter extends CustomPainter {
           );
           canvas.restore();
 
-          // 4) A single clean catch-light near the top of the column — the tight
-          //    bright glint polished metal throws. One only; kept crisp but small
-          //    so the finish stays clean.
+          // 4) One clean catch-light glint high on the nail — the tight bright
+          //    spark polished metal throws. Kept small so the finish stays clean.
           canvas.drawCircle(
-            Offset(size.width * 0.44, size.height * 0.20),
-            size.width * 0.10,
+            Offset(size.width * 0.45, size.height * 0.18),
+            size.width * 0.11,
             Paint()
               ..shader = ui.Gradient.radial(
-                Offset(size.width * 0.44, size.height * 0.20),
-                size.width * 0.10,
+                Offset(size.width * 0.45, size.height * 0.18),
+                size.width * 0.11,
                 [
-                  Colors.white.withValues(alpha: 0.85),
+                  Colors.white.withValues(alpha: 0.9),
                   Colors.white.withValues(alpha: 0.0),
                 ],
                 [0.0, 1.0],
