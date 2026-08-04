@@ -497,11 +497,11 @@ class _NailFinishPainter extends CustomPainter {
           // read as their own metal.
           final Color c = baseColor ?? const Color(0xFFC7CBD2);
           Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
-          final Color hi = mix(c, Colors.white, 0.97); // brightest reflection
-          final Color lit = mix(c, Colors.white, 0.66); // bright metal base
-          final Color mid = mix(c, Colors.white, 0.24); // metal's own light tone
-          final Color soft = mix(c, Colors.black, 0.22); // soft reflected shade
-          final Color dk = mix(c, Colors.black, 0.42); // deeper reflected shade
+          final Color hi = mix(c, Colors.white, 0.98); // brightest reflection
+          final Color lit = mix(c, Colors.white, 0.70); // bright metal base
+          final Color mid = mix(c, Colors.white, 0.34); // metal's own light tone
+          final Color soft = mix(c, Colors.black, 0.12); // gentle reflected grey
+          final Color dk = mix(c, Colors.black, 0.28); // deepest swirl, still soft
 
           // 1) A bright, reflective metal base. Only gentle vertical variation —
           //    it stays light the whole way (her drawing is a bright mirror, not
@@ -552,179 +552,115 @@ class _NailFinishPainter extends CustomPainter {
           //    chrome its liquid, room-reflecting look. Placed at organic
           //    positions and angles, never symmetric, so they read as a real
           //    reflection rather than a pattern.
-          reflection(0.58, 0.46, 1.15, 0.42, -0.55, dk, 0.55); // main sweep
-          reflection(0.30, 0.70, 0.72, 0.40, 0.45, soft, 0.50); // lower-left
-          reflection(0.74, 0.74, 0.60, 0.34, -0.30, soft, 0.40); // lower-right
+          reflection(0.56, 0.44, 1.20, 0.44, -0.55, dk, 0.40); // main soft swirl
+          reflection(0.32, 0.68, 0.78, 0.42, 0.50, soft, 0.42); // lower-left swirl
+          reflection(0.74, 0.72, 0.64, 0.36, -0.30, soft, 0.34); // lower-right swirl
 
-          // 3) Bright reflected LIGHTS — broad blurred highlights curving through
-          //    the upper nail and a smaller one lower down, so the surface looks
-          //    like polished metal catching the light from more than one spot.
-          reflection(0.40, 0.28, 0.95, 0.62, 0.30, hi, 0.75); // main highlight
-          reflection(0.68, 0.60, 0.55, 0.40, -0.35, hi, 0.42); // lower glint
-
-          // 4) One clean catch-light — the tight bright spark polished metal
-          //    throws. Kept small and crisp so the finish stays clean.
-          canvas.drawCircle(
-            Offset(size.width * 0.42, size.height * 0.20),
-            size.width * 0.09,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset(size.width * 0.42, size.height * 0.20),
-                size.width * 0.09,
-                [
-                  Colors.white.withValues(alpha: 0.95),
-                  Colors.white.withValues(alpha: 0.0),
-                ],
-                [0.0, 1.0],
-              ),
-          );
+          // 3) Bright reflected LIGHTS — broad, blurred highlights curving through
+          //    the nail from a couple of directions, so the surface reads as a
+          //    bright polished mirror catching the room (like Ashlyn's drawing)
+          //    rather than a shaded dome. Kept bright and soft, no hard spark.
+          reflection(0.42, 0.26, 1.00, 0.66, 0.32, hi, 0.78); // main highlight
+          reflection(0.66, 0.56, 0.66, 0.44, -0.38, hi, 0.50); // secondary sweep
+          reflection(0.24, 0.42, 0.55, 0.42, 0.30, hi, 0.40); // left glow swirl
         }
         break;
 
       case NailFinish.catEye:
         {
-          // Magnetic "cat-eye" gel (matches the rose-gold Vettsy reference). The
-          // real look is chatoyancy: a FINE, DENSE metallic shimmer over the
-          // whole nail with one bright band of light running the LENGTH of the
-          // nail (cuticle→tip) down the centre, and the metal DARKENING sharply
-          // toward both side edges. That quick side fall-off is what gives the
-          // 3D "eye"; its absence is why a soft even sheen just reads as gloss.
+          // Galaxy / diamond magnetic cat-eye — matches Ashlyn's reference photo:
+          // a DEEP, DARK base packed with a DENSE field of fine bright sparkle
+          // "stars", crossed by one broad, soft, CURVED band of light (the
+          // magnetic flash). The dark base + dense starry shimmer is what makes it
+          // read as a magnetic cat-eye; a plain bright wash just looks like gloss.
+          // Every tone is built FROM THE BASE COLOUR so a coloured cat-eye keeps
+          // its own metal while still reading dark-and-starry.
+          final Color c = baseColor ?? const Color(0xFF23272F);
+          Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
+          final Color deep = mix(c, Colors.black, 0.74); // deep shadowed edges
+          final Color body = mix(c, Colors.black, 0.40); // lighter core of base
 
-          _base(canvas, size, rect, sides: 0.14);
-
-          // Chatoyancy across the WIDTH: bright down the central column,
-          // darkening sharply to deep shade at both side edges so the centre
-          // reads as a concentrated slit of light (the 3D "eye"), not a flat
-          // wash. Laid down FIRST so the shimmer flakes sit on top of the
-          // shading and catch the light in the bright band.
+          // 1) Deep base with a soft brighter pool through the middle so the
+          //    sparkle and flash have some depth to sit on.
+          canvas.drawRect(rect, Paint()..color = deep);
           canvas.drawRect(
             rect,
-            Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(0, size.height / 2),
-                Offset(size.width, size.height / 2),
-                [
-                  Colors.black.withValues(alpha: 0.58), // deep shade, left edge
-                  Colors.black.withValues(alpha: 0.12),
-                  Colors.black.withValues(alpha: 0.0), // bright centre
-                  Colors.black.withValues(alpha: 0.12),
-                  Colors.black.withValues(alpha: 0.58), // deep shade, right edge
-                ],
-                [0.0, 0.30, 0.5, 0.70, 1.0],
-              ),
-          );
-          // Slight darkening at the very tip and cuticle so the glowing band
-          // tapers toward both ends like a real cat-eye.
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(0, 0),
-                Offset(0, size.height),
-                [
-                  Colors.black.withValues(alpha: 0.30),
-                  Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.32),
-                ],
-                [0.0, 0.20, 0.80, 1.0],
-              ),
-          );
-
-          // The "big shine" — a broad, SOFT bloom of light down the centre,
-          // NOT a hard white line. It is kept at moderate alpha and heavily
-          // blurred so the polish colour glows THROUGH it (a bright tint of the
-          // real colour), which is what makes it read as a magnetic shine
-          // rather than a painted-on white stripe.
-          // A clear CRESCENT curve (client: "the big main shine curves more").
-          // Ends sit left of centre, the belly bows well to the right, so the
-          // shine arcs like a real magnetic cat-eye instead of a straight line.
-          const endX = 0.38; // both ends
-          const ctrlX = 0.74; // control pulls the belly right
-          const bellyX = 0.25 * endX + 0.5 * ctrlX + 0.25 * endX; // = 0.56
-          final eye = Path()
-            ..moveTo(size.width * endX, size.height * 0.08)
-            ..quadraticBezierTo(size.width * ctrlX, size.height * 0.5,
-                size.width * endX, size.height * 0.92);
-          // Wide outer halo.
-          canvas.drawPath(
-            eye,
-            Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = size.width * 0.46
-              ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.16)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.18),
-          );
-          // Mid glow.
-          canvas.drawPath(
-            eye,
-            Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = size.width * 0.20
-              ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.30)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.08),
-          );
-          // Soft bright core — blurred, NOT a crisp line (this was the "fake"
-          // tell before). Base colour still reads through it.
-          canvas.drawPath(
-            eye,
-            Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = size.width * 0.07
-              ..strokeCap = StrokeCap.round
-              ..color = Colors.white.withValues(alpha: 0.55)
-              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.035),
-          );
-          // A large elongated bloom on the BELLY of the curve so the shine
-          // swells where the arc bows out and fades toward the ends — the "big
-          // shine", now following the crescent.
-          canvas.save();
-          canvas.translate(size.width * bellyX, size.height * 0.5);
-          canvas.scale(0.55, 1.35);
-          canvas.drawCircle(
-            Offset.zero,
-            size.width * 0.42,
             Paint()
               ..shader = ui.Gradient.radial(
-                Offset.zero,
-                size.width * 0.42,
-                [
-                  Colors.white.withValues(alpha: 0.28),
-                  Colors.white.withValues(alpha: 0.0),
-                ],
+                Offset(size.width * 0.5, size.height * 0.44),
+                size.width * 0.95,
+                [body, deep],
+                [0.0, 1.0],
               ),
           );
-          canvas.restore();
 
-          // Fine, dense magnetic flake shimmer laid ON TOP so the sparkle
-          // reads over the shading and shine — "small sparklers". Seeded so it
-          // holds still between repaints.
+          // 2) The magnetic FLASH — a broad, soft, curved sweep of light arcing
+          //    ACROSS the nail (not a straight slit). The base colour is
+          //    brightened so a coloured cat-eye flashes in its own metal, then a
+          //    whiter core rides the middle of the arc.
+          final Color flash = mix(c, Colors.white, 0.82);
+          final band = Path()
+            ..moveTo(size.width * 0.04, size.height * 0.60)
+            ..quadraticBezierTo(size.width * 0.52, size.height * 0.16,
+                size.width * 0.96, size.height * 0.48);
+          canvas.drawPath(
+            band,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = size.width * 0.52
+              ..strokeCap = StrokeCap.round
+              ..color = flash.withValues(alpha: 0.34)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.17),
+          );
+          canvas.drawPath(
+            band,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = size.width * 0.18
+              ..strokeCap = StrokeCap.round
+              ..color = flash.withValues(alpha: 0.55)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.08),
+          );
+          canvas.drawPath(
+            band,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = size.width * 0.06
+              ..strokeCap = StrokeCap.round
+              ..color = Colors.white.withValues(alpha: 0.5)
+              ..maskFilter = MaskFilter.blur(BlurStyle.normal, size.width * 0.03),
+          );
+
+          // 3) DENSE fine sparkle — the "stars". Hundreds of tiny bright specks
+          //    across the whole nail (seeded so they hold still between repaints),
+          //    brighter than a plain glitter so they twinkle on the dark base.
+          //    Plain dots (no per-speck blur) so a full set of nails stays smooth
+          //    over the live camera.
           final rnd = math.Random(42);
-          for (int i = 0; i < 260; i++) {
+          for (int i = 0; i < 640; i++) {
             final x = rnd.nextDouble() * size.width;
             final y = rnd.nextDouble() * size.height;
-            final r = 0.35 + rnd.nextDouble() * 0.75;
-            final a = 0.12 + rnd.nextDouble() * 0.24;
-            canvas.drawCircle(
-                Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
+            final r = 0.3 + rnd.nextDouble() * 0.85;
+            final a = 0.30 + rnd.nextDouble() * 0.5;
+            canvas.drawCircle(Offset(x, y), r,
+                Paint()..color = Colors.white.withValues(alpha: a));
           }
-          // A scatter of brighter sparkle glints, biased toward the lit centre
-          // band where real flakes flash hardest — the "big shine" sparkle.
-          // Drawn as plain tiny circles (no per-speck blur) so a set of nails
-          // stays smooth over the live camera.
-          for (int i = 0; i < 34; i++) {
-            final bias = rnd.nextDouble();
-            // Pull x toward the centre band for most glints.
-            final x = bias < 0.7
-                ? size.width * (bellyX + (rnd.nextDouble() - 0.5) * 0.40)
-                : rnd.nextDouble() * size.width;
+          // 4) A scatter of standout STAR glints — a bright dot with a small,
+          //    fine cross-flare — the diamond twinkle of a galaxy cat-eye. Kept
+          //    small and few so they read as sparkle, not graphic plus-signs.
+          //    Cross lines only (no blur) so it stays fast across a set of nails.
+          for (int i = 0; i < 30; i++) {
+            final x = rnd.nextDouble() * size.width;
             final y = rnd.nextDouble() * size.height;
-            final r = 0.8 + rnd.nextDouble() * 1.2;
-            final a = 0.5 + rnd.nextDouble() * 0.4;
-            canvas.drawCircle(
-                Offset(x, y), r, Paint()..color = Colors.white.withValues(alpha: a));
+            final s = size.width * (0.013 + rnd.nextDouble() * 0.028);
+            final p = Paint()
+              ..color = Colors.white.withValues(alpha: 0.8)
+              ..strokeWidth = 0.7
+              ..strokeCap = StrokeCap.round;
+            canvas.drawLine(Offset(x - s, y), Offset(x + s, y), p);
+            canvas.drawLine(Offset(x, y - s), Offset(x, y + s), p);
+            canvas.drawCircle(Offset(x, y), 0.9,
+                Paint()..color = Colors.white.withValues(alpha: 0.95));
           }
         }
         break;
