@@ -499,6 +499,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // True while a nail is being dragged, so we can show crosshair guides that
   // stay visible even when the finger covers the nail.
   bool _dragging = false;
+  // "Move all" mode: one drag shifts the WHOLE set of nails together. This is
+  // the one-gesture fix for a uniform auto-placement offset (e.g. the whole set
+  // sitting a touch high) so the customer never has to drag five nails one by
+  // one to correct the same shift.
+  bool _moveAllMode = false;
   String? _currentDesign;
   // The shape/finish/length applied to new nails and to "all nails" edits. A
   // single selected nail can override these for that finger only.
@@ -633,6 +638,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _nails.clear();
       _undoStack.clear();
       _selected = null;
+      _moveAllMode = false;
       // Coming from the Studio we keep the composed design so it can be laid
       // onto the photo as a starter set; otherwise start with a clean slate.
       if (!keepDesign) {
@@ -769,6 +775,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         _pendingLandmarks = result.normalizedLandmarks;
         _ambient = ambient;
         _selected = null;
+        _moveAllMode = false;
         _nails.clear();
         _undoStack.clear();
         _currentDesign ??= kDefaultDesign;
@@ -1090,6 +1097,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         widthFactor: _widthFactor,
       ));
       _selected = _nails.length - 1;
+      _moveAllMode = false;
     });
   }
 
@@ -2581,7 +2589,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 // the RepaintBoundary below, so it's always the un-zoomed view.
                 InteractiveViewer(
                   transformationController: _zoomCtrl,
-                  panEnabled: _selected == null,
+                  panEnabled: _selected == null && !_moveAllMode,
                   minScale: 1.0,
                   maxScale: 5.0,
                   clipBehavior: Clip.hardEdge,
@@ -2626,23 +2634,30 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                               setState(() => _selected = null);
                             }
                           },
-                          // Only claim one-finger drags when a nail is selected
-                          // (to move it). When nothing is selected these are null
-                          // so the drag falls through to the zoom viewer's pan.
-                          onPanStart: _selected == null
+                          // Claim one-finger drags when a nail is selected (move
+                          // it) OR in Move-all mode (shift the whole set). When
+                          // neither is active these are null so the drag falls
+                          // through to the zoom viewer's pan.
+                          onPanStart: (_selected == null && !_moveAllMode)
                               ? null
                               : (_) {
                                   _pushUndo();
                                   setState(() => _dragging = true);
                                 },
-                          onPanUpdate: _selected == null
+                          onPanUpdate: (_selected == null && !_moveAllMode)
                               ? null
                               : (d) {
-                                  if (_selected! >= _nails.length) return;
-                                  setState(() =>
-                                      _nails[_selected!].center += d.delta);
+                                  setState(() {
+                                    if (_moveAllMode) {
+                                      for (final n in _nails) {
+                                        n.center += d.delta;
+                                      }
+                                    } else if (_selected! < _nails.length) {
+                                      _nails[_selected!].center += d.delta;
+                                    }
+                                  });
                                 },
-                          onPanEnd: _selected == null
+                          onPanEnd: (_selected == null && !_moveAllMode)
                               ? null
                               : (_) => setState(() => _dragging = false),
                         ),
@@ -2670,6 +2685,26 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                               ),
                               child: const Text(
                                 'Pick a design below to try it on',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_moveAllMode && _currentDesign != null)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 16,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xE600897B),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Move-all: drag to shift every nail together',
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
@@ -2836,17 +2871,31 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => setState(() => _selected = i),
+              onTap: () {
+                // In Move-all mode a tap shouldn't single out one nail.
+                if (_moveAllMode) return;
+                setState(() => _selected = i);
+              },
               onPanStart: (_) {
                 // One undo snapshot per drag gesture (not per frame).
                 _pushUndo();
                 setState(() {
-                  _selected = i;
+                  // In Move-all mode, dragging (even starting on a nail) shifts
+                  // the whole set rather than selecting this one.
+                  if (!_moveAllMode) _selected = i;
                   _dragging = true;
                 });
               },
               onPanUpdate: (d) {
-                setState(() => n.center += d.delta);
+                setState(() {
+                  if (_moveAllMode) {
+                    for (final m in _nails) {
+                      m.center += d.delta;
+                    }
+                  } else {
+                    n.center += d.delta;
+                  }
+                });
               },
               onPanEnd: (_) => setState(() => _dragging = false),
             ),
@@ -2895,6 +2944,23 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             icon: const Icon(Icons.undo, size: 18),
             label: const Text('Undo'),
           ),
+          // Move-all toggle: when the whole set is shifted the same way (e.g. a
+          // touch high after auto-placement), turn this on and drag once to move
+          // every nail together, instead of dragging each one. Only offered when
+          // there are nails and no single nail is selected.
+          if (_photo != null && _nails.isNotEmpty && _selected == null)
+            TextButton.icon(
+              onPressed: () =>
+                  setState(() => _moveAllMode = !_moveAllMode),
+              icon: Icon(Icons.open_with,
+                  size: 18,
+                  color: _moveAllMode ? const Color(0xFF00897B) : null),
+              label: Text(
+                _moveAllMode ? 'Moving all' : 'Move all',
+                style: TextStyle(
+                    color: _moveAllMode ? const Color(0xFF00897B) : null),
+              ),
+            ),
           const Spacer(),
           if (_selected != null) ...[
             TextButton.icon(

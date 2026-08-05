@@ -67,7 +67,14 @@ const double kNailWidthFactor = 0.56;
 /// were shrunk (v1.6.54) 0.13 read LOW again — bare fingertip above each nail,
 /// "doesn't cover the full nail". Smaller nails need LESS backset to reach the
 /// visible tip, so 0.13→0.08 to ride them back up over the whole nail bed.
-const double kNailBacksetFactor = 0.08;
+/// v1.6.89: Ashlyn's post-auto-place screenshot (Android) shows the whole set
+/// riding a touch HIGH — overhanging past the fingertip into the background,
+/// bare nail-bed below. That is a CONSISTENT bias across all five nails, so the
+/// whole set is shifted DOWN uniformly (+0.06 here and on the thumb/pinky
+/// per-finger values) to seat the nails back on the bed while keeping the
+/// relative per-finger tuning intact. A one-gesture "Move all" control now
+/// covers any residual per-photo offset without further constant-chasing.
+const double kNailBacksetFactor = 0.14;
 
 /// The pinky gets its own backset. Its tip→DIP segment is the shortest of the
 /// five, so MediaPipe landmark noise is a bigger FRACTION of it and the pinky
@@ -93,14 +100,16 @@ const double kNailBacksetFactor = 0.08;
 /// v1.6.62: -0.15 OVERSHOT (tester now says the pinky sits "too high", i.e. the
 /// nail rides too far toward/past the tip), so ease back to the midpoint -0.12 —
 /// bracketed between -0.10 (a sliver too low) and -0.15 (too high).
-const double kNailPinkyBacksetFactor = -0.12;
+/// v1.6.89: shifted +0.06 with the global set-wide down-nudge (-0.12→-0.06).
+const double kNailPinkyBacksetFactor = -0.06;
 
 /// The thumb reads consistently LOW on the tester's device (its axis is diagonal
 /// and its distal phalanx is stubby, so the tip landmark lands well short of the
 /// real nail bed). A NEGATIVE backset pushes the thumb nail past the tip
 /// landmark, up onto the nail bed where it belongs (0.04 still read low across
 /// tester shots; -0.06 lifted it onto the bed, -0.10 with the global up-shift).
-const double kNailThumbBacksetFactor = -0.10;
+/// v1.6.89: shifted +0.06 with the global set-wide down-nudge (-0.10→-0.04).
+const double kNailThumbBacksetFactor = -0.04;
 
 /// Tip landmark indices (MediaPipe Hands).
 const int kThumbTipIndex = 4;
