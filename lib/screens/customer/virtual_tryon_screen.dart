@@ -3412,9 +3412,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Straight',
+                Text('Gentle',
                     style: TextStyle(fontSize: 11, color: Colors.black54)),
-                Text('Deep curve',
+                Text('Deep arch',
                     style: TextStyle(fontSize: 11, color: Colors.black54)),
               ],
             ),

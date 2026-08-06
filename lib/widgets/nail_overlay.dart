@@ -1131,17 +1131,20 @@ class _StrokePainter extends CustomPainter {
 /// Shared by the procedural French [ColorDesign] and the French-tip OVERLAY that
 /// stacks on artwork, so both read identically.
 ///
-/// [arch] (0..1) controls the smile-line curvature: the side anchors stay put at
-/// the free-edge band while the centre control point rises toward the tip as
-/// arch grows, so 0 = a straight-across tip and 1 = a deep curved smile. The
-/// default ([kFrenchArchDefault]) reproduces the classic smile line.
+/// [arch] (0..1) controls how deep and how curved the French smile is. As arch
+/// grows BOTH the sidewall depth increases (the tip runs further down the nail)
+/// AND the centre rises further toward the free edge (a more pronounced smile) —
+/// so the whole range is arched (never a flat straight line): 0 = a gentle
+/// shallow smile, 1 = a deep, dramatically arched smile that covers well past
+/// halfway at the sides. [kFrenchArchDefault] is a natural mid arch.
 Path frenchTipBand(Size size, [double arch = kFrenchArchDefault]) {
   final w = size.width, h = size.height;
   final t = arch.clamp(0.0, 1.0);
-  const sideY = 0.34; // depth of the smile at the sidewalls (fraction of h)
-  // Centre of the smile rises toward the free edge as arch grows. Clamped so a
-  // very deep arch still leaves a sliver of tip colour in the middle.
-  final ctrlY = (sideY - 0.40 * t).clamp(0.02, sideY);
+  // Tip depth at the sidewalls: runs from a shallow tip to well past halfway.
+  final sideY = 0.30 + 0.34 * t; // 0.30 → 0.64
+  // How far the centre of the smile rises ABOVE the sidewalls (the arch depth).
+  final archAmt = 0.16 + 0.24 * t; // 0.16 → 0.40
+  final ctrlY = sideY - archAmt; // 0.14 → 0.24
   return Path()
     ..moveTo(0, h * sideY)
     ..quadraticBezierTo(w * 0.5, h * ctrlY, w, h * sideY)
