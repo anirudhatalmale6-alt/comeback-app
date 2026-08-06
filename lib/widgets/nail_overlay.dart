@@ -1142,12 +1142,16 @@ Path frenchTipBand(Size size, [double arch = kFrenchArchDefault]) {
   final t = arch.clamp(0.0, 1.0);
   // Tip depth at the sidewalls: runs from a shallow tip to well past halfway.
   final sideY = 0.30 + 0.34 * t; // 0.30 → 0.64
-  // How far the centre of the smile rises ABOVE the sidewalls (the arch depth).
-  final archAmt = 0.16 + 0.24 * t; // 0.16 → 0.40
-  final ctrlY = sideY - archAmt; // 0.14 → 0.24
+  // How high the smile rises toward the tip at the centre. A cubic curve with
+  // both control points pulled toward the middle surfaces ~75% of this rise as
+  // visible arch depth (vs ~50% for a plain quadratic) AND gives a sharper,
+  // more pronounced peak — so the deep end reads as a dramatic curve, not just
+  // a lower straight-ish line.
+  final archAmt = 0.12 + 0.34 * t; // 0.12 → 0.46
+  final ctrlY = (sideY - archAmt).clamp(0.02, 1.0); // control height near tip
   return Path()
     ..moveTo(0, h * sideY)
-    ..quadraticBezierTo(w * 0.5, h * ctrlY, w, h * sideY)
+    ..cubicTo(w * 0.30, h * ctrlY, w * 0.70, h * ctrlY, w, h * sideY)
     ..lineTo(w, 0)
     ..lineTo(0, 0)
     ..close();
