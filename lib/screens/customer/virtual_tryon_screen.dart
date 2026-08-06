@@ -516,6 +516,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // The base (background) colour used behind French tips. Palette tip taps keep
   // this base; the custom picker can change it.
   int _frenchBase = kFrenchBaseColor;
+  // Curvature of the French smile line (0 = straight across, 1 = deep curve),
+  // shared by every French tip in the set so the whole hand reads consistently.
+  // Adjustable from the French customiser sliders.
+  double _frenchArch = kFrenchArchDefault;
   final List<String> _customDesigns = [];
   bool _busy = false;
 
@@ -1654,6 +1658,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         color: color,
         tint: tintArgb == null ? null : Color(tintArgb),
         frenchTip: ftipArgb == null ? null : Color(ftipArgb),
+        frenchArch: _frenchArch,
         decals: _decalSpecs(decals),
         strokes: _strokeSpecs(strokes),
         shape: _shape,
@@ -2845,6 +2850,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                           frenchOverlayArgb(n.asset) == null
                       ? null
                       : Color(frenchOverlayArgb(n.asset)!),
+                  frenchArch: _frenchArch,
                   decals: _decalSpecs(n.decals),
                   strokes: _strokeSpecs(n.strokes),
                   shape: n.shape,
@@ -3280,6 +3286,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final cd = activeId == null ? null : colorDesignFor(activeId);
     Color tip = (cd != null && cd.tip != null) ? cd.tip! : const Color(0xFFFFFFFF);
     Color base = (cd != null && cd.tip != null) ? cd.base : Color(_frenchBase);
+    final double prevArch = _frenchArch;
+    double arch = _frenchArch;
 
     final applied = await showModalBottomSheet<bool>(
       context: context,
@@ -3327,7 +3335,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       child: SizedBox(
                         width: 64,
                         height: 90,
-                        child: NailColorSwatch(ColorDesign(base, tip: tip)),
+                        child: NailColorSwatch(
+                            ColorDesign(base, tip: tip, arch: arch)),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -3341,6 +3350,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       final c = await showColorWheelDialog(ctx,
                           initial: base, title: 'Base colour');
                       if (c != null) setSheet(() => base = c);
+                    }),
+                    const Divider(height: 1),
+                    _archSlider(arch, (v) {
+                      setSheet(() => arch = v);
+                      setState(() => _frenchArch = v); // live on placed nails
                     }),
                     const SizedBox(height: 16),
                     FilledButton(
@@ -3359,9 +3373,55 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
 
     if (applied == true) {
-      setState(() => _frenchBase = base.toARGB32());
+      setState(() {
+        _frenchBase = base.toARGB32();
+        _frenchArch = arch;
+      });
       _applyDesign(frenchDesignId(tip.toARGB32(), base.toARGB32()));
+    } else {
+      // Cancelled: revert any live arch preview back to what it was.
+      setState(() => _frenchArch = prevArch);
     }
+  }
+
+  /// A labelled Arch slider (Straight ↔ Deep) for the French smile line, shared
+  /// by the Custom French and French-tip-on-top sheets.
+  Widget _archSlider(double value, ValueChanged<double> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('Tip arch', style: TextStyle(fontSize: 15)),
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: const Color(0xFF00897B),
+              thumbColor: const Color(0xFF00897B),
+              overlayColor: const Color(0x2900897B),
+            ),
+            child: Slider(
+              value: value.clamp(0.0, 1.0),
+              onChanged: onChanged,
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Straight',
+                    style: TextStyle(fontSize: 11, color: Colors.black54)),
+                Text('Deep curve',
+                    style: TextStyle(fontSize: 11, color: Colors.black54)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Leading tile for the artwork categories: a colour-wheel button that
@@ -3483,6 +3543,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final tintArgb = designTintArgb(activeId);
     Color tip = Color(frenchOverlayArgb(activeId) ?? 0xFFFFFFFF);
     final hadTip = frenchOverlayArgb(activeId) != null;
+    final double prevArch = _frenchArch;
+    double arch = _frenchArch;
 
     final result = await showModalBottomSheet<String>(
       context: context,
@@ -3513,6 +3575,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                           image: baseImg,
                           tint: tintArgb == null ? null : Color(tintArgb),
                           frenchTip: tip,
+                          frenchArch: arch,
                           shape: _shape,
                           finish: _finish,
                         ),
@@ -3548,6 +3611,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                         ),
                       ),
                     ),
+                    _archSlider(arch, (v) {
+                      setSheet(() => arch = v);
+                      setState(() => _frenchArch = v); // live on placed nails
+                    }),
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () => Navigator.pop(sheetCtx, 'apply'),
@@ -3570,9 +3637,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
 
     if (result == 'apply') {
+      setState(() => _frenchArch = arch);
       _applyDesign(withFrenchOverlay(activeId, tip.toARGB32()));
     } else if (result == 'remove') {
       _applyDesign(stripFrenchOverlay(activeId));
+    } else {
+      // Cancelled: revert any live arch preview.
+      setState(() => _frenchArch = prevArch);
     }
   }
 

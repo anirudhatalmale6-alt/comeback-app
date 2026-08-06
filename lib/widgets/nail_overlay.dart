@@ -27,6 +27,11 @@ class AmbientLight {
       ]);
 }
 
+/// How curved the French "smile line" is, 0..1. 0 = a straight-across tip
+/// (no arch); higher = a deeper, more pronounced curved smile. The default
+/// reproduces the classic French smile the app has always drawn.
+const double kFrenchArchDefault = 0.5;
+
 /// A procedurally-painted design: a solid [base] colour, optionally with a
 /// French [tip] crescent in a second colour. This lets the customer pick ANY
 /// base colour or tip colour instead of being limited to the handful of baked-in
@@ -38,7 +43,11 @@ class ColorDesign {
   /// free-edge on top of the [base]. Null means a plain solid colour.
   final Color? tip;
 
-  const ColorDesign(this.base, {this.tip});
+  /// Curvature of the French smile line (see [kFrenchArchDefault]). Only used
+  /// when [tip] is set.
+  final double arch;
+
+  const ColorDesign(this.base, {this.tip, this.arch = kFrenchArchDefault});
 }
 
 /// The nail-tip styles a customer can pick, matching what a technician offers.
@@ -756,6 +765,10 @@ class NailOverlay extends StatelessWidget {
   /// French tip on top. Ignored for a [color] design — those carry their own tip.
   final Color? frenchTip;
 
+  /// Curvature of the French smile line, 0..1 (see [kFrenchArchDefault]). Applies
+  /// to both a [color] French tip and a [frenchTip] overlay on artwork.
+  final double frenchArch;
+
   /// Premade decal stickers (hearts, stars, gems…) placed on top of the design,
   /// clipped to the nail so they never bleed onto the skin. Positioned/sized
   /// relative to the nail box, so the same list reads identically on the big
@@ -780,6 +793,7 @@ class NailOverlay extends StatelessWidget {
     this.color,
     this.tint,
     this.frenchTip,
+    this.frenchArch = kFrenchArchDefault,
     this.decals = const [],
     this.strokes = const [],
     this.shape = NailShape.oval,
@@ -793,7 +807,11 @@ class NailOverlay extends StatelessWidget {
     Widget design;
     if (color != null) {
       // Painted from colours; the painter clips itself to the nail silhouette.
-      design = CustomPaint(painter: _ColorDesignPainter(shape, color!));
+      // Apply the current French arch to the tip (if any).
+      design = CustomPaint(
+          painter: _ColorDesignPainter(
+              shape,
+              ColorDesign(color!.base, tip: color!.tip, arch: frenchArch)));
     } else {
       // BoxFit.cover so the artwork fills the whole nail silhouette; it is
       // scaled, never stretched out of proportion.
@@ -821,7 +839,9 @@ class NailOverlay extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             design,
-            CustomPaint(painter: _FrenchOverlayPainter(shape, frenchTip!)),
+            CustomPaint(
+                painter:
+                    _FrenchOverlayPainter(shape, frenchTip!, frenchArch)),
           ],
         );
       }
@@ -1110,11 +1130,21 @@ class _StrokePainter extends CustomPainter {
 ///
 /// Shared by the procedural French [ColorDesign] and the French-tip OVERLAY that
 /// stacks on artwork, so both read identically.
-Path frenchTipBand(Size size) {
+///
+/// [arch] (0..1) controls the smile-line curvature: the side anchors stay put at
+/// the free-edge band while the centre control point rises toward the tip as
+/// arch grows, so 0 = a straight-across tip and 1 = a deep curved smile. The
+/// default ([kFrenchArchDefault]) reproduces the classic smile line.
+Path frenchTipBand(Size size, [double arch = kFrenchArchDefault]) {
   final w = size.width, h = size.height;
+  final t = arch.clamp(0.0, 1.0);
+  const sideY = 0.34; // depth of the smile at the sidewalls (fraction of h)
+  // Centre of the smile rises toward the free edge as arch grows. Clamped so a
+  // very deep arch still leaves a sliver of tip colour in the middle.
+  final ctrlY = (sideY - 0.40 * t).clamp(0.02, sideY);
   return Path()
-    ..moveTo(0, h * 0.34)
-    ..quadraticBezierTo(w * 0.5, h * 0.14, w, h * 0.34)
+    ..moveTo(0, h * sideY)
+    ..quadraticBezierTo(w * 0.5, h * ctrlY, w, h * sideY)
     ..lineTo(w, 0)
     ..lineTo(0, 0)
     ..close();
@@ -1126,19 +1156,21 @@ Path frenchTipBand(Size size) {
 class _FrenchOverlayPainter extends CustomPainter {
   final NailShape shape;
   final Color tip;
-  const _FrenchOverlayPainter(this.shape, this.tip);
+  final double arch;
+  const _FrenchOverlayPainter(this.shape, this.tip,
+      [this.arch = kFrenchArchDefault]);
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.clipPath(nailSilhouette(size, shape));
-    canvas.drawPath(frenchTipBand(size), Paint()..color = tip);
+    canvas.drawPath(frenchTipBand(size, arch), Paint()..color = tip);
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _FrenchOverlayPainter old) =>
-      old.shape != shape || old.tip != tip;
+      old.shape != shape || old.tip != tip || old.arch != arch;
 }
 
 /// Paints a [ColorDesign] inside the nail silhouette: a solid base, plus a
@@ -1158,7 +1190,7 @@ class _ColorDesignPainter extends CustomPainter {
     canvas.drawRect(Offset.zero & size, Paint()..color = design.base);
     final tip = design.tip;
     if (tip != null) {
-      canvas.drawPath(frenchTipBand(size), Paint()..color = tip);
+      canvas.drawPath(frenchTipBand(size, design.arch), Paint()..color = tip);
     }
     canvas.restore();
   }
@@ -1167,7 +1199,8 @@ class _ColorDesignPainter extends CustomPainter {
   bool shouldRepaint(covariant _ColorDesignPainter old) =>
       old.shape != shape ||
       old.design.base != design.base ||
-      old.design.tip != design.tip;
+      old.design.tip != design.tip ||
+      old.design.arch != design.arch;
 }
 
 /// A small glossy preview of a [ColorDesign] on a nail silhouette, used for the
@@ -1202,7 +1235,8 @@ class _ColorSwatchPainter extends CustomPainter {
       old.shape != shape ||
       old.finish != finish ||
       old.design.base != design.base ||
-      old.design.tip != design.tip;
+      old.design.tip != design.tip ||
+      old.design.arch != design.arch;
 }
 
 /// A small solid-colour preview of a nail [shape] with a given [finish], used in
