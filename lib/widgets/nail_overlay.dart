@@ -505,6 +505,13 @@ class _NailFinishPainter extends CustomPainter {
           // built FROM THE BASE COLOUR so silver, gold, rose-gold and black each
           // read as their own metal.
           final Color c = baseColor ?? const Color(0xFFC7CBD2);
+          // With no base colour the nail is wearing ARTWORK (a glitter, ombré,
+          // pattern or the customer's own photo) rather than a flat colour. The
+          // mirror below is an opaque fill, so at full strength it would erase
+          // that artwork completely; over artwork it's laid on as a translucent
+          // metallic wash instead, letting the design read through it. On a
+          // solid colour (the normal chrome pick) nothing changes.
+          final double fill = baseColor == null ? 0.55 : 1.0;
           Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
           final Color hi = mix(c, Colors.white, 0.98); // brightest reflection
           final Color lit = mix(c, Colors.white, 0.70); // bright metal base
@@ -522,7 +529,13 @@ class _NailFinishPainter extends CustomPainter {
               ..shader = ui.Gradient.linear(
                 Offset(size.width * 0.5, 0),
                 Offset(size.width * 0.5, size.height),
-                [lit, hi, lit, mid, lit],
+                [
+                  lit.withValues(alpha: fill),
+                  hi.withValues(alpha: fill),
+                  lit.withValues(alpha: fill),
+                  mid.withValues(alpha: fill),
+                  lit.withValues(alpha: fill),
+                ],
                 [0.0, 0.18, 0.44, 0.72, 1.0],
               ),
           );
@@ -585,20 +598,25 @@ class _NailFinishPainter extends CustomPainter {
           // Every tone is built FROM THE BASE COLOUR so a coloured cat-eye keeps
           // its own metal while still reading dark-and-starry.
           final Color c = baseColor ?? const Color(0xFF23272F);
+          // As with chrome: no base colour means the nail is wearing artwork, so
+          // the deep galaxy base goes on as a translucent veil rather than an
+          // opaque fill and the design underneath still reads. On a solid colour
+          // it stays exactly as deep and starry as before.
+          final double fill = baseColor == null ? 0.55 : 1.0;
           Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
           final Color deep = mix(c, Colors.black, 0.74); // deep shadowed edges
           final Color body = mix(c, Colors.black, 0.40); // lighter core of base
 
           // 1) Deep base with a soft brighter pool through the middle so the
           //    sparkle and flash have some depth to sit on.
-          canvas.drawRect(rect, Paint()..color = deep);
+          canvas.drawRect(rect, Paint()..color = deep.withValues(alpha: fill));
           canvas.drawRect(
             rect,
             Paint()
               ..shader = ui.Gradient.radial(
                 Offset(size.width * 0.5, size.height * 0.44),
                 size.width * 0.95,
-                [body, deep],
+                [body.withValues(alpha: fill), deep.withValues(alpha: fill)],
                 [0.0, 1.0],
               ),
           );

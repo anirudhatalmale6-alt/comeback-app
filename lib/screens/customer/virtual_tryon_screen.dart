@@ -874,8 +874,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// Applies a design (colour or artwork). When [finish] is given the same tap
   /// also sets the finish — this is how the Chrome/Cat Eye base categories paint
   /// colour + finish in one go. When [resetSpecial] is set (a plain Solids/
-  /// French pick), a chrome/cat-eye base is returned to a normal glossy finish
-  /// so leaving those categories doesn't strand the special finish.
+  /// French pick, or any artwork design), a chrome/cat-eye base is returned to a
+  /// normal glossy finish so leaving those categories doesn't strand the special
+  /// finish — chrome and cat-eye cover the whole nail, so stranding one made the
+  /// next design the customer picked invisible.
   void _applyDesign(String asset, {NailFinish? finish, bool resetSpecial = false}) {
     NailFinish? f = finish;
     if (f == null && resetSpecial) {
@@ -998,7 +1000,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// design. Multiple photos import at once with backgrounds auto-removed.
   Future<void> _pickCustomDesign() async {
     final added = await _importPhotos();
-    if (added.isNotEmpty) _applyDesign(added.first);
+    if (added.isNotEmpty) _applyDesign(added.first, resetSpecial: true);
   }
 
   /// Imports photos (multi-select), removes each background on-device, adds the
@@ -3528,7 +3530,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final picked = await showColorWheelDialog(context,
         initial: start, title: 'Recolour design');
     if (picked == null) return;
-    _applyDesign(tintedDesignId(base, picked.toARGB32()));
+    _applyDesign(tintedDesignId(base, picked.toARGB32()), resetSpecial: true);
   }
 
   /// Leading tile for the artwork categories that stacks a French tip on top of
@@ -3717,7 +3719,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final activeId = _activeDesignId();
     final active = activeId != null && stripDesignSuffix(activeId) == id;
     return GestureDetector(
-      onTap: () => _applyDesign(id),
+      // Artwork (glitter, ombré, patterns, uploads) is a picture, and the
+      // chrome / cat-eye finishes paint an opaque metal or galaxy layer right
+      // over it — so leaving one of those on would make the design the customer
+      // just tapped completely invisible. Picking artwork therefore drops back
+      // to a normal glossy top coat so what she taps is what she sees.
+      onTap: () => _applyDesign(id, resetSpecial: true),
       child: Column(
         children: [
           Container(
