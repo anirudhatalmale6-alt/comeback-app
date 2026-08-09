@@ -1667,6 +1667,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  /// The Studio preview's height-to-width ratio for the current length setting.
+  ///
+  /// The Studio used to draw every nail at a FIXED 1.5 ratio, so the length
+  /// slider (which works over the hand) had no visible effect there — the nails
+  /// could never be made to look longer while designing. Scaling that ratio by
+  /// the length factor makes the Studio preview grow and shrink exactly like the
+  /// nails on the hand, so what's composed is what gets worn.
+  double get _studioAspect =>
+      1.5 * (_lengthFactor / kNailDefaultLengthFactor);
+
   /// The Design Studio: compose a look on a big, easy preview (no fiddling on
   /// tiny nails over a hand photo), then "put it on your hand".
   Widget _buildStudio() {
@@ -1720,9 +1730,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               builder: (context, c) {
                 const scales = [0.82, 0.93, 1.0, 0.92, 0.84];
                 const gap = 8.0;
+                final aspect = _studioAspect;
                 final totalScale = scales.fold<double>(0, (a, b) => a + b);
                 final avail = c.maxWidth - 28 - gap * (scales.length - 1);
-                final unit = (avail / totalScale).clamp(40.0, 104.0);
+                // Fit by height as well as width: at long settings the nails are
+                // much taller, and sizing on width alone would overflow the fan
+                // off the top of the preview area.
+                final byHeight = (c.maxHeight - 8) / aspect;
+                final unit = math
+                    .min(avail / totalScale, byHeight)
+                    .clamp(40.0, 104.0);
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1738,7 +1755,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                             _studioZoomCtrl.value = Matrix4.identity();
                           }),
                           child: _previewNail(
-                              unit * scales[i], unit * scales[i] * 1.5,
+                              unit * scales[i], unit * scales[i] * aspect,
                               design: _studioDesigns[i],
                               decals: _studioDecals[i],
                               strokes: _studioStrokes[i]),
@@ -1846,11 +1863,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                           child: LayoutBuilder(
                             builder: (context, c) {
                               // Fit BOTH width and height so the nail never
-                              // overflows on small screens.
+                              // overflows on small screens — at long settings
+                              // the nail is much taller, so height decides.
+                              final aspect = _studioAspect;
                               final w = math
-                                  .min(c.maxWidth * 0.5, c.maxHeight / 1.5)
+                                  .min(c.maxWidth * 0.5, c.maxHeight / aspect)
                                   .clamp(80.0, 160.0);
-                              return _buildDecalEditableNail(i, w, w * 1.5);
+                              return _buildDecalEditableNail(i, w, w * aspect);
                             },
                           ),
                         ),
@@ -3182,24 +3201,37 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// each swatch paints the whole nail; for French each swatch sets the tip
   /// colour over the current base.
   Widget _buildColorPalette({required bool french, NailFinish? finish}) {
+    // Solids and the base styles (Chrome / Cat Eye) also lead with the French
+    // tip tile, so a tip can be stacked on top of them — a chrome base keeps its
+    // chrome finish and just gains the tip. The French tab itself is already a
+    // tip picker, so it doesn't need the tile.
+    final leading = <Widget>[
+      _buildCustomColorTile(french: french, finish: finish),
+      if (!french) _buildFrenchOverlayTile(),
+    ];
     return Container(
       height: 92,
       color: Colors.white,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: kNailPalette.length + 1,
+        itemCount: kNailPalette.length + leading.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
-          if (i == 0) {
-            return _buildCustomColorTile(french: french, finish: finish);
-          }
-          final argb = kNailPalette[i - 1] | 0xFF000000;
+          if (i < leading.length) return leading[i];
+          final argb = kNailPalette[i - leading.length] | 0xFF000000;
           final id =
               french ? frenchDesignId(argb, _frenchBase) : solidDesignId(argb);
           // For a base-style palette (Chrome/Cat Eye) a swatch only counts as
           // active when both its colour AND its finish match what's on the nail.
-          final active = _activeDesignId() == id &&
+          // Compare on the BASE colour so a base still reads as selected once a
+          // French tip is stacked on it (the id becomes `french#tip#base`).
+          final activeId = _activeDesignId();
+          final activeBase =
+              activeId == null ? null : colorDesignFor(activeId)?.base;
+          final active = (french
+                  ? activeId == id
+                  : activeBase?.toARGB32() == argb) &&
               (finish == null || _activeFinish() == finish);
           final design = french
               ? ColorDesign(Color(_frenchBase), tip: Color(argb))
@@ -3208,8 +3240,21 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             child: GestureDetector(
               // Chrome/Cat Eye apply their finish with the colour; plain Solids/
               // French reset a chrome/cat-eye base back to a normal glossy finish.
-              onTap: () => _applyDesign(id,
-                  finish: finish, resetSpecial: finish == null),
+              // Changing the base colour keeps any French tip already stacked on
+              // it, so re-picking a chrome shade doesn't drop the tip.
+              onTap: () {
+                final curTip = french
+                    ? null
+                    : (activeId == null
+                        ? null
+                        : colorDesignFor(activeId)?.tip);
+                _applyDesign(
+                    curTip == null
+                        ? id
+                        : frenchDesignId(curTip.toARGB32(), argb),
+                    finish: finish,
+                    resetSpecial: finish == null);
+              },
               child: Container(
                 width: 54,
                 height: 54,
@@ -3491,7 +3536,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   /// nude nail wearing a French tip in the current (or default white) colour.
   Widget _buildFrenchOverlayTile() {
     final activeId = _activeDesignId();
-    final ftip = activeId == null ? null : frenchOverlayArgb(activeId);
+    // Artwork designs carry the tip as an `#ftip=` suffix; a painted colour base
+    // (Solid / Chrome / Cat Eye) carries it inside the id as `french#tip#base`.
+    final colorBase = activeId == null ? null : colorDesignFor(activeId);
+    final ftip = activeId == null
+        ? null
+        : (colorBase != null
+            ? colorBase.tip?.toARGB32()
+            : frenchOverlayArgb(activeId));
     final on = ftip != null;
     return Center(
       child: GestureDetector(
@@ -3533,16 +3585,19 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _snack('Pick a design first');
       return;
     }
-    if (colorDesignFor(activeId) != null) {
-      // Solids/French are painted, not artwork — the French tab already does
-      // tips for those. This overlay is only for glitter/pattern/ombré/uploads.
-      _snack('Pick a glitter, ombré, pattern or your own upload to add a tip');
-      return;
-    }
-    final baseImg = designProvider(activeId);
-    final tintArgb = designTintArgb(activeId);
-    Color tip = Color(frenchOverlayArgb(activeId) ?? 0xFFFFFFFF);
-    final hadTip = frenchOverlayArgb(activeId) != null;
+    // A painted colour base (a Solid, or a Chrome/Cat Eye base) carries its tip
+    // in the design id itself (`french#tip#base`) rather than as an `#ftip=`
+    // suffix, so the tip is read/written differently — but the sheet, the live
+    // preview and the arch slider are shared. Keeping the finish untouched is
+    // what lets a French tip sit on top of a chrome or cat-eye base.
+    final ColorDesign? colorBase = colorDesignFor(activeId);
+    final baseImg = colorBase == null ? designProvider(activeId) : null;
+    final tintArgb = colorBase == null ? designTintArgb(activeId) : null;
+    final int? existingTip = colorBase != null
+        ? colorBase.tip?.toARGB32()
+        : frenchOverlayArgb(activeId);
+    Color tip = Color(existingTip ?? 0xFFFFFFFF);
+    final hadTip = existingTip != null;
     final double prevArch = _frenchArch;
     double arch = _frenchArch;
 
@@ -3573,8 +3628,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                         height: 96,
                         child: NailOverlay(
                           image: baseImg,
+                          color: colorBase == null
+                              ? null
+                              : ColorDesign(colorBase.base, tip: tip),
                           tint: tintArgb == null ? null : Color(tintArgb),
-                          frenchTip: tip,
+                          frenchTip: colorBase == null ? tip : null,
                           frenchArch: arch,
                           shape: _shape,
                           finish: _finish,
@@ -3638,9 +3696,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
 
     if (result == 'apply') {
       setState(() => _frenchArch = arch);
-      _applyDesign(withFrenchOverlay(activeId, tip.toARGB32()));
+      // No finish is passed either way, so a chrome / cat-eye base keeps its
+      // finish and simply gains the tip on top.
+      _applyDesign(colorBase == null
+          ? withFrenchOverlay(activeId, tip.toARGB32())
+          : frenchDesignId(tip.toARGB32(), colorBase.base.toARGB32()));
     } else if (result == 'remove') {
-      _applyDesign(stripFrenchOverlay(activeId));
+      _applyDesign(colorBase == null
+          ? stripFrenchOverlay(activeId)
+          : solidDesignId(colorBase.base.toARGB32()));
     } else {
       // Cancelled: revert any live arch preview.
       setState(() => _frenchArch = prevArch);
@@ -3914,7 +3978,7 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
   // tester request for a free slider). Ranges span a touch past the old end
   // presets so nothing that used to be reachable is lost.
   static const double _lengthMin = 0.70; // shorter than old "Short" (0.90)
-  static const double _lengthMax = 2.30; // longer than old "X-Long" (2.15)
+  static const double _lengthMax = 2.90; // extra-long tips (was 2.30)
   static const double _widthMin = 0.70; // slimmer than old "Slim" (0.80)
   static const double _widthMax = 1.60; // wider than old "X-Wide" (1.40)
 

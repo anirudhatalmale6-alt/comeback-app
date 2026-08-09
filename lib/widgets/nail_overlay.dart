@@ -805,13 +805,20 @@ class NailOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget design;
+    // A chrome or cat-eye finish lays dense, near-opaque shading over the whole
+    // nail, which all but erases a French tip painted underneath it. For those
+    // the tip is lifted ABOVE the finish instead (see [tipOverFinish] below), so
+    // it reads as a tip layered on top of the chrome — which is how it is worn.
+    final bool liftTip =
+        color?.tip != null && _finishCoversTip(finish);
     if (color != null) {
       // Painted from colours; the painter clips itself to the nail silhouette.
       // Apply the current French arch to the tip (if any).
       design = CustomPaint(
           painter: _ColorDesignPainter(
               shape,
-              ColorDesign(color!.base, tip: color!.tip, arch: frenchArch)));
+              ColorDesign(color!.base,
+                  tip: liftTip ? null : color!.tip, arch: frenchArch)));
     } else {
       // BoxFit.cover so the artwork fills the whole nail silhouette; it is
       // scaled, never stretched out of proportion.
@@ -892,6 +899,11 @@ class NailOverlay extends StatelessWidget {
           CustomPaint(
               painter:
                   _NailFinishPainter(shape, finish, baseColor: color?.base)),
+          // The lifted French tip sits over the finish so a chrome or cat-eye
+          // base still shows a clean, readable tip.
+          if (liftTip)
+            CustomPaint(
+                painter: _FrenchTipOnTopPainter(shape, color!.tip!, frenchArch)),
         ],
       ),
     );
@@ -1155,6 +1167,61 @@ Path frenchTipBand(Size size, [double arch = kFrenchArchDefault]) {
     ..lineTo(w, 0)
     ..lineTo(0, 0)
     ..close();
+}
+
+/// Whether [f] lays down coverage dense enough to bury a French tip painted
+/// underneath it, so the tip has to be drawn over the finish instead. Chrome's
+/// mirror sweeps and cat-eye's near-black galaxy both do; the lighter finishes
+/// (gloss, matte, jelly…) let a tip beneath them read normally and look better
+/// with their sheen playing over the tip.
+bool _finishCoversTip(NailFinish f) =>
+    f == NailFinish.chrome ||
+    f == NailFinish.catEye ||
+    f == NailFinish.glitter ||
+    f == NailFinish.velvet;
+
+/// Paints a French tip crescent that sits ON TOP of a finished nail (used when
+/// the finish would otherwise bury it — see [_finishCoversTip]). The tip is a
+/// coat of polish over the base, so it gets its own soft sheen rather than being
+/// a flat block of colour: brightest just below the free edge, easing back to
+/// the plain tip colour at the smile line.
+class _FrenchTipOnTopPainter extends CustomPainter {
+  final NailShape shape;
+  final Color tip;
+  final double arch;
+  const _FrenchTipOnTopPainter(this.shape, this.tip, this.arch);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.clipPath(nailSilhouette(size, shape));
+    final band = frenchTipBand(size, arch);
+    canvas.drawPath(band, Paint()..color = tip);
+    // A gentle top-down sheen so the tip reads as glossy polish laid over the
+    // base rather than a sticker. y=0 is the free edge.
+    canvas.save();
+    canvas.clipPath(band);
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(size.width * 0.5, 0),
+          Offset(size.width * 0.5, size.height * 0.72),
+          [
+            Colors.white.withValues(alpha: 0.34),
+            Colors.white.withValues(alpha: 0.10),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+          [0.0, 0.34, 1.0],
+        ),
+    );
+    canvas.restore();
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _FrenchTipOnTopPainter old) =>
+      old.shape != shape || old.tip != tip || old.arch != arch;
 }
 
 /// Paints a French tip crescent of [tip] colour ON TOP of an existing artwork
