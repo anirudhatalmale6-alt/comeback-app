@@ -1,17 +1,26 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../services/saved_colors.dart';
+
 /// Opens a color-wheel picker and returns the chosen colour, or null if the
 /// customer cancels. [initial] seeds the wheel and brightness slider so editing
 /// an existing colour starts from where it was.
+///
+/// Set [saveable] when the colour being picked is a NAIL colour: the dialog then
+/// offers "Save to my colours", and shows the palette she has already saved so
+/// she can pull one straight back up. Left off for incidental colours (studio
+/// backgrounds, drawing ink) that don't belong in a nail palette.
 Future<Color?> showColorWheelDialog(
   BuildContext context, {
   required Color initial,
   String title = 'Pick a colour',
+  bool saveable = false,
 }) {
   return showDialog<Color>(
     context: context,
-    builder: (_) => _ColorWheelDialog(initial: initial, title: title),
+    builder: (_) =>
+        _ColorWheelDialog(initial: initial, title: title, saveable: saveable),
   );
 }
 
@@ -22,7 +31,9 @@ String _hex6(Color c) =>
 class _ColorWheelDialog extends StatefulWidget {
   final Color initial;
   final String title;
-  const _ColorWheelDialog({required this.initial, required this.title});
+  final bool saveable;
+  const _ColorWheelDialog(
+      {required this.initial, required this.title, this.saveable = false});
 
   @override
   State<_ColorWheelDialog> createState() => _ColorWheelDialogState();
@@ -57,6 +68,73 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
       _hue = (math.atan2(dy, dx) * 180 / math.pi + 360) % 360;
       _sat = (dist / r).clamp(0.0, 1.0);
     });
+  }
+
+  /// The colours she has already saved, under the wheel: tap one to load it
+  /// into the wheel (then "Use colour" to wear it), long-press to remove it.
+  Widget _buildSavedStrip() {
+    return ValueListenableBuilder<List<int>>(
+      valueListenable: SavedColors.colors,
+      builder: (context, saved, _) {
+        if (saved.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 10),
+            child: Text(
+              'Tap Save to keep a colour in My Colours',
+              style: TextStyle(fontSize: 11, color: Colors.black45),
+            ),
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('My Colours  (hold to remove)',
+                  style: TextStyle(fontSize: 11, color: Colors.black54)),
+              const SizedBox(height: 6),
+              SizedBox(
+                width: _wheel,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final argb in saved)
+                      GestureDetector(
+                        onTap: () {
+                          final hsv = HSVColor.fromColor(Color(argb));
+                          setState(() {
+                            _hue = hsv.hue;
+                            _sat = hsv.saturation;
+                            _val = hsv.value;
+                          });
+                        },
+                        onLongPress: () => SavedColors.remove(argb),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: Color(argb),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: argb == (_color.toARGB32() | 0xFF000000)
+                                  ? const Color(0xFF00897B)
+                                  : Colors.grey.shade400,
+                              width: argb == (_color.toARGB32() | 0xFF000000)
+                                  ? 2.5
+                                  : 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -112,6 +190,40 @@ class _ColorWheelDialogState extends State<_ColorWheelDialog> {
                 ),
               ],
             ),
+            if (widget.saveable) ...[
+              const SizedBox(height: 8),
+              // Save the shade she just dialled in, so it's waiting for her in
+              // the colour strip next time instead of having to be found on the
+              // wheel all over again. Tapping again un-saves it. On its own row
+              // so the label never crowds the hex code on a narrow phone.
+              ValueListenableBuilder<List<int>>(
+                valueListenable: SavedColors.colors,
+                builder: (context, saved, _) {
+                  final isSaved =
+                      saved.contains(_color.toARGB32() | 0xFF000000);
+                  return SizedBox(
+                    width: _wheel,
+                    child: OutlinedButton.icon(
+                      onPressed: () => SavedColors.toggle(_color.toARGB32()),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF00897B),
+                        side: const BorderSide(color: Color(0xFF00897B)),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                      ),
+                      icon: Icon(
+                          isSaved ? Icons.favorite : Icons.favorite_border,
+                          size: 18),
+                      label: Text(
+                          isSaved
+                              ? 'Saved to My Colours'
+                              : 'Save to My Colours',
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                  );
+                },
+              ),
+            ],
+            if (widget.saveable) _buildSavedStrip(),
           ],
         ),
       ),

@@ -21,6 +21,7 @@ import 'package:comeback_app/screens/customer/guided_capture_screen.dart';
 import 'package:comeback_app/services/hand_geometry.dart';
 import 'package:comeback_app/services/photo_enhance.dart';
 import 'package:comeback_app/services/background_removal.dart';
+import 'package:comeback_app/services/saved_colors.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 /// [asset] doubles as the design's identity.
@@ -592,6 +593,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   void initState() {
     super.initState();
     _zoomCtrl.addListener(_onZoomChanged);
+    // Pull her saved palette off the device; the colour strips listen to it and
+    // fill themselves in as soon as it lands.
+    SavedColors.load();
   }
 
   @override
@@ -3211,17 +3215,37 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       _buildCustomColorTile(french: french, finish: finish),
       if (!french) _buildFrenchOverlayTile(),
     ];
+    return ValueListenableBuilder<List<int>>(
+      // Her own saved colours ride at the front of the strip, ahead of the
+      // built-in shades, on every colour tab — so a shade she dialled in on the
+      // wheel once is a single tap away afterwards.
+      valueListenable: SavedColors.colors,
+      builder: (context, saved, _) {
+        final swatches = <int>[
+          ...saved,
+          ...kNailPalette.where((c) => !saved.contains(c | 0xFF000000)),
+        ];
+        return _buildColorStrip(
+            swatches, saved, leading, french: french, finish: finish);
+      },
+    );
+  }
+
+  Widget _buildColorStrip(List<int> swatches, List<int> saved,
+      List<Widget> leading,
+      {required bool french, NailFinish? finish}) {
     return Container(
       height: 92,
       color: Colors.white,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        itemCount: kNailPalette.length + leading.length,
+        itemCount: swatches.length + leading.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           if (i < leading.length) return leading[i];
-          final argb = kNailPalette[i - leading.length] | 0xFF000000;
+          final argb = swatches[i - leading.length] | 0xFF000000;
+          final isSaved = saved.contains(argb);
           final id =
               french ? frenchDesignId(argb, _frenchBase) : solidDesignId(argb);
           // For a base-style palette (Chrome/Cat Eye) a swatch only counts as
@@ -3257,20 +3281,57 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     finish: finish,
                     resetSpecial: finish == null);
               },
-              child: Container(
-                width: 54,
-                height: 54,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color:
-                        active ? const Color(0xFF00897B) : Colors.grey.shade300,
-                    width: active ? 2.5 : 1,
+              // Hold any swatch to save it to My Colours (or take it back off),
+              // so she can build a palette straight from the strip as well as
+              // from the wheel.
+              onLongPress: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final nowSaved = await SavedColors.toggle(argb);
+                if (!mounted) return;
+                messenger.showSnackBar(SnackBar(
+                  duration: const Duration(seconds: 2),
+                  content: Text(nowSaved
+                      ? 'Saved to My Colours'
+                      : 'Removed from My Colours'),
+                ));
+              },
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: active
+                            ? const Color(0xFF00897B)
+                            : Colors.grey.shade300,
+                        width: active ? 2.5 : 1,
+                      ),
+                    ),
+                    child: NailColorSwatch(design,
+                        finish: finish ?? NailFinish.gloss),
                   ),
-                ),
-                child: NailColorSwatch(design, finish: finish ?? NailFinish.gloss),
+                  // A little heart marks the colours she saved herself, so her
+                  // own shades are obvious among the built-in ones.
+                  if (isSaved)
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.favorite,
+                            size: 11, color: Color(0xFF00897B)),
+                      ),
+                    ),
+                ],
               ),
             ),
           );
@@ -3320,7 +3381,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final cd = activeId == null ? null : colorDesignFor(activeId);
     final start = (cd != null && cd.tip == null) ? cd.base : const Color(0xFFE23B4E);
     final picked =
-        await showColorWheelDialog(context, initial: start, title: 'Nail colour');
+        await showColorWheelDialog(context,
+            initial: start, title: 'Nail colour', saveable: true);
     if (picked == null) return;
     _applyDesign(solidDesignId(picked.toARGB32()),
         finish: finish, resetSpecial: finish == null);
@@ -3389,13 +3451,13 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     const SizedBox(height: 8),
                     swatchRow('Tip colour', tip, () async {
                       final c = await showColorWheelDialog(ctx,
-                          initial: tip, title: 'Tip colour');
+                          initial: tip, title: 'Tip colour', saveable: true);
                       if (c != null) setSheet(() => tip = c);
                     }),
                     const Divider(height: 1),
                     swatchRow('Base colour', base, () async {
                       final c = await showColorWheelDialog(ctx,
-                          initial: base, title: 'Base colour');
+                          initial: base, title: 'Base colour', saveable: true);
                       if (c != null) setSheet(() => base = c);
                     }),
                     const Divider(height: 1),
@@ -3528,7 +3590,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     final curTint = activeId == null ? null : designTintArgb(activeId);
     final start = Color(curTint ?? 0xFFEE5DA0);
     final picked = await showColorWheelDialog(context,
-        initial: start, title: 'Recolour design');
+        initial: start, title: 'Recolour design', saveable: true);
     if (picked == null) return;
     _applyDesign(tintedDesignId(base, picked.toARGB32()), resetSpecial: true);
   }
@@ -3645,7 +3707,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     InkWell(
                       onTap: () async {
                         final c = await showColorWheelDialog(ctx,
-                            initial: tip, title: 'Tip colour');
+                            initial: tip, title: 'Tip colour', saveable: true);
                         if (c != null) setSheet(() => tip = c);
                       },
                       child: Padding(
