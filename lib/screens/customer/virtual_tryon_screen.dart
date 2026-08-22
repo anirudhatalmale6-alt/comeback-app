@@ -500,6 +500,28 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // True while a nail is being dragged, so we can show crosshair guides that
   // stay visible even when the finger covers the nail.
   bool _dragging = false;
+
+  /// True while a continuous gesture is in flight (dragging a nail, or holding
+  /// a Size/Angle slider). Those fire setState on every touch move, which
+  /// rebuilds the entire screen — including the category chips and the design
+  /// strip, two horizontal lists of individually-painted nail swatches. Neither
+  /// of them can change mid-gesture, so [_frozenChips]/[_frozenStrip] hand the
+  /// SAME widget instance back for the duration; Flutter then skips those
+  /// subtrees entirely instead of rebuilding them sixty times a second. This is
+  /// what stops dragging a nail (or scrubbing a slider) feeling sticky.
+  bool _gesture = false;
+  Widget? _frozenChips;
+  Widget? _frozenStrip;
+
+  bool get _inGesture => _dragging || _gesture;
+
+  Widget _categoryChipsCached() => _inGesture
+      ? (_frozenChips ??= _buildCategoryChips())
+      : (_frozenChips = _buildCategoryChips());
+
+  Widget _designStripCached() => _inGesture
+      ? (_frozenStrip ??= _buildDesignStrip())
+      : (_frozenStrip = _buildDesignStrip());
   // "Move all" mode: one drag shifts the WHOLE set of nails together. This is
   // the one-gesture fix for a uniform auto-placement offset (e.g. the whole set
   // sitting a touch high) so the customer never has to drag five nails one by
@@ -2771,8 +2793,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         // never resizes the photo above it (which would rescale the photo and
         // pull the nails off the fingers).
         _buildPerNailHint(),
-        _buildCategoryChips(),
-        _buildDesignStrip(),
+        _categoryChipsCached(),
+        _designStripCached(),
         _buildActions(),
       ],
     );
@@ -3045,7 +3067,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     value: n.scale.clamp(0.35, 4.0),
                     min: 0.35,
                     max: 4.0,
-                    onChangeStart: (_) => _pushUndo(),
+                    onChangeStart: (_) {
+                      _pushUndo();
+                      _gesture = true;
+                    },
+                    onChangeEnd: (_) => setState(() => _gesture = false),
                     onChanged: (v) => setState(() => n.scale = v),
                   ),
                 ),
@@ -3076,7 +3102,11 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     value: n.rotation.clamp(-math.pi, math.pi),
                     min: -math.pi,
                     max: math.pi,
-                    onChangeStart: (_) => _pushUndo(),
+                    onChangeStart: (_) {
+                      _pushUndo();
+                      _gesture = true;
+                    },
+                    onChangeEnd: (_) => setState(() => _gesture = false),
                     onChanged: (v) => setState(() => n.rotation = v),
                   ),
                 ),

@@ -494,20 +494,30 @@ class _NailFinishPainter extends CustomPainter {
 
       case NailFinish.chrome:
         {
-          // MIRROR CHROME. Ashlyn's note on the previous build was that chrome
-          // still looked "wrong and fake — it's supposed to look more like a
-          // mirror". It did, and the reason was the way it was built: soft,
-          // heavily-blurred pastel patches, which is exactly what an airbrush
-          // looks like, and nothing like a mirror. A mirror doesn't have its own
-          // shading — it REFLECTS THE ROOM. So it has huge contrast (near-black
-          // sitting right next to blown-out white), the changes between light
-          // and dark are CRISP rather than feathered, the bands bend with the
-          // curve of the nail, and the surface goes dark at the sides where it
-          // curls away from the room. That is what this paints, in layers: the
-          // reflected room as hard bands, bowed to follow the nail's dome, a
-          // dark roll-off at each side with a bright wrap-around rim, and one
-          // sharp catch-light. Every tone is still mixed FROM THE BASE COLOUR,
-          // so silver, gold, rose gold and black each mirror as their own metal.
+          // MIRROR CHROME.
+          //
+          // Two goes at this now. The first was soft blurred patches — Ashlyn
+          // called it airbrushed, and she was right. The second swung too far
+          // the other way: piling a high-contrast band gradient, four more dark
+          // bands and a heavy side roll-off on top of each other stacked shadow
+          // on shadow, so the nail went almost black with one white smear
+          // wiped across it. Worse, not better.
+          //
+          // So this one is built the way a mirror actually behaves. A mirror
+          // has NO shading of its own — it shows you the room. On a nail that
+          // room is simple: bright light bouncing off the free edge, a dark
+          // horizon just behind it, the ceiling light across the middle, the
+          // shadow of the hand below that, a last bounce at the cuticle. What
+          // makes it read as metal is not how dark it gets — it's how FAST it
+          // changes: light snapping to dark over a couple of pixels. So the
+          // contrast lives in the stop spacing, ONE layer, and everything after
+          // it only shapes the edges. The metal's own colour is kept clearly
+          // readable throughout, which is what a real chrome powder looks like.
+          //
+          // It is also deliberately blur-free — every tone here is a gradient
+          // shader. Mask blurs are the single most expensive thing a nail can
+          // paint, and five nails' worth of them on every drag frame is what
+          // was making the try-on feel sticky.
           final Color c = baseColor ?? const Color(0xFFC8CDD6);
           // With no base colour the nail is wearing ARTWORK (a glitter, ombré,
           // pattern or the customer's own photo) rather than a flat colour. The
@@ -518,107 +528,95 @@ class _NailFinishPainter extends CustomPainter {
           final double fill = baseColor == null ? 0.55 : 1.0;
           Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
           Color f(Color x) => x.withValues(alpha: fill);
-          // Metal lives on RANGE. Mid-tones on their own read as plastic, so
-          // the ladder runs all the way from an almost-black reflection to a
-          // blown-out white one.
-          // Kept just short of pure white on purpose: a coloured chrome (teal,
-          // gold, rose) has to keep its own hue even in the hottest part of the
-          // reflection, or the nail reads as a white stripe instead of metal.
-          final Color blown = mix(c, Colors.white, 0.88); // clipped highlight
-          final Color white = mix(c, Colors.white, 0.66);
-          final Color lit = mix(c, Colors.white, 0.40);
-          final Color body = mix(c, Colors.white, 0.04); // the metal itself
-          final Color shade = mix(c, Colors.black, 0.42);
-          final Color dark = mix(c, Colors.black, 0.60);
-          final Color black = mix(c, Colors.black, 0.78); // deepest reflection
+          // The tone ladder. Narrower than the last build on purpose: the
+          // highlight stops well short of white and the shadow well short of
+          // black, so a maroon still reads maroon and a teal still reads teal
+          // instead of collapsing into a grey nail with a white stripe. Range
+          // comes from the SNAP between these tones, not from their extremes.
+          final Color hi2 = mix(c, Colors.white, 0.78); // hottest reflection
+          final Color hi1 = mix(c, Colors.white, 0.52);
+          final Color mid = mix(c, Colors.white, 0.10); // the metal itself
+          final Color lo1 = mix(c, Colors.black, 0.30);
+          final Color lo2 = mix(c, Colors.black, 0.52); // deepest reflection
 
-          // 1) The reflected room, as hard bands running down the nail: light
-          //    bouncing up off the free edge, the dark horizon just behind it,
-          //    the big blown-out ceiling light across the middle, the shadow of
-          //    the hand below that, and a little bounce again at the cuticle.
-          //    The stop pairs are deliberately close together — that quick
-          //    light-to-dark snap is the single thing that reads as "mirror".
-          //    The axis is tilted rather than straight down the nail: nothing in
-          //    a real reflection lines up square with the nail, and the tilt is
-          //    what stops the bands looking like printed stripes.
+          // 1) The room, running down the nail on a slightly tilted axis —
+          //    nothing in a real reflection lines up square with the nail, and
+          //    the tilt is what stops the bands reading as printed stripes.
+          //    Note the paired stops (0.09/0.12, 0.50/0.54): those tight jumps
+          //    are the mirror. Everything between them is a slow drift, which
+          //    is what a room actually looks like reflected in a curved surface.
           canvas.drawRect(
             rect,
             Paint()
               ..shader = ui.Gradient.linear(
-                Offset(size.width * 0.26, 0),
-                Offset(size.width * 0.78, size.height),
+                Offset(size.width * 0.24, 0),
+                Offset(size.width * 0.76, size.height),
                 [
-                  f(white),
-                  f(blown),
-                  f(shade),
-                  f(black),
-                  f(dark),
-                  f(body),
-                  f(lit),
-                  f(blown),
-                  f(blown),
-                  f(lit),
-                  f(shade),
-                  f(dark),
-                  f(shade),
-                  f(lit),
+                  f(hi1), // the free edge picks up bounced light
+                  f(hi2),
+                  f(hi2),
+                  f(lo1), // …and snaps straight into the horizon behind it
+                  f(lo2),
+                  f(lo1),
+                  f(mid),
+                  f(hi1),
+                  f(hi2), // the ceiling light across the middle of the nail
+                  f(hi1),
+                  f(mid),
+                  f(lo1),
+                  f(lo2), // the shadow the hand itself casts back
+                  f(lo1),
+                  f(mid),
+                  f(hi1), // a last bounce at the cuticle
+                  f(mid),
                 ],
                 [
                   0.0,
-                  0.045,
-                  0.10,
-                  0.18,
-                  0.29,
-                  0.37,
-                  0.44,
+                  0.055,
+                  0.09,
+                  0.12,
+                  0.20,
+                  0.28,
+                  0.35,
+                  0.45,
                   0.50,
-                  0.575,
-                  0.635,
-                  0.70,
-                  0.81,
-                  0.91,
+                  0.54,
+                  0.60,
+                  0.665,
+                  0.73,
+                  0.79,
+                  0.86,
+                  0.94,
                   1.0,
                 ],
               ),
           );
 
-          // A bowed band of reflection. The nail is domed, so every edge in the
-          // reflection curves with it; drawing them as curved shapes over the
-          // straight bands above is what stops the finish looking like a
-          // printed gradient. Blur stays tiny on purpose — a mirror's edges are
-          // sharp, and feathering them is what made the old chrome look
-          // airbrushed.
-          void band(double top, double bot, double bow, Color col, double a,
-              double blur) {
-            final p = Path()
-              ..moveTo(-size.width * 0.25, size.height * top)
-              ..quadraticBezierTo(size.width * 0.5, size.height * (top + bow),
-                  size.width * 1.25, size.height * top)
-              ..lineTo(size.width * 1.25, size.height * bot)
-              ..quadraticBezierTo(size.width * 0.5, size.height * (bot + bow),
-                  -size.width * 0.25, size.height * bot)
-              ..close();
+          // 2) One curved horizon over the top. A nail is domed, so the edges
+          //    in a reflection bow with it; a single bowed edge is enough to
+          //    sell that, and it stays crisp instead of being feathered in.
+          void bowed(double top, double bot, double bow, Color col, double a) {
             canvas.drawPath(
-              p,
-              Paint()
-                ..color = col.withValues(alpha: a * fill)
-                ..maskFilter = blur <= 0
-                    ? null
-                    : MaskFilter.blur(BlurStyle.normal, size.width * blur),
+              Path()
+                ..moveTo(-size.width * 0.3, size.height * top)
+                ..quadraticBezierTo(size.width * 0.5, size.height * (top + bow),
+                    size.width * 1.3, size.height * top)
+                ..lineTo(size.width * 1.3, size.height * bot)
+                ..quadraticBezierTo(size.width * 0.5, size.height * (bot + bow),
+                    -size.width * 0.3, size.height * bot)
+                ..close(),
+              Paint()..color = col.withValues(alpha: a * fill),
             );
           }
 
-          // 2) The same reflection, curved. Dark horizon under the tip, the hot
-          //    light band bowing the other way across the middle, the hand's
-          //    shadow low down.
-          band(0.12, 0.30, 0.17, black, 0.50, 0.010);
-          band(0.45, 0.58, -0.15, blown, 0.70, 0.012);
-          band(0.61, 0.69, -0.12, dark, 0.32, 0.010);
-          band(0.75, 0.91, 0.14, dark, 0.40, 0.018);
+          bowed(0.415, 0.505, -0.10, hi2, 0.50); // the bright ceiling band
+          bowed(0.585, 0.615, -0.075, hi2, 0.34); // its thin second edge
+          bowed(0.155, 0.235, 0.10, lo2, 0.30); // the horizon under the tip
 
-          // 3) Roll-off. At the sides the surface turns away from the room and
-          //    stops reflecting it, so it drops almost to black — the strongest
-          //    single cue that you're looking at a curved piece of metal.
+          // 3) Curvature across the nail. The sides turn away from the room, so
+          //    they stop reflecting it and drop off — but only gently. Driving
+          //    this hard is what buried the last build; here it's just enough to
+          //    round the nail off.
           canvas.drawRect(
             rect,
             Paint()
@@ -626,65 +624,71 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(0, size.height * 0.5),
                 Offset(size.width, size.height * 0.5),
                 [
-                  Colors.black.withValues(alpha: 0.62 * fill),
-                  Colors.black.withValues(alpha: 0.14 * fill),
+                  Colors.black.withValues(alpha: 0.34 * fill),
+                  Colors.black.withValues(alpha: 0.08 * fill),
                   Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.18 * fill),
-                  Colors.black.withValues(alpha: 0.68 * fill),
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.10 * fill),
+                  Colors.black.withValues(alpha: 0.38 * fill),
                 ],
-                [0.0, 0.10, 0.42, 0.80, 1.0],
+                [0.0, 0.09, 0.30, 0.70, 0.90, 1.0],
               ),
           );
 
-          // 4) …and right on the edge the reflection wraps back round, giving
-          //    the thin brilliant rim you always see down the side of chrome.
+          // 4) Right at each edge the reflection wraps back around, giving the
+          //    thin brilliant rim you always see running down the side of a
+          //    chromed surface. Two or three pixels wide, and one of the
+          //    strongest "this is metal" cues there is.
           canvas.drawRect(
             rect,
             Paint()
               ..shader = ui.Gradient.linear(
-                Offset(size.width * 0.015, 0),
-                Offset(size.width * 0.14, 0),
+                Offset(size.width * 0.008, 0),
+                Offset(size.width * 0.085, 0),
                 [
                   Colors.white.withValues(alpha: 0.0),
-                  Colors.white.withValues(alpha: 0.62 * fill),
+                  Colors.white.withValues(alpha: 0.55 * fill),
                   Colors.white.withValues(alpha: 0.0),
                 ],
-                [0.0, 0.42, 1.0],
+                [0.0, 0.45, 1.0],
               ),
           );
           canvas.drawRect(
             rect,
             Paint()
               ..shader = ui.Gradient.linear(
-                Offset(size.width * 0.88, 0),
-                Offset(size.width * 0.995, 0),
+                Offset(size.width * 0.92, 0),
+                Offset(size.width * 0.994, 0),
                 [
                   Colors.white.withValues(alpha: 0.0),
-                  Colors.white.withValues(alpha: 0.40 * fill),
+                  Colors.white.withValues(alpha: 0.34 * fill),
                   Colors.white.withValues(alpha: 0.0),
                 ],
-                [0.0, 0.60, 1.0],
+                [0.0, 0.55, 1.0],
               ),
           );
 
-          // 5) One hard catch-light. Polished metal always throws a sharp
-          //    specular streak; the soft glows of the old version never could.
+          // 5) A whisper of a glint near the free edge. Deliberately faint —
+          //    at any real strength it showed up as a pale smudge on the dark
+          //    metals, and the banded reflection above already carries the
+          //    specular. Painted as a radial gradient rather than a blurred
+          //    shape: same soft falloff, none of the cost.
           canvas.save();
-          canvas.translate(size.width * 0.33, size.height * 0.46);
-          canvas.rotate(-0.55);
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromCenter(
-                center: Offset.zero,
-                width: size.width * 0.13,
-                height: size.height * 0.34,
-              ),
-              Radius.circular(size.width * 0.065),
-            ),
+          canvas.translate(size.width * 0.33, size.height * 0.275);
+          canvas.scale(1.0, 1.6);
+          final double gr = size.width * 0.11;
+          canvas.drawCircle(
+            Offset.zero,
+            gr,
             Paint()
-              ..color = Colors.white.withValues(alpha: 0.55 * fill)
-              ..maskFilter =
-                  MaskFilter.blur(BlurStyle.normal, size.width * 0.022),
+              ..shader = ui.Gradient.radial(
+                Offset.zero,
+                gr,
+                [
+                  Colors.white.withValues(alpha: 0.20 * fill),
+                  Colors.white.withValues(alpha: 0.0),
+                ],
+              ),
           );
           canvas.restore();
 
@@ -694,10 +698,10 @@ class _NailFinishPainter extends CustomPainter {
             rect,
             Paint()
               ..shader = ui.Gradient.linear(
-                Offset(0, 0),
-                Offset(0, size.height * 0.05),
+                const Offset(0, 0),
+                Offset(0, size.height * 0.04),
                 [
-                  Colors.white.withValues(alpha: 0.50 * fill),
+                  Colors.white.withValues(alpha: 0.45 * fill),
                   Colors.white.withValues(alpha: 0.0),
                 ],
               ),
