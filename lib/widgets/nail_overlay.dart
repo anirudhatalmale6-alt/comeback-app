@@ -521,6 +521,16 @@ class _NailFinishPainter extends CustomPainter {
           // base colour, so a blue shifts to lilac and pink, a red shifts to
           // gold and magenta, and each one shimmers as its own metal.
           //
+          // …and then Ashlyn's next note was "still not shiny enough", which was
+          // also fair. The colour model above was right but I'd built it with no
+          // SPECULAR STRUCTURE at all, so it came out as a satin pearl. Shine is
+          // not brightness — it's RANGE and EDGE. A glossy surface has a hard
+          // bright reflection, a dark band pressed right up against it, a second
+          // smaller catch further along, and a lit rim where the surface turns
+          // away. This version keeps every colour decision above and adds all
+          // four, with the bright core tinted rather than white so it stays a
+          // coloured shine.
+          //
           // Still deliberately blur-free — every soft edge here is a gradient
           // shader, which the GPU does for almost nothing.
           final Color c = baseColor ?? const Color(0xFFBBD9EA);
@@ -547,10 +557,20 @@ class _NailFinishPainter extends CustomPainter {
                 (hsv.value + (1 - hsv.value) * lift).clamp(0.0, 1.0),
               ).toColor();
 
-          // The base, very slightly deepened — the reference is a touch richer
-          // at the free edge and at the cuticle than through the middle.
+          // The base, deepened and slightly richer. This is the DARK end of the
+          // range, and the range is what makes the finish read as glossy — a
+          // bright streak with nothing dark near it just looks like a pale
+          // smudge. It's the nail's own colour taken down, not black, so the
+          // depth arrives without the whole thing turning muddy.
           final Color deep = HSVColor.fromAHSV(
-                  fill, hsv.hue, hsv.saturation, (hsv.value * 0.86).clamp(0, 1))
+                  fill,
+                  hsv.hue,
+                  math.min(hsv.saturation * 1.12, 1.0),
+                  // Pale colours need proportionally MORE of a drop than dark
+                  // ones. A flat multiplier left the pastels with almost no
+                  // shadow, so their streak had nothing to shine against and
+                  // they were the only shades that still looked satin.
+                  (hsv.value * (0.74 - 0.16 * hsv.value)).clamp(0, 1))
               .toColor();
           final Color body = irid(0, 0.95, 0.04); // the nail's own colour
           // The shimmer tones are blended BACK toward the base before they're
@@ -566,7 +586,15 @@ class _NailFinishPainter extends CustomPainter {
           // far around the wheel it stopped being a highlight and became a
           // second colour — a cream-gold stripe down a red nail that read as a
           // cat-eye rather than a shine.
-          final Color pearl = acc(irid(26, 0.22, 0.78), 0.86); // pale, not white
+          final Color pearl = acc(irid(26, 0.22, 0.88), 0.90); // pale, not white
+          // The specular core. It IS nearly white — a reflection of a light
+          // source is always brighter and less saturated than the surface it
+          // sits on, and refusing to paint one is what left this looking satin.
+          // It keeps a little of the pearl's tint and it's kept NARROW, so the
+          // eye still reads the shine as coloured while getting the hard bright
+          // centre that says "glossy".
+          final Color hot =
+              Color.lerp(pearl, Colors.white, 0.55)!.withValues(alpha: fill);
 
           // 1) The wash down the nail. Soft, wide stops — this is a pearl
           //    turning through its colours, not a room being reflected, so
@@ -654,9 +682,37 @@ class _NailFinishPainter extends CustomPainter {
               ),
           );
 
-          // 5) Curvature. Barely there compared with the mirror version — the
-          //    reference has almost no shadow on it at all, and heavy side
-          //    shading is what kept dragging this finish back toward metal.
+          // 5) The core shadow — a soft dark band lying alongside where the
+          //    bright streak is about to go. This is the layer I'd been missing
+          //    entirely, and it does more for "shiny" than any amount of extra
+          //    white: a reflection only reads as a reflection when there's
+          //    something dark pressed up against it. Painted in the deepened
+          //    base colour rather than black, so it adds depth, not grime.
+          canvas.save();
+          canvas.translate(size.width * 0.19, size.height * 0.52);
+          canvas.rotate(-0.16);
+          canvas.scale(1.0, 4.6);
+          final double sw = size.width * 0.17;
+          canvas.drawCircle(
+            Offset.zero,
+            sw,
+            Paint()
+              ..shader = ui.Gradient.radial(
+                Offset.zero,
+                sw,
+                [
+                  deep.withValues(alpha: 0.52 * fill),
+                  deep.withValues(alpha: 0.26 * fill),
+                  deep.withValues(alpha: 0.0),
+                ],
+                const [0.0, 0.46, 1.0],
+              ),
+          );
+          canvas.restore();
+
+          // 6) Curvature, a little firmer than the pearl version — the sides
+          //    have to turn away from the light for the rim in step 10 to have
+          //    anything to sit against.
           canvas.drawRect(
             rect,
             Paint()
@@ -664,27 +720,47 @@ class _NailFinishPainter extends CustomPainter {
                 Offset(0, size.height * 0.5),
                 Offset(size.width, size.height * 0.5),
                 [
-                  Colors.black.withValues(alpha: 0.20 * fill),
+                  Colors.black.withValues(alpha: 0.24 * fill),
                   Colors.black.withValues(alpha: 0.0),
                   Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.21 * fill),
+                  Colors.black.withValues(alpha: 0.28 * fill),
                 ],
-                const [0.0, 0.16, 0.84, 1.0],
+                const [0.0, 0.15, 0.82, 1.0],
               ),
           );
 
-          // 6) The gel top-coat streak. This is the single most defining thing
-          //    in the reference photo and the thing my earlier attempts kept
-          //    losing: a long, bright, narrow reflection running most of the
-          //    length of the nail, slightly off vertical. Without it the finish
-          //    reads as a soft pastel gradient rather than something SHINY.
-          //    It's tinted with the pearl rather than painted white, which is
-          //    exactly the "colourful shine, not a bright white shine" note.
+          // 7) The gel top-coat streak, in three tiers. The soft coloured halo
+          //    is the shine you see; the bright band is its body; the narrow
+          //    near-white core is the actual light source. Three tiers rather
+          //    than one is the difference between a pale smear and a hard wet
+          //    reflection — the halo keeps it coloured, the core makes it shine.
+          canvas.save();
+          canvas.translate(size.width * 0.385, size.height * 0.46);
+          canvas.rotate(-0.16);
+          canvas.scale(1.0, 4.4);
+          final double gh = size.width * 0.20;
+          canvas.drawCircle(
+            Offset.zero,
+            gh,
+            Paint()
+              ..shader = ui.Gradient.radial(
+                Offset.zero,
+                gh,
+                [
+                  pearl.withValues(alpha: 0.52 * fill),
+                  pearl.withValues(alpha: 0.30 * fill),
+                  pearl.withValues(alpha: 0.0),
+                ],
+                const [0.0, 0.46, 1.0],
+              ),
+          );
+          canvas.restore();
+
           canvas.save();
           canvas.translate(size.width * 0.37, size.height * 0.46);
           canvas.rotate(-0.16);
-          canvas.scale(1.0, 4.2);
-          final double gw = size.width * 0.16;
+          canvas.scale(1.0, 4.8);
+          final double gw = size.width * 0.105;
           canvas.drawCircle(
             Offset.zero,
             gw,
@@ -693,23 +769,21 @@ class _NailFinishPainter extends CustomPainter {
                 Offset.zero,
                 gw,
                 [
-                  pearl.withValues(alpha: 0.80 * fill),
-                  pearl.withValues(alpha: 0.66 * fill),
-                  pearl.withValues(alpha: 0.26 * fill),
+                  pearl.withValues(alpha: 0.96 * fill),
+                  pearl.withValues(alpha: 0.86 * fill),
+                  pearl.withValues(alpha: 0.30 * fill),
                   pearl.withValues(alpha: 0.0),
                 ],
-                const [0.0, 0.34, 0.62, 1.0],
+                const [0.0, 0.40, 0.74, 1.0],
               ),
           );
           canvas.restore();
 
-          // …with a tighter, brighter core inside it, which is what makes a gel
-          //    top-coat look wet rather than merely pale.
           canvas.save();
-          canvas.translate(size.width * 0.355, size.height * 0.44);
+          canvas.translate(size.width * 0.362, size.height * 0.44);
           canvas.rotate(-0.16);
-          canvas.scale(1.0, 11.0);
-          final double gc = size.width * 0.055;
+          canvas.scale(1.0, 12.0);
+          final double gc = size.width * 0.042;
           canvas.drawCircle(
             Offset.zero,
             gc,
@@ -718,25 +792,84 @@ class _NailFinishPainter extends CustomPainter {
                 Offset.zero,
                 gc,
                 [
-                  pearl.withValues(alpha: 0.98 * fill),
-                  pearl.withValues(alpha: 0.80 * fill),
-                  pearl.withValues(alpha: 0.0),
+                  hot,
+                  hot.withValues(alpha: 0.85 * fill),
+                  hot.withValues(alpha: 0.0),
                 ],
-                const [0.0, 0.45, 1.0],
+                const [0.0, 0.50, 1.0],
               ),
           );
           canvas.restore();
 
-          // 7) The free edge catches the light — a fine, bright, slightly
-          //    coloured line right on the lip.
+          // 8) A second, smaller catch-light down near the free edge, where the
+          //    nail curves over. Real gloss never has exactly one reflection,
+          //    and the second one is what stops the streak reading as a painted
+          //    stripe.
+          canvas.save();
+          canvas.translate(size.width * 0.66, size.height * 0.155);
+          canvas.rotate(0.72);
+          canvas.scale(1.0, 2.6);
+          final double sc = size.width * 0.085;
+          canvas.drawCircle(
+            Offset.zero,
+            sc,
+            Paint()
+              ..shader = ui.Gradient.radial(
+                Offset.zero,
+                sc,
+                [
+                  hot.withValues(alpha: 0.80 * fill),
+                  pearl.withValues(alpha: 0.42 * fill),
+                  pearl.withValues(alpha: 0.0),
+                ],
+                const [0.0, 0.42, 1.0],
+              ),
+          );
+          canvas.restore();
+
+          // 9) The free edge catches the light — a fine, bright line right on
+          //    the lip, tighter and brighter than before.
           canvas.drawRect(
             rect,
             Paint()
               ..shader = ui.Gradient.linear(
                 const Offset(0, 0),
-                Offset(0, size.height * 0.05),
+                Offset(0, size.height * 0.045),
                 [
-                  pearl.withValues(alpha: 0.65 * fill),
+                  hot.withValues(alpha: 0.85 * fill),
+                  pearl.withValues(alpha: 0.0),
+                ],
+              ),
+          );
+
+          // 10) Rim light down the far side. This one is pure chrome: where the
+          //     surface rolls away from you it stops showing its own colour and
+          //     starts showing the light behind it, so a thin bright edge sits
+          //     right against the darkest part of the nail. Painted AFTER the
+          //     side shading in step 6 so it lands on top of that shadow — the
+          //     dark-then-bright jump at the very edge is the whole effect.
+          canvas.drawRect(
+            rect,
+            Paint()
+              ..shader = ui.Gradient.linear(
+                Offset(size.width, size.height * 0.5),
+                Offset(size.width * 0.885, size.height * 0.5),
+                [
+                  pearl.withValues(alpha: 0.75 * fill),
+                  pearl.withValues(alpha: 0.0),
+                ],
+              ),
+          );
+          // …and a much fainter one at the cuticle, where the polish rolls over
+          //    the same way.
+          canvas.drawRect(
+            rect,
+            Paint()
+              ..shader = ui.Gradient.linear(
+                Offset(0, size.height),
+                Offset(0, size.height * 0.955),
+                [
+                  pearl.withValues(alpha: 0.34 * fill),
                   pearl.withValues(alpha: 0.0),
                 ],
               ),

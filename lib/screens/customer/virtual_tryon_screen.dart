@@ -1557,89 +1557,134 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  /// The landing screen. This used to be four full-width pill buttons each with
+  /// its own caption floating underneath, which is a lot of loose text stacked
+  /// down the middle of a page — it read as a list of options rather than a
+  /// choice. Now the two real routes into the feature are cards that carry their
+  /// own captions, and the two plain photo actions sit together on one line
+  /// underneath, where they belong.
   Widget _buildChooser() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.back_hand_outlined,
-                size: 84, color: Colors.pink.shade200),
-            const SizedBox(height: 20),
-            const Text(
-              'Try nail designs on your own hand',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Take or upload a clear photo of your hand with your '
-              'fingers spread, then try on any design.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-            ),
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              onPressed: () => setState(() {
-                _studio = true;
-                _studioFocus = null;
-                for (int i = 0; i < _studioDesigns.length; i++) {
-                  _studioDesigns[i] = null;
-                }
-                _currentDesign ??= kDefaultDesign;
-              }),
-              icon: const Icon(Icons.brush),
-              label: const Text('Design My Nails First'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(240, 50),
-                backgroundColor: const Color(0xFF00897B),
+    // Centred when it fits, scrollable when it doesn't — on a short phone with
+    // the Auto Try-On card showing, this content is close to a full screen.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 32),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight - 50),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+          // The hand sits inside a soft blush halo instead of floating on the
+          // background as a bare outline icon.
+          Container(
+            width: 122,
+            height: 122,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFFF8BBD0).withValues(alpha: 0.55),
+                  const Color(0xFFF8BBD0).withValues(alpha: 0.10),
+                ],
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Pick your colours & design on a big preview, then put it '
-              'on your hand',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            child: Icon(Icons.back_hand_outlined,
+                size: 62, color: Colors.pink.shade200),
+          ),
+          const SizedBox(height: 22),
+          const Text(
+            'Try designs on your own hand',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.15,
+              color: Color(0xFF1F2A2A),
+              height: 1.3,
             ),
-            const SizedBox(height: 18),
-            if (Platform.isAndroid) ...[
-              FilledButton.icon(
-                onPressed: _openGuidedCapture,
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('Auto Try-On (Beta)'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(240, 50),
-                  backgroundColor: const Color(0xFF7E57C2),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Guided camera — finds your nails automatically',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-              ),
-              const SizedBox(height: 18),
-            ],
-            FilledButton.icon(
-              onPressed: () => _pickPhoto(ImageSource.camera),
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Take a Photo'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(220, 48),
-              ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Take or upload a clear photo of your hand with your '
+            'fingers spread, then try on any design.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13.5,
+              height: 1.45,
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => _pickPhoto(ImageSource.gallery),
-              icon: const Icon(Icons.photo_library_outlined),
-              label: const Text('Upload from Gallery'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(220, 48),
-              ),
+          ),
+          const SizedBox(height: 30),
+          _ChooserCard(
+            icon: Icons.brush_outlined,
+            title: 'Design My Nails First',
+            caption: 'Pick your colours & design on a big preview, '
+                'then put it on your hand',
+            gradient: const [Color(0xFF00A38F), Color(0xFF00796B)],
+            glow: const Color(0xFF00897B),
+            onTap: () => setState(() {
+              _studio = true;
+              _studioFocus = null;
+              for (int i = 0; i < _studioDesigns.length; i++) {
+                _studioDesigns[i] = null;
+              }
+              _currentDesign ??= kDefaultDesign;
+            }),
+          ),
+          if (Platform.isAndroid) ...[
+            const SizedBox(height: 14),
+            _ChooserCard(
+              icon: Icons.auto_awesome_outlined,
+              title: 'Auto Try-On',
+              badge: 'BETA',
+              caption: 'Guided camera — finds your nails automatically',
+              gradient: const [Color(0xFF9B5DE5), Color(0xFF6F42C1)],
+              glow: const Color(0xFF7E57C2),
+              onTap: _openGuidedCapture,
             ),
           ],
+          const SizedBox(height: 26),
+          // A hairline rule with "or already have a photo?" set into it. Two
+          // 1px lines do the job that a block of explanatory text was doing.
+          Row(
+            children: [
+              Expanded(child: Container(height: 1, color: const Color(0x14000000))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'or use a photo',
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      letterSpacing: 0.6,
+                      color: Colors.grey.shade500),
+                ),
+              ),
+              Expanded(child: Container(height: 1, color: const Color(0x14000000))),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _GhostButton(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Take a Photo',
+                  onTap: () => _pickPhoto(ImageSource.camera),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _GhostButton(
+                  icon: Icons.photo_library_outlined,
+                  label: 'Gallery',
+                  onTap: () => _pickPhoto(ImageSource.gallery),
+                ),
+              ),
+            ],
+          ),
+            ],
+          ),
         ),
       ),
     );
@@ -4314,6 +4359,187 @@ class _ShapeLengthSheetState extends State<_ShapeLengthSheet> {
                   onPressed: () => Navigator.pop(context),
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
                   child: const Text('Done'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One of the two main routes on the Try-On landing screen: a gradient card
+/// carrying its own icon, title and caption. Replacing the pill-button-plus-
+/// floating-caption pattern with this is most of what makes that screen feel
+/// finished rather than assembled.
+class _ChooserCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String caption;
+  final String? badge;
+  final List<Color> gradient;
+  final Color glow;
+  final VoidCallback onTap;
+
+  const _ChooserCard({
+    required this.icon,
+    required this.title,
+    required this.caption,
+    required this.gradient,
+    required this.glow,
+    required this.onTap,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: glow.withValues(alpha: 0.20),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 17, 14, 17),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.20),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.30), width: 1),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 23),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  letterSpacing: 0.15,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (badge != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.24),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  badge!,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.7,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          caption,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      color: Colors.white.withValues(alpha: 0.85), size: 14),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A quiet outlined action for the secondary photo routes.
+class _GhostButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _GhostButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0x1F000000)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: const Color(0xFF00796B)),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1F2A2A),
+                  ),
                 ),
               ),
             ],
