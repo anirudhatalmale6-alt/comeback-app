@@ -88,3 +88,6 @@ firebase/
 ├── firestore.rules        # Security rules
 └── firestore.indexes.json # Required composite indexes
 ```
+
+
+<!-- Security scan triggered at 2026-09-04 12:57:38 -->
