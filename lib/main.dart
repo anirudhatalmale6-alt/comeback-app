@@ -12,14 +12,19 @@ import 'package:comeback_app/screens/employee/employee_dashboard.dart';
 import 'package:comeback_app/screens/customer/customer_dashboard.dart';
 import 'package:comeback_app/utils/app_theme.dart';
 import 'package:comeback_app/firebase_options.dart';
+import 'package:comeback_app/widgets/chrome_maps.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Decode the chrome reflection maps before the first frame. Three small
+  // PNGs; doing it here means the finish is never drawn with its fallback
+  // ramp, and a colour change never has to wait on an asset load.
+  await ChromeMaps.load();
   runApp(const AppBootstrap());
 }
 

@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
+import 'chrome_maps.dart';
+
 /// A measurement of the photo's ambient light, used to tint the painted nails so
 /// they sit in the SAME light as the hand instead of glowing like a flat sticker
 /// pasted on top. It is a simple per-channel scale (a diagonal colour matrix):
@@ -294,7 +296,45 @@ class _NailFinishPainter extends CustomPainter {
   // tones (warm-gold highlights, rose-copper mids, dark-chrome shadows) instead
   // of a neutral texture tinted the same for every colour. Null → neutral.
   final Color? baseColor;
-  const _NailFinishPainter(this.shape, this.finish, {this.baseColor});
+
+  /// Which baked environment variant this nail reflects. Five fingers of one
+  /// hand showing an identical reflection is the thing that reads as printed,
+  /// so each nail takes a slightly different view of the same room.
+  final int variant;
+  const _NailFinishPainter(this.shape, this.finish,
+      {this.baseColor, this.variant = 0});
+
+  /// Used only when the baked maps are unavailable — an asset that failed to
+  /// decode, or the first frames before [ChromeMaps.load] has finished. A plain
+  /// metallic ramp across the nail: not the real finish, but a recognisable
+  /// one, and never a blank nail.
+  void _chromeFallback(
+      Canvas canvas, Size size, Rect rect, Color c, double fill) {
+    final HSVColor hsv = HSVColor.fromColor(c);
+    Color tone(double v) => HSVColor.fromAHSV(
+          fill,
+          hsv.hue,
+          (hsv.saturation * (0.40 + 0.60 * (1 - v))).clamp(0.0, 1.0),
+          v.clamp(0.0, 1.0),
+        ).toColor();
+    final double b = hsv.value;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(0, size.height * 0.5),
+          Offset(size.width, size.height * 0.5),
+          [
+            tone(b * 0.42),
+            tone(b),
+            tone(math.min(1.0, b * 1.35 + 0.12)),
+            tone(b * 0.58),
+            tone(b * 0.96),
+          ],
+          const [0.0, 0.22, 0.44, 0.72, 1.0],
+        ),
+    );
+  }
 
   // Convex side-shading + rounded cuticle base, shared by all finishes so the
   // nail always reads as a curved surface rather than a flat cut-out.
@@ -494,386 +534,90 @@ class _NailFinishPainter extends CustomPainter {
 
       case NailFinish.chrome:
         {
-          // AURORA / PEARL CHROME — built from Ashlyn's reference photo of a
-          // set of sky-blue chrome nails (images.jpeg, msg 2270911502) and her
-          // note: "more of a colorful shine then a bright white shine".
+          // MIRROR CHROME.
           //
-          // Worth writing down why the first three attempts missed, because it
-          // wasn't a tuning problem — it was the wrong subject. I was painting
-          // MIRRORED METAL: near-black next to blown-out white, hard edges, the
-          // reflection of a room. That is what a chrome bumper looks like. It is
-          // not what chrome POWDER on a nail looks like, and the reference is
-          // unambiguous about the difference:
+          // Earlier passes at this finish were all painted by hand — a
+          // gradient, a stripe, banded tones, blurred pools — and none of them
+          // held up, because a highlight placed by hand sits ON the nail
+          // instead of being bent BY it. Chrome has no look of its own: it is a
+          // mirror, and what you are really looking at is the room it stands
+          // in, wrapped around the curve of the nail.
           //
-          //   * it is LOW contrast, not high — nothing on it is near-black and
-          //     nothing is pure white
-          //   * the shine is COLOURED. The highlights on a blue nail come back
-          //     pink, lilac and pale peach. That colour shift IS the finish; a
-          //     white highlight is exactly what makes it look like cheap plastic
-          //   * the transitions are SOFT and blended, not snapped
-          //   * the base colour stays obvious the whole way through
-          //
-          // So this paints a pearl, not a mirror: the colour is rolled around
-          // the hue wheel, desaturated and lifted, and washed down the nail in
-          // broad soft bands, with a second shift running ACROSS the nail (the
-          // reason a duochrome changes colour as you turn your hand) and a wide
-          // tinted bloom over the top. Every shimmer tone is derived FROM the
-          // base colour, so a blue shifts to lilac and pink, a red shifts to
-          // gold and magenta, and each one shimmers as its own metal.
-          //
-          // …and then Ashlyn's next note was "still not shiny enough", which was
-          // also fair. The colour model above was right but I'd built it with no
-          // SPECULAR STRUCTURE at all, so it came out as a satin pearl. Shine is
-          // not brightness — it's RANGE and EDGE. A glossy surface has a hard
-          // bright reflection, a dark band pressed right up against it, a second
-          // smaller catch further along, and a lit rim where the surface turns
-          // away. This version keeps every colour decision above and adds all
-          // four, with the bright core tinted rather than white so it stays a
-          // coloured shine.
-          //
-          // Still deliberately blur-free — every soft edge here is a gradient
-          // shader, which the GPU does for almost nothing.
-          final Color c = baseColor ?? const Color(0xFFBBD9EA);
-          // With no base colour the nail is wearing ARTWORK (a glitter, ombré,
-          // pattern or the customer's own photo) rather than a flat colour. The
-          // wash below is an opaque fill, so at full strength it would erase
-          // that artwork completely; over artwork it's laid on as a translucent
-          // pearl instead, letting the design read through it. On a solid colour
-          // (the normal chrome pick) nothing changes.
+          // So the reflection is not painted here at all. It is baked by
+          // `tools/bake_chrome_maps.py` from a model of the nail's curvature
+          // and a small analytic studio, then composited over the nail's own
+          // colour in three passes. See [ChromeMaps] for what each map holds.
+          final Color c = baseColor ?? const Color(0xFFC4CBD4);
+          // No base colour means the nail is wearing ARTWORK (a glitter, an
+          // ombré, a pattern, the customer's own photo). Chrome is an opaque
+          // metal, so at full strength it would erase that artwork completely;
+          // over artwork the whole stack is composited at partial opacity
+          // instead, so the design still reads through the metal. On a solid
+          // colour — the normal chrome pick — nothing changes.
           final double fill = baseColor == null ? 0.55 : 1.0;
-          final HSVColor hsv = HSVColor.fromColor(c);
 
-          /// One shimmer tone: the base colour rolled [deg] around the hue
-          /// wheel, its saturation scaled by [satMul] and its brightness lifted
-          /// [lift] of the way to full. The saturation floor matters — a silver
-          /// or a black has almost no hue to roll, and without it they'd shimmer
-          /// in flat grey; the floor gives them the faint rainbow that real
-          /// chrome powder throws on a neutral base.
-          Color irid(double deg, double satMul, double lift) => HSVColor.fromAHSV(
-                fill,
-                (hsv.hue + deg + 360) % 360,
-                math.max(hsv.saturation * satMul, 0.10 * satMul + 0.02)
-                    .clamp(0.0, 1.0),
-                (hsv.value + (1 - hsv.value) * lift).clamp(0.0, 1.0),
-              ).toColor();
+          if (!ChromeMaps.ready) {
+            _chromeFallback(canvas, size, rect, c, fill);
+            break;
+          }
 
-          // The base, deepened and slightly richer. This is the DARK end of the
-          // range, and the range is what makes the finish read as glossy — a
-          // bright streak with nothing dark near it just looks like a pale
-          // smudge. It's the nail's own colour taken down, not black, so the
-          // depth arrives without the whole thing turning muddy.
-          final Color deep = HSVColor.fromAHSV(
-                  fill,
-                  hsv.hue,
-                  math.min(hsv.saturation * 1.12, 1.0),
-                  // Pale colours need proportionally MORE of a drop than dark
-                  // ones. A flat multiplier left the pastels with almost no
-                  // shadow, so their streak had nothing to shine against and
-                  // they were the only shades that still looked satin.
-                  (hsv.value * (0.74 - 0.16 * hsv.value)).clamp(0, 1))
-              .toColor();
-          final Color body = irid(0, 0.95, 0.04); // the nail's own colour
-          // The shimmer tones are blended BACK toward the base before they're
-          // used. Straight hue shifts turned a maroon olive and a gold green —
-          // a full rainbow, which is not what the reference is. On a real
-          // chrome nail the base colour still dominates and the shifts are
-          // accents playing over the top of it, so each one is mixed to taste.
-          Color acc(Color x, double t) => Color.lerp(body, x, t)!;
-          final Color cool = acc(irid(-40, 0.55, 0.28), 0.55); // shifts one way…
-          final Color violet = acc(irid(52, 0.55, 0.36), 0.55); // …and the other
-          final Color pink = acc(irid(86, 0.46, 0.44), 0.32); // the far shift
-          // The highlight tone. Its hue is kept CLOSE to the base on purpose: rolled
-          // far around the wheel it stopped being a highlight and became a
-          // second colour — a cream-gold stripe down a red nail that read as a
-          // cat-eye rather than a shine.
-          final Color pearl = acc(irid(26, 0.22, 0.88), 0.90); // pale, not white
-          // The specular core. It IS nearly white — a reflection of a light
-          // source is always brighter and less saturated than the surface it
-          // sits on, and refusing to paint one is what left this looking satin.
-          // It keeps a little of the pearl's tint and it's kept NARROW, so the
-          // eye still reads the shine as coloured while getting the hard bright
-          // centre that says "glossy".
-          final Color hot =
-              Color.lerp(pearl, Colors.white, 0.55)!.withValues(alpha: fill);
+          // Everything goes into its own layer. The blend modes below need the
+          // nail's colour UNDERNEATH them, and the design is painted by a
+          // sibling widget that may sit on a different compositing layer — so
+          // the base is laid down here rather than blended against whatever
+          // happens to have reached the canvas.
+          canvas.saveLayer(
+              rect, Paint()..color = Color.fromRGBO(0, 0, 0, fill));
+          canvas.drawRect(rect, Paint()..color = c);
 
-          // 1) The wash down the nail. Soft, wide stops — this is a pearl
-          //    turning through its colours, not a room being reflected, so
-          //    nothing here snaps.
-          canvas.drawRect(
+          final ui.Image mirror = ChromeMaps.mirror!;
+          final ui.Image irid = ChromeMaps.irid!;
+          final ui.Image gloss = ChromeMaps.gloss!;
+
+          // 1) The reflected room, as a tone ramp on the nail's own colour.
+          //    hardLight is the operative part: it drives the colour to black
+          //    where the reflection is dark and to white where it is blown, and
+          //    leaves it exactly as chosen in between. That is what gives each
+          //    metal its OWN darks and lights — gold down to bronze and up to
+          //    pale gold, black into black chrome — instead of one grey texture
+          //    wearing a tint.
+          canvas.drawImageRect(
+            mirror,
+            ChromeMaps.tile(mirror, variant),
             rect,
             Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(size.width * 0.30, 0),
-                Offset(size.width * 0.70, size.height),
-                [deep, body, body, violet, violet, pink, body, body, cool, deep],
-                const [
-                  0.0, 0.09, 0.20, 0.32, 0.43, 0.53, 0.63, 0.77, 0.89, 1.0,
-                ],
-              ),
+              ..blendMode = BlendMode.hardLight
+              ..filterQuality = FilterQuality.high,
           );
 
-          // 2) The second shift, running ACROSS the nail. This is the part that
-          //    makes a duochrome read as a duochrome: as the surface curves away
-          //    from you the colour travels, so the left edge of the nail is a
-          //    different colour from the right even though it's one polish.
-          canvas.drawRect(
+          // 2) The hue roll. A chrome powder shifts colour as the surface turns
+          //    away from you. The map only carries it in the MID-tones, because
+          //    a hue shift inside a blown highlight or inside a black is not a
+          //    shimmer, it is a stain.
+          canvas.drawImageRect(
+            irid,
+            ChromeMaps.tile(irid, variant),
             rect,
             Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(0, size.height * 0.5),
-                Offset(size.width, size.height * 0.5),
-                [
-                  cool.withValues(alpha: 0.32 * fill),
-                  cool.withValues(alpha: 0.06 * fill),
-                  pearl.withValues(alpha: 0.16 * fill),
-                  pink.withValues(alpha: 0.06 * fill),
-                  pink.withValues(alpha: 0.30 * fill),
-                ],
-                const [0.0, 0.24, 0.47, 0.72, 1.0],
-              ),
+              ..blendMode = BlendMode.overlay
+              ..color = const Color.fromRGBO(0, 0, 0, 0.38)
+              ..filterQuality = FilterQuality.high,
           );
 
-          // 3) The bloom: one wide, soft, TINTED highlight over the upper half.
-          //    Tinted is the whole point — pull this toward white and the finish
-          //    instantly looks like plastic with a torch shone on it.
-          canvas.drawRect(
+          // 3) The clear top coat's own reflection, ADDED over the metal. This
+          //    is the wet, glass-like layer that sits above the chrome rather
+          //    than inside it; without it the finish is a convincing metal that
+          //    nobody has put a top coat on.
+          canvas.drawImageRect(
+            gloss,
+            ChromeMaps.tile(gloss, variant),
             rect,
             Paint()
-              ..shader = ui.Gradient.radial(
-                Offset(size.width * 0.44, size.height * 0.42),
-                size.width * 0.66,
-                [
-                  pearl.withValues(alpha: 0.15 * fill),
-                  pearl.withValues(alpha: 0.05 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.45, 1.0],
-              ),
+              ..blendMode = BlendMode.plus
+              ..filterQuality = FilterQuality.high,
           );
 
-          // 4) The coloured flare. In the reference the pink/lilac shift pools
-          //    in the cuticle half of the nail rather than spreading evenly, so
-          //    it gets its own soft pool there instead of being smeared over
-          //    the whole surface.
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset(size.width * 0.58, size.height * 0.72),
-                size.width * 0.62,
-                [
-                  pink.withValues(alpha: 0.42 * fill),
-                  pink.withValues(alpha: 0.12 * fill),
-                  pink.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.5, 1.0],
-              ),
-          );
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset(size.width * 0.30, size.height * 0.62),
-                size.width * 0.45,
-                [
-                  violet.withValues(alpha: 0.32 * fill),
-                  violet.withValues(alpha: 0.0),
-                ],
-              ),
-          );
-
-          // 5) The core shadow — a soft dark band lying alongside where the
-          //    bright streak is about to go. This is the layer I'd been missing
-          //    entirely, and it does more for "shiny" than any amount of extra
-          //    white: a reflection only reads as a reflection when there's
-          //    something dark pressed up against it. Painted in the deepened
-          //    base colour rather than black, so it adds depth, not grime.
-          canvas.save();
-          canvas.translate(size.width * 0.19, size.height * 0.52);
-          canvas.rotate(-0.16);
-          canvas.scale(1.0, 4.6);
-          final double sw = size.width * 0.17;
-          canvas.drawCircle(
-            Offset.zero,
-            sw,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset.zero,
-                sw,
-                [
-                  deep.withValues(alpha: 0.52 * fill),
-                  deep.withValues(alpha: 0.26 * fill),
-                  deep.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.46, 1.0],
-              ),
-          );
           canvas.restore();
-
-          // 6) Curvature, a little firmer than the pearl version — the sides
-          //    have to turn away from the light for the rim in step 10 to have
-          //    anything to sit against.
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(0, size.height * 0.5),
-                Offset(size.width, size.height * 0.5),
-                [
-                  Colors.black.withValues(alpha: 0.24 * fill),
-                  Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.0),
-                  Colors.black.withValues(alpha: 0.28 * fill),
-                ],
-                const [0.0, 0.15, 0.82, 1.0],
-              ),
-          );
-
-          // 7) The gel top-coat streak, in three tiers. The soft coloured halo
-          //    is the shine you see; the bright band is its body; the narrow
-          //    near-white core is the actual light source. Three tiers rather
-          //    than one is the difference between a pale smear and a hard wet
-          //    reflection — the halo keeps it coloured, the core makes it shine.
-          canvas.save();
-          canvas.translate(size.width * 0.385, size.height * 0.46);
-          canvas.rotate(-0.16);
-          canvas.scale(1.0, 4.4);
-          final double gh = size.width * 0.20;
-          canvas.drawCircle(
-            Offset.zero,
-            gh,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset.zero,
-                gh,
-                [
-                  pearl.withValues(alpha: 0.52 * fill),
-                  pearl.withValues(alpha: 0.30 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.46, 1.0],
-              ),
-          );
-          canvas.restore();
-
-          canvas.save();
-          canvas.translate(size.width * 0.37, size.height * 0.46);
-          canvas.rotate(-0.16);
-          canvas.scale(1.0, 4.8);
-          final double gw = size.width * 0.105;
-          canvas.drawCircle(
-            Offset.zero,
-            gw,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset.zero,
-                gw,
-                [
-                  pearl.withValues(alpha: 0.96 * fill),
-                  pearl.withValues(alpha: 0.86 * fill),
-                  pearl.withValues(alpha: 0.30 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.40, 0.74, 1.0],
-              ),
-          );
-          canvas.restore();
-
-          canvas.save();
-          canvas.translate(size.width * 0.362, size.height * 0.44);
-          canvas.rotate(-0.16);
-          canvas.scale(1.0, 12.0);
-          final double gc = size.width * 0.042;
-          canvas.drawCircle(
-            Offset.zero,
-            gc,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset.zero,
-                gc,
-                [
-                  hot,
-                  hot.withValues(alpha: 0.85 * fill),
-                  hot.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.50, 1.0],
-              ),
-          );
-          canvas.restore();
-
-          // 8) A second, smaller catch-light down near the free edge, where the
-          //    nail curves over. Real gloss never has exactly one reflection,
-          //    and the second one is what stops the streak reading as a painted
-          //    stripe.
-          canvas.save();
-          canvas.translate(size.width * 0.66, size.height * 0.155);
-          canvas.rotate(0.72);
-          canvas.scale(1.0, 2.6);
-          final double sc = size.width * 0.085;
-          canvas.drawCircle(
-            Offset.zero,
-            sc,
-            Paint()
-              ..shader = ui.Gradient.radial(
-                Offset.zero,
-                sc,
-                [
-                  hot.withValues(alpha: 0.80 * fill),
-                  pearl.withValues(alpha: 0.42 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-                const [0.0, 0.42, 1.0],
-              ),
-          );
-          canvas.restore();
-
-          // 9) The free edge catches the light — a fine, bright line right on
-          //    the lip, tighter and brighter than before.
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.linear(
-                const Offset(0, 0),
-                Offset(0, size.height * 0.045),
-                [
-                  hot.withValues(alpha: 0.85 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-              ),
-          );
-
-          // 10) Rim light down the far side. This one is pure chrome: where the
-          //     surface rolls away from you it stops showing its own colour and
-          //     starts showing the light behind it, so a thin bright edge sits
-          //     right against the darkest part of the nail. Painted AFTER the
-          //     side shading in step 6 so it lands on top of that shadow — the
-          //     dark-then-bright jump at the very edge is the whole effect.
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(size.width, size.height * 0.5),
-                Offset(size.width * 0.885, size.height * 0.5),
-                [
-                  pearl.withValues(alpha: 0.75 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-              ),
-          );
-          // …and a much fainter one at the cuticle, where the polish rolls over
-          //    the same way.
-          canvas.drawRect(
-            rect,
-            Paint()
-              ..shader = ui.Gradient.linear(
-                Offset(0, size.height),
-                Offset(0, size.height * 0.955),
-                [
-                  pearl.withValues(alpha: 0.34 * fill),
-                  pearl.withValues(alpha: 0.0),
-                ],
-              ),
-          );
         }
         break;
 
@@ -1044,7 +788,8 @@ class _NailFinishPainter extends CustomPainter {
   bool shouldRepaint(covariant _NailFinishPainter oldDelegate) =>
       oldDelegate.shape != shape ||
       oldDelegate.finish != finish ||
-      oldDelegate.baseColor != baseColor;
+      oldDelegate.baseColor != baseColor ||
+      oldDelegate.variant != variant;
 }
 
 /// A single nail: the chosen design rendered INSIDE a natural nail-shaped
@@ -1094,6 +839,11 @@ class NailOverlay extends StatelessWidget {
   /// same light as the hand. Defaults to no adjustment.
   final AmbientLight ambient;
 
+  /// Which finger this is, 0-4. Only the chrome finish uses it, to give each
+  /// nail on the hand a slightly different view of the same reflected room —
+  /// five identical reflections read as a printed sticker, not as metal.
+  final int variant;
+
   const NailOverlay({
     super.key,
     this.image,
@@ -1106,6 +856,7 @@ class NailOverlay extends StatelessWidget {
     this.shape = NailShape.oval,
     this.finish = NailFinish.gloss,
     this.ambient = AmbientLight.neutral,
+    this.variant = 0,
   }) : assert(image != null || color != null,
             'NailOverlay needs an image or a colour to paint');
 
@@ -1205,7 +956,8 @@ class NailOverlay extends StatelessWidget {
           Opacity(opacity: finish.opacity, child: design),
           CustomPaint(
               painter:
-                  _NailFinishPainter(shape, finish, baseColor: color?.base)),
+                  _NailFinishPainter(shape, finish,
+                      baseColor: color?.base, variant: variant)),
           // The lifted French tip sits over the finish so a chrome or cat-eye
           // base still shows a clean, readable tip.
           if (liftTip)

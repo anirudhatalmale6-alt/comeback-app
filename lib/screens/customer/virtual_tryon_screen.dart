@@ -2931,6 +2931,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               angle: n.rotation,
               alignment: Alignment.center,
               child: NailOverlay(
+                  // Each finger reflects the studio from a slightly different
+                  // angle, so a chrome set does not come out as five copies of
+                  // one stamp.
+                  variant: i,
                   image: colorDesignFor(n.asset) == null
                       ? designProvider(n.asset)
                       : null,

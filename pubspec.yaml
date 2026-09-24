@@ -1,7 +1,7 @@
 name: comeback_app
 description: Come Back - Nail Salon Management App
 publish_to: 'none'
-version: 1.6.98+151
+version: 1.6.99+152
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -39,3 +39,4 @@ flutter:
     - assets/sounds/
     - assets/nail_designs/
     - assets/nail_designs/decals/
+    - assets/finishes/
