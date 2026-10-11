@@ -1,7 +1,7 @@
 name: comeback_app
 description: Come Back - Nail Salon Management App
 publish_to: 'none'
-version: 1.6.99+152
+version: 1.7.0+153
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -40,3 +40,16 @@ flutter:
     - assets/nail_designs/
     - assets/nail_designs/decals/
     - assets/finishes/
+    - assets/fonts/
+  fonts:
+    # Bundled rather than asking the device for its generic "serif". The nail
+    # book is meant to look the same on every phone, and a platform serif is
+    # whatever that OS happens to ship. SIL OFL 1.1 — licence alongside the
+    # files in assets/fonts/.
+    - family: NailBookSerif
+      fonts:
+        - asset: assets/fonts/LiberationSerif-Regular.ttf
+        - asset: assets/fonts/LiberationSerif-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/LiberationSerif-Italic.ttf
+          style: italic

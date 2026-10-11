@@ -7,7 +7,7 @@ import 'package:comeback_app/services/firestore_service.dart';
 import 'package:comeback_app/screens/customer/search_salons_screen.dart';
 import 'package:comeback_app/screens/customer/customer_profile_screen.dart';
 import 'package:comeback_app/screens/customer/my_appointments_screen.dart';
-import 'package:comeback_app/screens/customer/nail_photos_screen.dart';
+import 'package:comeback_app/screens/customer/nail_book_screen.dart';
 import 'package:comeback_app/screens/customer/favorite_salons_screen.dart';
 import 'package:comeback_app/screens/customer/customer_messages_screen.dart';
 import 'package:comeback_app/screens/customer/virtual_tryon_screen.dart';
@@ -73,7 +73,7 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
           ),
           const SearchSalonsScreen(),
           const MyAppointmentsScreen(),
-          const NailPhotosScreen(),
+          NailBookScreen(customerName: user.name),
           CustomerProfileScreen(customer: user),
         ];
 
@@ -121,10 +121,10 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
                   label: 'Bookings',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.photo_library_outlined),
+                  icon: Icon(Icons.menu_book_outlined),
                   selectedIcon:
-                      Icon(Icons.photo_library_rounded, color: Color(0xFF00897B)),
-                  label: 'My Nails',
+                      Icon(Icons.menu_book_rounded, color: Color(0xFF00897B)),
+                  label: 'Nail Book',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.person_outline_rounded),
@@ -187,7 +187,7 @@ class CustomerHomeTab extends StatelessWidget {
           ),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -250,7 +250,7 @@ class CustomerHomeTab extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Find your favourite nail salon',
+                          'Design your nails, then book them in',
                           style: TextStyle(
                             color: Colors.grey.shade500,
                             fontSize: 13,
@@ -262,55 +262,78 @@ class CustomerHomeTab extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 26),
-              _TryOnBanner(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const VirtualTryOnScreen(),
+              const SizedBox(height: 28),
+
+              // Everything on this screen is now one family of rows inside two
+              // labelled groups.
+              //
+              // It used to open with a full-width pink-and-purple gradient
+              // banner carrying a "NEW" badge, with the four real options
+              // stacked underneath as separate floating cards. That put the main
+              // thing the app does in a different visual language from
+              // everything else, and the badge dated the screen — a flag that
+              // says NEW is only true for a few weeks and then just looks
+              // untended. Grouped rows read as a considered product; a stack of
+              // differently-styled boxes reads as features added one at a time.
+              const _SectionLabel('DESIGN'),
+              const SizedBox(height: 10),
+              _MenuGroup(
+                rows: [
+                  _MenuRow(
+                    icon: Icons.auto_awesome_outlined,
+                    title: 'Virtual Nail Try-On',
+                    subtitle: 'Design a set and see it on your own hand',
+                    color: const Color(0xFFE0407A),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VirtualTryOnScreen(),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 26),
-              const _SectionLabel('QUICK ACTIONS'),
-              const SizedBox(height: 12),
-              _QuickActionCard(
-                icon: Icons.search_rounded,
-                title: 'Find a Salon',
-                subtitle: 'Search salons near you',
-                color: const Color(0xFF00897B),
-                onTap: () => onNavigate(1),
-              ),
-              const SizedBox(height: 10),
-              _QuickActionCard(
-                icon: Icons.favorite_outline_rounded,
-                title: 'Favourites',
-                subtitle: customer.favoriteSalonIds.isEmpty
-                    ? 'No favourites yet'
-                    : '${customer.favoriteSalonIds.length} saved salons',
-                color: const Color(0xFFE91E63),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const FavoriteSalonsScreen(),
+                  _MenuRow(
+                    icon: Icons.menu_book_outlined,
+                    title: 'My Nail Book',
+                    subtitle: 'Every look you have saved, in one place',
+                    color: const Color(0xFF8E5BC7),
+                    onTap: () => onNavigate(3),
                   ),
-                ),
+                ],
               ),
+              const SizedBox(height: 24),
+              const _SectionLabel('SALONS & BOOKINGS'),
               const SizedBox(height: 10),
-              _QuickActionCard(
-                icon: Icons.event_available_outlined,
-                title: 'My Appointments',
-                subtitle: 'View upcoming bookings',
-                color: const Color(0xFF3F7FD4),
-                onTap: () => onNavigate(2),
-              ),
-              const SizedBox(height: 10),
-              _QuickActionCard(
-                icon: Icons.photo_camera_outlined,
-                title: 'My Nail Photos',
-                subtitle: 'Save designs for next visit',
-                color: const Color(0xFF8E5BC7),
-                onTap: () => onNavigate(3),
+              _MenuGroup(
+                rows: [
+                  _MenuRow(
+                    icon: Icons.search_rounded,
+                    title: 'Find a Salon',
+                    subtitle: 'Search salons near you',
+                    color: const Color(0xFF00897B),
+                    onTap: () => onNavigate(1),
+                  ),
+                  _MenuRow(
+                    icon: Icons.favorite_outline_rounded,
+                    title: 'Favourites',
+                    subtitle: customer.favoriteSalonIds.isEmpty
+                        ? 'No favourites yet'
+                        : '${customer.favoriteSalonIds.length} saved salons',
+                    color: const Color(0xFFE91E63),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FavoriteSalonsScreen(),
+                      ),
+                    ),
+                  ),
+                  _MenuRow(
+                    icon: Icons.event_available_outlined,
+                    title: 'My Appointments',
+                    subtitle: 'View upcoming bookings',
+                    color: const Color(0xFF3F7FD4),
+                    onTap: () => onNavigate(2),
+                  ),
+                ],
               ),
             ],
           ),
@@ -321,7 +344,7 @@ class CustomerHomeTab extends StatelessWidget {
 }
 
 /// A quiet uppercase label above a group. Cheap, and it's what turns a stack of
-/// four cards into a section rather than a pile.
+/// rows into a section rather than a pile.
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
@@ -343,197 +366,25 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _TryOnBanner extends StatelessWidget {
-  final VoidCallback onTap;
-  const _TryOnBanner({required this.onTap});
+/// A group of [_MenuRow]s sharing one card: a hairline border and a wide, very
+/// faint shadow, with hairline dividers between the rows.
+///
+/// One card holding three rows rather than three cards holding one each. Four
+/// separate boxes down a page is what made this screen look like a list of
+/// unrelated features; a single panel with ruled rows is the shape every
+/// well-made settings or banking app uses, and it costs nothing.
+class _MenuGroup extends StatelessWidget {
+  final List<_MenuRow> rows;
+  const _MenuGroup({required this.rows});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        // A coloured glow rather than a grey drop shadow. Grey under a pink
-        // gradient always looks like dirt; the card's own colour, spread wide
-        // and faint, is what makes it sit on the page instead of on top of it.
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFEC407A).withValues(alpha: 0.20),
-            blurRadius: 26,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(22),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Ink(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFF0578A), Color(0xFF9B5DE5), Color(0xFF7048C4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Two very faint discs bleeding off the right edge. They read as
-                // light on a curved surface and stop the gradient looking like a
-                // flat swatch.
-                Positioned(
-                  right: -34,
-                  top: -46,
-                  child: _Glow(size: 130, alpha: 0.13),
-                ),
-                Positioned(
-                  right: 44,
-                  bottom: -60,
-                  child: _Glow(size: 108, alpha: 0.08),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 20, 16, 20),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.32),
-                              width: 1),
-                        ),
-                        child: const Icon(Icons.auto_awesome_outlined,
-                            color: Colors.white, size: 26),
-                      ),
-                      const SizedBox(width: 15),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    'Virtual Nail Try-On',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 17.5,
-                                      letterSpacing: 0.2,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                _NewBadge(),
-                              ],
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Try any design on your own hand',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12.5,
-                                height: 1.25,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Icon(Icons.arrow_forward_ios_rounded,
-                          color: Colors.white.withValues(alpha: 0.85),
-                          size: 15),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A soft white disc used as a decorative light bloom inside the banner.
-class _Glow extends StatelessWidget {
-  final double size;
-  final double alpha;
-  const _Glow({required this.size, required this.alpha});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: alpha),
-            Colors.white.withValues(alpha: 0),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NewBadge extends StatelessWidget {
-  const _NewBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Text(
-        'NEW',
-        style: TextStyle(
-          color: Color(0xFFE0407A),
-          fontWeight: FontWeight.w700,
-          fontSize: 9.5,
-          letterSpacing: 0.7,
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // A hairline border plus a wide, very faint shadow, instead of Material's
-    // elevation. Elevation 1 on four stacked cards is what made this screen look
-    // like a stack of grey boxes; a 1px line at 7% black reads as a card without
-    // shouting about it.
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF1F2A2A).withValues(alpha: 0.07)),
+        border:
+            Border.all(color: const Color(0xFF1F2A2A).withValues(alpha: 0.07)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1F2A2A).withValues(alpha: 0.04),
@@ -546,54 +397,94 @@ class _QuickActionCard extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          splashColor: color.withValues(alpha: 0.08),
-          highlightColor: color.withValues(alpha: 0.04),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(15, 15, 15, 15),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        color.withValues(alpha: 0.16),
-                        color.withValues(alpha: 0.06),
-                      ],
-                    ),
-                  ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15.5,
-                            letterSpacing: 0.1,
-                            color: Color(0xFF1F2A2A),
-                          )),
-                      const SizedBox(height: 3),
-                      Text(subtitle,
-                          style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 12.5)),
-                    ],
+        child: Column(
+          children: [
+            for (int i = 0; i < rows.length; i++) ...[
+              if (i > 0)
+                // Indented to clear the icon, so the rule reads as a separator
+                // between items rather than a line drawn across a box.
+                Padding(
+                  padding: const EdgeInsets.only(left: 76),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: const Color(0xFF1F2A2A).withValues(alpha: 0.06),
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios_rounded,
-                    color: Colors.grey.shade400, size: 14),
-              ],
+              rows[i],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MenuRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      splashColor: color.withValues(alpha: 0.08),
+      highlightColor: color.withValues(alpha: 0.04),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color.withValues(alpha: 0.16),
+                    color.withValues(alpha: 0.06),
+                  ],
+                ),
+              ),
+              child: Icon(icon, color: color, size: 22),
             ),
-          ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15.5,
+                        letterSpacing: 0.1,
+                        color: Color(0xFF1F2A2A),
+                      )),
+                  const SizedBox(height: 3),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.grey.shade500, fontSize: 12.5)),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.grey.shade400, size: 14),
+          ],
         ),
       ),
     );
