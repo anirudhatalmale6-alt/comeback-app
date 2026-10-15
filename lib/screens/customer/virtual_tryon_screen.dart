@@ -22,6 +22,7 @@ import 'package:comeback_app/services/hand_geometry.dart';
 import 'package:comeback_app/services/photo_enhance.dart';
 import 'package:comeback_app/services/background_removal.dart';
 import 'package:comeback_app/services/saved_colors.dart';
+import 'package:comeback_app/services/still_hand_detector.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 /// [asset] doubles as the design's identity.
@@ -553,6 +554,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // camera and lose the shot they just took).
   bool _processingCapture = false;
 
+  // Finds the hand in a photo that was taken or uploaded rather than captured
+  // through the guided camera, so those photos are fitted automatically too.
+  final StillHandDetector _stillDetector = StillHandDetector();
+  // True while that is running. Holds back the Studio starter fan, so nails do
+  // not appear in a generic fan and then jump onto the fingers a moment later.
+  bool _findingHand = false;
+  // Bumped on every new photo, so a slow detection for a photo the customer
+  // has already replaced cannot place nails on the new one.
+  int _photoGen = 0;
+
   // Design Studio: compose a look (design, colour, shape, finish) on an easy
   // preview BEFORE the photo, then "put it on your hand". _seedFan places the
   // composed design as a starter set on the next manually-chosen photo.
@@ -625,6 +636,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     _zoomCtrl.removeListener(_onZoomChanged);
     _zoomCtrl.dispose();
     _studioZoomCtrl.dispose();
+    _stillDetector.dispose();
     super.dispose();
   }
 
@@ -660,10 +672,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     if (picked == null) return;
     _resetZoom();
     final original = File(picked.path);
+    final int gen = ++_photoGen;
     setState(() {
       _photo = original;
       _photoImgSize = Size.zero;
       _pendingLandmarks = null;
+      _findingHand = StillHandDetector.supported;
       _ambient = AmbientLight.neutral;
       _nails.clear();
       _undoStack.clear();
@@ -681,12 +695,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     // Auto-enhance the photo (brighten/white-balance/sharpen) and measure its
     // light in the background; the photo swaps to the enhanced version and the
     // nails restyle once it lands. Dimensions are preserved so nothing shifts.
+    File shown = original;
+    ui.Image? decoded;
     try {
       final enhanced = await _enhancedPhotoFile(original);
       final bytes = await enhanced.readAsBytes();
-      final decoded = await decodeImageFromList(bytes);
+      decoded = await decodeImageFromList(bytes);
       final ambient = await _computeAmbient(decoded);
-      if (mounted) {
+      shown = enhanced;
+      if (mounted && gen == _photoGen) {
         setState(() {
           _photo = enhanced;
           _ambient = ambient;
@@ -694,6 +711,45 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       }
     } catch (_) {
       // Fall back to the original photo and neutral light on any failure.
+    }
+    if (!mounted || gen != _photoGen) return;
+
+    // Fit the nails to the hand in the photo.
+    //
+    // Before v1.7.1 nothing here ever looked for a hand. Only the guided
+    // camera did; a photo taken or uploaded through this route went straight
+    // to a fixed fan of nails that could not follow anyone's fingers — and
+    // _photoImgSize, which the auto-placement needs, was never even recorded
+    // for it. Now the photo goes through the same detector as the guided
+    // camera, and on success through the same _autoPlaceNails.
+    try {
+      decoded ??= await decodeImageFromList(await shown.readAsBytes());
+    } catch (_) {
+      if (mounted && gen == _photoGen) setState(() => _findingHand = false);
+      return;
+    }
+    final ui.Image img = decoded;
+    if (!mounted || gen != _photoGen) return;
+    setState(() =>
+        _photoImgSize = Size(img.width.toDouble(), img.height.toDouble()));
+    if (!StillHandDetector.supported) return;
+
+    final landmarks = await _stillDetector.detect(img);
+    if (!mounted || gen != _photoGen) return;
+    setState(() {
+      _findingHand = false;
+      if (landmarks != null) {
+        // _autoPlaceNails picks these up on the next layout, exactly as it
+        // does for the guided camera, Studio per-finger designs included.
+        _pendingLandmarks = landmarks;
+        _seedFan = false;
+        _nails.clear();
+        _currentDesign ??= kDefaultDesign;
+      }
+    });
+    if (landmarks == null) {
+      _snack("Couldn't find a hand in this photo — drag the nails onto your "
+          'fingers, or use Auto Try-On to fit them automatically.');
     }
   }
 
@@ -2698,6 +2754,7 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                   WidgetsBinding.instance
                       .addPostFrameCallback((_) => _autoPlaceNails());
                 } else if (_seedFan &&
+                    !_findingHand &&
                     _nails.isEmpty &&
                     _currentDesign != null) {
                   // Came from the Studio with a manual photo: lay the composed
@@ -2717,6 +2774,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       Center(
                         child: Image.file(_photo!, fit: BoxFit.contain),
                       ),
+                      if (_findingHand)
+                        const IgnorePointer(
+                          child: Center(child: _FindingHandPill()),
+                        ),
                       // Full-photo gesture layer, UNDER the nails. A tap on empty
                       // space deselects; a DRAG on empty space moves the selected
                       // nail — so you can drag from the side of the screen and
@@ -4549,6 +4610,40 @@ class _GhostButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown over the photo for the second or so it takes to find the hand, so the
+/// editor does not look empty or stuck while the nails are being fitted.
+class _FindingHandPill extends StatelessWidget {
+  const _FindingHandPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2.2, color: Colors.white),
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Finding your nails…',
+            style: TextStyle(
+                color: Colors.white, fontSize: 13.5, letterSpacing: 0.2),
+          ),
+        ],
       ),
     );
   }
