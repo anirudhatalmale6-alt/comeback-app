@@ -23,6 +23,7 @@ import 'package:comeback_app/services/photo_enhance.dart';
 import 'package:comeback_app/services/background_removal.dart';
 import 'package:comeback_app/services/saved_colors.dart';
 import 'package:comeback_app/services/still_hand_detector.dart';
+import 'package:comeback_app/services/finger_centering.dart';
 
 /// A design tile bundled with the app so the try-on works with no setup.
 /// [asset] doubles as the design's identity.
@@ -604,6 +605,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   // the detected hand landmarks (normalized) awaiting auto-placement.
   Size _photoImgSize = Size.zero;
   List<Offset>? _pendingLandmarks;
+  // Fingertips in _pendingLandmarks already centred on their silhouette, so
+  // computeNailPoses skips its fixed inward pull for them.
+  Set<int> _pendingCentered = const {};
 
   // The photo's measured ambient light, applied to every painted nail so they
   // sit in the same light as the hand. Reset to neutral on each new photo and
@@ -734,14 +738,16 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         _photoImgSize = Size(img.width.toDouble(), img.height.toDouble()));
     if (!StillHandDetector.supported) return;
 
-    final landmarks = await _stillDetector.detect(img);
+    final found = await _stillDetector.detect(img);
     if (!mounted || gen != _photoGen) return;
+    final landmarks = found?.landmarks;
     setState(() {
       _findingHand = false;
-      if (landmarks != null) {
+      if (found != null) {
         // _autoPlaceNails picks these up on the next layout, exactly as it
         // does for the guided camera, Studio per-finger designs included.
-        _pendingLandmarks = landmarks;
+        _pendingLandmarks = found.landmarks;
+        _pendingCentered = found.centeredTips;
         _seedFan = false;
         _nails.clear();
         _currentDesign ??= kDefaultDesign;
@@ -854,11 +860,24 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
       if (!mounted) return;
       final ambient = await _computeAmbient(decoded);
       if (!mounted) return;
+      // The guided camera's landmarks come from a live preview frame taken a
+      // moment before the photo, so they can sit a little to one side of the
+      // fingers in the photo itself. Centre each nail on the finger as it
+      // actually appears in the photo, exactly as for an uploaded one.
+      var hand = CenteredHand(result.normalizedLandmarks, const {});
+      try {
+        final frame = await StillHandDetector.shrinkForAnalysis(decoded);
+        hand = centerOnFingers(frame, result.normalizedLandmarks);
+      } catch (_) {
+        // Keep the detector's own positions.
+      }
+      if (!mounted) return;
       setState(() {
         _photo = enhanced;
         _photoImgSize =
             Size(decoded.width.toDouble(), decoded.height.toDouble());
-        _pendingLandmarks = result.normalizedLandmarks;
+        _pendingLandmarks = hand.landmarks;
+        _pendingCentered = hand.centeredTips;
         _ambient = ambient;
         _selected = null;
         _moveAllMode = false;
@@ -889,7 +908,8 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
         .map((n) =>
             Offset(n.dx * _photoImgSize.width, n.dy * _photoImgSize.height))
         .toList();
-    final poses = computeNailPoses(lmImg);
+    final poses = computeNailPoses(lmImg, centeredTips: _pendingCentered);
+    _pendingCentered = const {};
     final baseW = _boxSize.width * kNailBaseWidthFactor;
     final baseH = baseW * kNailAspectRatio;
     final shared = _currentDesign ?? kDefaultDesign;

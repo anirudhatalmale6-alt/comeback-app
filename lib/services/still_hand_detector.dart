@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
 
+import 'finger_centering.dart';
 import 'still_hand_frames.dart';
 
 /// Finds the hand in a still photo, so a photo the customer takes or uploads
@@ -46,16 +47,18 @@ class StillHandDetector {
   static bool get supported => Platform.isAndroid;
 
   /// Returns 21 landmarks normalised (0–1) to [photo] exactly as the editor
-  /// displays it, or null if no hand was found or detection is unavailable.
+  /// displays it — with each finger centred on its measured silhouette where
+  /// that could be done confidently — or null if no hand was found or
+  /// detection is unavailable.
   ///
   /// [photo] must be the decoded image the editor is showing: Flutter's decoder
   /// has already applied the photo's EXIF orientation to it, so landmarks
   /// found on it line up with what is on screen without any rotation here.
-  Future<List<Offset>?> detect(ui.Image photo) async {
+  Future<CenteredHand?> detect(ui.Image photo) async {
     if (!supported || _disposed) return null;
     StreamSubscription<List<Hand>>? sub;
     try {
-      final frame = await _shrink(photo);
+      final frame = await shrinkForAnalysis(photo);
       _plugin ??= HandLandmarkerPlugin.create(
         numHands: 2,
         minHandDetectionConfidence: 0.5,
@@ -103,7 +106,9 @@ class StillHandDetector {
         ];
         final best = largestHand(found);
         if (best >= 0) {
-          return passToPhoto(found[best], pass, frame.width, frame.height);
+          final onPhoto =
+              passToPhoto(found[best], pass, frame.width, frame.height);
+          return centerOnFingers(frame, onPhoto);
         }
       }
       return null;
@@ -123,8 +128,9 @@ class StillHandDetector {
 
   /// Draws [img] at no more than [kStillDetectMaxSide] on its longer side and
   /// reads the pixels back. Scaled uniformly, so normalised landmarks found on
-  /// the small copy are equally true of the full photo.
-  static Future<RgbaFrame> _shrink(ui.Image img) async {
+  /// the small copy are equally true of the full photo. Also used by the
+  /// guided camera's route, to centre its nails on the same pixels.
+  static Future<RgbaFrame> shrinkForAnalysis(ui.Image img) async {
     final s = math.min(
         1.0, kStillDetectMaxSide / math.max(img.width, img.height));
     final w = math.max(2, (img.width * s).round());

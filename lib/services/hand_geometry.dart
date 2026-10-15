@@ -153,7 +153,14 @@ Offset rotateNormalized(Offset p, int quarterTurnsCw) {
 
 /// Computes a [NailPose] per finger from [landmarks] (21 image-pixel points).
 /// Fingers whose joints are degenerate (too close) are skipped.
-List<NailPose> computeNailPoses(List<Offset> landmarks) {
+///
+/// [centeredTips] are fingertips whose landmarks have already been moved onto
+/// the finger's measured silhouette (see `finger_centering.dart`). Those skip
+/// the fixed inward pull below: the pull is a guess at exactly the sideways
+/// error that has now been measured, and applying both would move a centred
+/// nail back off centre.
+List<NailPose> computeNailPoses(List<Offset> landmarks,
+    {Set<int> centeredTips = const {}}) {
   assert(landmarks.length >= 21, 'expected 21 hand landmarks');
   final poses = <NailPose>[];
   for (final fj in kFingerJoints) {
@@ -187,7 +194,9 @@ List<NailPose> computeNailPoses(List<Offset> landmarks) {
     // undo MediaPipe's outward tip bias. Perpendicular-agnostic: we simply move
     // a fraction of the nail width along the direction to the neighbour tip.
     final neighborIdx = kLateralNeighborTip[fj[0]];
-    if (neighborIdx != null && neighborIdx < landmarks.length) {
+    if (neighborIdx != null &&
+        neighborIdx < landmarks.length &&
+        !centeredTips.contains(fj[0])) {
       final nb = landmarks[neighborIdx];
       final lx = nb.dx - tip.dx, ly = nb.dy - tip.dy;
       final ln = math.sqrt(lx * lx + ly * ly);
